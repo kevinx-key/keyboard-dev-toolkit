@@ -1,31 +1,31 @@
 # Keyboard Dev Toolkit
 
-> All-in-one custom keyboard design tool — from layout to PCB, entirely in your browser. Draw your layout, generate the plate, generate the PCB, and export production-ready files. Your designs never leave your computer.
+> All-in-one custom keyboard design tool that runs entirely in your browser — draw the layout, generate the plate, generate the PCB, and export the files you need to build it.
 
-**KLE-compatible · 100% client-side · zero upload, zero telemetry · free & open source**
+**KLE-compatible · 100% client-side · works offline · free & open source**
 
 ---
 
 ## What is this?
 
-Keyboard Dev Toolkit is a **keyboard design tool that runs in your browser**. Whether you're building a one-off custom keyboard for yourself or prototyping a PCB for mass production, the whole pipeline lives in one place:
+Keyboard Dev Toolkit is a keyboard design tool that runs **entirely in your browser**. Whether you're building a one-off custom keyboard for yourself or prototyping a PCB for mass production, the whole pipeline lives in one place:
 
 1. **Draw the layout** — drag-and-drop key placement like KLE, with rotated clusters, stepped/homing/decal keys and more
 2. **Generate the plate** — one-click plate geometry, exported as DXF for CNC / laser cutting
-3. **Generate the PCB** — automatic switch/stabilizer/mounting-hole placement, exported to KiCad / LCEDA for fabrication
-4. **Output firmware** — Pro edition generates QMK firmware source (keyboard.json / keymap.c / VIA) — draw it, then flash it
+3. **Generate the PCB** — automatic switch, stabilizer and mounting-hole placement, producing the design files your PCB manufacturer needs
+4. **Export a 3D model** — STEP format for case / enclosure design
 
-> Everything is computed **locally in your browser**. There is no server, no upload, no telemetry — your unreleased designs stay on your machine.
+Everything is computed locally in your browser — no server involved, fully usable offline.
 
 ## Why this tool
 
 | Pain point | How we solve it |
 |-----------|-----------------|
 | KLE only draws layouts — no structural output | Plates and PCBs are generated automatically, turning drawings into manufacturable files |
-| Fear of leaking unreleased designs | 100% client-side: zero upload, zero telemetry, works offline |
+| Reluctant to share unreleased designs | Runs 100% locally on your device — no server, fully offline |
 | High switching costs to new tools | Fully KLE-compatible — import your existing layouts and migrate with zero friction |
 | "Free" tools that are painful to use | Modern UI (Next.js / React): marquee select, drag, zoom/pan, undo/redo, context menus, 9 UI languages |
-| Fragmented file formats | Unified exports: JSON / SVG / PNG / JPG / DXF / STEP / KiCad / LCEDA / QMK |
+| Fragmented file formats | Unified exports: JSON / SVG / PNG / JPG / DXF / STEP |
 
 ## Features
 
@@ -40,14 +40,14 @@ Auto-generates plate geometry from your layout: per-key cutout size and rotation
 ![Plate editor](./docs/screenshots/plate-editor.png)
 
 ### 🔌 PCB editor
-Auto-generates the PCB: switch footprints, stabilizer cutouts, mounting holes, and matrix wiring assignment (shared `matrix-core` engine with orphan-key detection) — export to KiCad or continue in LCEDA (立创EDA) for routing and fabrication.
+Auto-generates the PCB: switch footprints, stabilizer cutouts, mounting holes, and matrix wiring assignment (shared `matrix-core` engine with orphan-key detection) — export the design files and send them to your PCB manufacturer.
 
 ![PCB editor](./docs/screenshots/pcb-editor.png)
 
 ## Who is it for?
 
 - **Custom keyboard enthusiasts** — design your own layout and get a machinable plate
-- **Keyboard makers & indie developers** — from drawing to PCB to firmware, one tool
+- **Keyboard makers & indie developers** — from drawing to PCB, one tool
 - **Small studios / startups** — fast prototyping before mass production; change the layout and the PCB follows
 - **AI & automation workflows** — fully client-side, standard JSON data format, scriptable and callable by AI tools
 
@@ -55,48 +55,77 @@ Auto-generates the PCB: switch footprints, stabilizer cutouts, mounting holes, a
 
 ### 🌐 Online (try it first)
 
-Use the hosted web version directly in your browser — no installation needed (all free features included).
+Use the hosted web version directly in your browser — no installation needed.
 
 ### 🖥️ Desktop app (coming soon)
 
-Windows installer (`.exe`) will be published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page: double-click to install, works offline, opens local files directly. Watch the Releases page for updates.
+A Windows installer (`.exe`) will be published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page: double-click to install, works offline, opens local files directly. Watch the Releases page for updates.
 
-### 🛠️ Run locally (developers)
+### 🛠️ Run it locally (step by step)
+
+This guide walks you through running the app on your own computer. Total time: about 5 minutes.
+
+**Step 1 — Install Node.js (v24 or newer)**
+
+The app requires Node.js 24+. Download the installer from [nodejs.org](https://nodejs.org) (choose the latest LTS, which is v24 or newer) and run it — accept the defaults.
+
+> On Windows, you can also use [nvm-windows](https://github.com/coreybutler/nvm-windows) or [fnm](https://github.com/Schniz/fnm) to manage Node versions.
+
+Verify the installation by opening a terminal (Command Prompt / PowerShell / Terminal) and running:
 
 ```bash
-npm install     # postinstall injects community stubs automatically
-npm run dev     # open http://localhost:3000
+node -v    # should print v24.x.x or newer
+npm -v     # should print a version number
 ```
 
-Build & test:
+**Step 2 — Get the source code**
 
 ```bash
-npm run check             # lint + typecheck + production build
-npx vitest run tests/     # unit tests (443+ cases)
+git clone https://github.com/709208969/keyboard-dev-toolkit.git
+cd keyboard-dev-toolkit
 ```
 
-## Free vs Pro
+> No Git? Install it from [git-scm.com](https://git-scm.com), or download the repository ZIP from the GitHub page and extract it.
 
-| Feature | Community (this repo / web) | Pro |
-|---------|:---:|:---:|
-| Layout editor (12 label slots, rotated clusters, stepped keys, etc.) | ✅ | ✅ |
-| Plate generation + DXF export | ✅ | ✅ |
-| PCB generation (switches / stabilizers / mounting holes) | ✅ | ✅ |
-| Export JSON / SVG / PNG / JPG | ✅ | ✅ |
-| STEP 3D model export | ✅ | ✅ |
-| **KiCad `.kicad_pcb` export** | 🔒 | ✅ |
-| **LCEDA (立创EDA) import workflow** | 🔒 | ✅ |
-| **QMK firmware source generation** (keyboard.json / keymap.c / VIA) | 🔒 | ✅ |
-| Manufacturing order pipeline (coming soon) | — | ✅ |
+**Step 3 — Install dependencies**
 
-The Community Edition is free and open source (AGPL-3.0). Pro-only modules are physical placeholders (`pro-stub/`) in this repo — real implementations are injected at build time from a private repository, so proprietary code can never leak into this repo.
+```bash
+npm install
+```
+
+This may take a few minutes on first run. The `postinstall` step automatically prepares the community modules — no extra action needed.
+
+**Step 4 — Start the app**
+
+```bash
+npm run dev
+```
+
+Wait until you see `Ready` / `Local: http://localhost:3000`, then open **http://localhost:3000** in your browser. Done!
+
+**Optional — production build**
+
+```bash
+npm run build
+npm start      # serves on http://localhost:3000
+```
+
+**Troubleshooting**
+
+| Problem | Fix |
+|---------|-----|
+| `npm install` fails or times out | If you're in China, use a mirror: `npm config set registry https://registry.npmmirror.com`, then `npm install` again |
+| Error about Node version (`engine node` mismatch) | Install Node 24+ (Step 1) — check with `node -v` |
+| Port 3000 already in use | Run `npm run dev -- -p 3001` and open http://localhost:3001 |
+| Blank page after starting | Hard-refresh (Ctrl+Shift+R) or clear the browser cache |
+| Windows firewall prompt | Allow access — the app is local-only |
 
 ## Architecture (for AI & developers)
 
 - **Stack**: Next.js 16 / React 19 / TypeScript 5 / Tailwind v4 + Tauri v2 (Rust) desktop shell
 - **100% client-side**: static export, no backend, no server, works offline
 - **Data flow**: `KLE JSON / URL hash(##@@) / localStorage → parseKLE → KeyProps[] → editorReducer (undo/redo) → canvas & generators → multi-format export`
-- **matrix-core**: geometry → matrix assignment engine (with orphan-key detection), shared by PCB preview, KiCad and QMK pipelines
+- **matrix-core**: geometry → matrix assignment engine (with orphan-key detection), shared by the PCB preview and export pipelines
 - **Compatibility**: bidirectional KLE data format — paste KLE JSON or share links directly in/out
 - **Testing**: 443+ unit tests (incl. KLE round-trip snapshots) + Playwright E2E
 - **i18n**: 9 languages built in
@@ -106,11 +135,11 @@ The Community Edition is free and open source (AGPL-3.0). Pro-only modules are p
 **Q: Can I import my existing KLE layouts?**
 A: Yes. KLE JSON or URL share links import directly — no conversion needed.
 
-**Q: Is my design data safe?**
-A: Yes. The app runs 100% locally in your browser — there is no server, so your data is never uploaded.
+**Q: Does the app need an internet connection?**
+A: No. The app runs entirely in your browser on your device — no server involved, fully usable offline.
 
 **Q: Can the exported files go straight to a fab?**
-A: Plate DXF is machinable directly; for PCB, finish routing via the KiCad / LCEDA workflow and submit for fabrication.
+A: Yes. The plate DXF is machinable directly, and the PCB design files are ready to send to your PCB manufacturer.
 
 ## Contributing
 
@@ -121,16 +150,15 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 ## License & Trademark
 
 - Code: **[GNU Affero General Public License v3.0](./LICENSE)** (AGPL-3.0-only). Any derivative — including hosted services — must be released under AGPL.
-- "Keyboard Dev Toolkit", the K星 logo and wordmarks are trademarks of the K星团队. Forks must rename the product and may not present themselves as the original.
+- The project name "Keyboard Dev Toolkit" and the K星 logo belong to the K星 team. Forks and derived versions should use a different product name and must not present themselves as the original.
 - KLE format compatibility is independent of keyboard-layout-editor.com; that site is not affiliated with this project. Thanks to Ian Prest and the KLE community for the original inspiration.
 
 ---
 
 ## 中文简介
 
-键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**100% 本地运行，设计永不离开你的电脑**。
+键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**全程本地运行、可离线使用**。
 
-- 社区版（本仓库）：编辑器 + 定位板/PCB 生成 + DXF/STEP 导出，AGPL-3.0 开源
-- 专业版：KiCad / 立创EDA / QMK 固件生产级导出
-- Windows 安装版（.exe）即将在 Releases 发布，敬请关注
-- 快速上手：`npm install && npm run dev`，或直接使用在线版本
+- 画配列 → 出定位板（DXF 直接加工）→ 生成 PCB（直接交给厂家制造）→ 导出 STEP 3D 模型
+- 浏览器即可使用，无需安装；Windows 安装版（.exe）即将在 Releases 发布
+- 免费开源（AGPL-3.0），本地部署指南见上方英文部分
