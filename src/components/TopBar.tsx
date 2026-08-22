@@ -1,15 +1,29 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Keyboard, Globe, Palette, Check, ChevronDown } from "lucide-react";
+import { Keyboard, Globe, Palette, Check, ChevronDown, RefreshCw } from "lucide-react";
 import { useI18n, type Lang, LANG_LABELS } from "../lib/i18n";
 import { useTheme, THEME_LABELS, THEME_CLASSES, type Theme } from "../lib/theme";
+import { getPlatform, openExternal } from "../lib/platform-bridge";
+import UpdateDialog from "./UpdateDialog";
 
 const iconProps = { size: 13, strokeWidth: 2 } as const;
+
+const GITHUB_RELEASES_URL = "https://github.com/709208969/keyboard-dev-toolkit/releases";
 
 export default function TopBar() {
   const { lang, setLang } = useI18n();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
+  const [updateOpen, setUpdateOpen] = useState(false);
+
+  const handleUpdateClick = () => {
+    if (getPlatform() === "tauri") {
+      setUpdateOpen(true);
+    } else {
+      void openExternal(GITHUB_RELEASES_URL);
+    }
+  };
 
   return (
     <div className="kle-toolbar">
@@ -19,11 +33,21 @@ export default function TopBar() {
         Keyboard Dev Toolkit
       </span>
 
-      {/* 右侧：语言 / 主题 */}
+      {/* 右侧：更新 / 语言 / 主题 */}
       <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <span
+          className="kle-btn"
+          onClick={handleUpdateClick}
+          title={t("tip.update")}
+          style={{ cursor: "pointer" }}
+        >
+          <RefreshCw {...iconProps} /> {t("topbar.update")}
+        </span>
         <LangDropdown lang={lang} setLang={setLang} />
         <ThemeDropdown theme={theme} setTheme={setTheme} />
       </span>
+
+      <UpdateDialog open={updateOpen} onClose={() => setUpdateOpen(false)} />
     </div>
   );
 }

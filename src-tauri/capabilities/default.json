@@ -10,6 +10,8 @@
     "fs:allow-write-text-file",
     "fs:allow-home-write-recursive",
     "clipboard-manager:default",
-    "opener:default"
+    "opener:default",
+    "updater:default",
+    "process:default"
   ]
 }

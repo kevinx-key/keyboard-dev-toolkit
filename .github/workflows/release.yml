@@ -89,6 +89,10 @@ jobs:
 
       - name: Build Tauri (${{ matrix.target }})
         # beforeBuildCommand in tauri.conf.json runs npm run build automatically
+        # 设置签名密钥环境变量后，tauri CLI 会自动为安装包生成 .sig 签名文件
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
 
       - name: Upload installer artifact
@@ -121,9 +125,17 @@ jobs:
         run: |
           mkdir -p installers/
           # Only copy the actual installer files — skip AppImage exploded contents
-          find artifacts/ -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) -exec cp {} installers/ \;
+          # *.sig 为 Tauri updater 签名文件，必须与安装包一起上传
+          find artifacts/ -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" -o -name "*.sig" \) -exec cp {} installers/ \;
           echo "=== Installer files ==="
           ls -lh installers/
+
+      - name: Generate updater manifest (latest.json)
+        shell: bash
+        run: node scripts/generate-latest-json.mjs
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -149,3 +161,4 @@ jobs:
           draft: true
           files: |
             installers/**/*
+            latest.json
