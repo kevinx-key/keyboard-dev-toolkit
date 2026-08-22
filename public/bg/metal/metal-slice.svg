@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a8"/>
+      <stop offset="0.25" stop-color="#aab0b8"/>
+      <stop offset="0.5" stop-color="#98a0a8"/>
+      <stop offset="0.75" stop-color="#a6acb4"/>
+      <stop offset="1" stop-color="#959ba3"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <g stroke="#8a9098" stroke-width="0.7" opacity="0.9">
+    <path d="M0 8 L256 8 M0 24 L256 24 M0 40 L256 40 M0 56 L256 56 M0 72 L256 72 M0 88 L256 88 M0 104 L256 104 M0 120 L256 120 M0 136 L256 136 M0 152 L256 152 M0 168 L256 168 M0 184 L256 184 M0 200 L256 200 M0 216 L256 216 M0 232 L256 232 M0 248 L256 248"/>
+  </g>
+  <g stroke="#7d838b" stroke-width="0.5" opacity="0.7">
+    <path d="M0 16 L256 16 M0 32 L256 32 M0 48 L256 48 M0 64 L256 64 M0 80 L256 80 M0 96 L256 96 M0 112 L256 112 M0 128 L256 128 M0 144 L256 144 M0 160 L256 160 M0 176 L256 176 M0 192 L256 192 M0 208 L256 208 M0 224 L256 224 M0 240 L256 240"/>
+  </g>
+  <rect width="256" height="256" fill="url(#sheen)"/>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A90D9"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Keycap base -->
+  <rect x="4" y="14" width="56" height="46" rx="6" fill="url(#bg)"/>
+  <!-- Keycap top face -->
+  <rect x="6" y="4" width="52" height="14" rx="4" fill="url(#top)"/>
+  <!-- Keycap top edge highlight -->
+  <rect x="6" y="4" width="52" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
+  <!-- Keycap inner shadow -->
+  <rect x="4" y="14" width="56" height="4" rx="2" fill="rgba(0,0,0,0.1)"/>
+  <!-- Key label "K" -->
+  <text x="32" y="48" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="central">K</text>
+  <!-- Small keyboard grid hint at bottom-right -->
+  <rect x="38" y="52" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="43" y="52" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="48" y="52" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="38" y="57" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="43" y="57" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+  <rect x="48" y="57" width="4" height="4" rx="0.5" fill="rgba(255,255,255,0.3)"/>
+</svg>

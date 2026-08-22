@@ -1,0 +1,477 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generatePCB > DXF snapshot: basic 2x2 layout 1`] = `
+"0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1009
+9
+$INSBASE
+10
+0.0
+20
+0.0
+30
+0.0
+9
+$EXTMIN
+10
+0.0
+20
+0.0
+30
+0.0
+9
+$EXTMAX
+10
+1000.0
+20
+1000.0
+30
+0.0
+0
+ENDSEC
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+5
+2
+70
+2
+0
+LAYER
+5
+10
+2
+0
+70
+0
+62
+7
+6
+Continuous
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+POLYLINE
+8
+0
+66
+1
+70
+1
+40
+0.0
+41
+0.0
+0
+VERTEX
+8
+0
+10
+5.0000
+20
+-5.0000
+30
+0.0
+0
+VERTEX
+8
+0
+10
+68.1500
+20
+-5.0000
+30
+0.0
+0
+VERTEX
+8
+0
+10
+68.1500
+20
+-49.1000
+30
+0.0
+0
+VERTEX
+8
+0
+10
+5.0000
+20
+-49.1000
+30
+0.0
+0
+SEQEND
+0
+CIRCLE
+8
+0
+10
+17.5250
+20
+-17.5250
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+12.4450
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+22.6050
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+13.7150
+20
+-14.9850
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+20.0650
+20
+-12.4450
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+36.5750
+20
+-17.5250
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+31.4950
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+41.6550
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+32.7650
+20
+-14.9850
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+39.1150
+20
+-12.4450
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+27.0500
+20
+-36.5750
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+21.9700
+20
+-36.5750
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+32.1300
+20
+-36.5750
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+23.2400
+20
+-34.0350
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+29.5900
+20
+-31.4950
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+15.1500
+20
+-29.4750
+30
+0.0
+40
+1.5000
+0
+CIRCLE
+8
+0
+10
+15.1500
+20
+-44.8750
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+38.9500
+20
+-29.4750
+30
+0.0
+40
+1.5000
+0
+CIRCLE
+8
+0
+10
+38.9500
+20
+-44.8750
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+55.6250
+20
+-17.5250
+30
+0.0
+40
+2.0000
+0
+CIRCLE
+8
+0
+10
+50.5450
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+60.7050
+20
+-17.5250
+30
+0.0
+40
+0.8500
+0
+CIRCLE
+8
+0
+10
+51.8150
+20
+-14.9850
+30
+0.0
+40
+0.7500
+0
+CIRCLE
+8
+0
+10
+58.1650
+20
+-12.4450
+30
+0.0
+40
+0.7500
+0
+ENDSEC
+0
+EOF"
+`;
+
+exports[`generatePCB > SVG snapshot: basic 2x2 sunken solder layout 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
+  <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
+  <!-- FR4 base panel -->
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <!-- Copper pour area -->
+  <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
+  <!-- Holes group: white fill, transparent interior via mask -->
+  <g fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15"><circle cx="17.525" cy="17.525" r="2"/><circle cx="12.445" cy="17.525" r="0.85"/><circle cx="22.605" cy="17.525" r="0.85"/><circle cx="13.715" cy="14.985" r="0.75"/><circle cx="20.065" cy="12.445" r="0.75"/><circle cx="36.575" cy="17.525" r="2"/><circle cx="31.495" cy="17.525" r="0.85"/><circle cx="41.655" cy="17.525" r="0.85"/><circle cx="32.765" cy="14.985" r="0.75"/><circle cx="39.115" cy="12.445" r="0.75"/><circle cx="27.050" cy="36.575" r="2"/><circle cx="21.970" cy="36.575" r="0.85"/><circle cx="32.130" cy="36.575" r="0.85"/><circle cx="23.240" cy="34.035" r="0.75"/><circle cx="29.590" cy="31.495" r="0.75"/><circle cx="15.150" cy="29.475" r="1.5"/><circle cx="15.150" cy="44.875" r="2"/><circle cx="38.950" cy="29.475" r="1.5"/><circle cx="38.950" cy="44.875" r="2"/><circle cx="55.625" cy="17.525" r="2"/><circle cx="50.545" cy="17.525" r="0.85"/><circle cx="60.705" cy="17.525" r="0.85"/><circle cx="51.815" cy="14.985" r="0.75"/><circle cx="58.165" cy="12.445" r="0.75"/></g>
+</svg>"
+`;
+
+exports[`generatePCB > board dimensions snapshot 1`] = `
+{
+  "h": 44.1,
+  "kc": 4,
+  "sc": 1,
+  "w": 63.150000000000006,
+}
+`;
+
+exports[`generatePCB > needLed snapshot 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
+  <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
+  <!-- FR4 base panel -->
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <!-- Copper pour area -->
+  <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
+  <!-- Holes group: white fill, transparent interior via mask -->
+  <g fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15"><circle cx="17.525" cy="17.525" r="2"/><circle cx="12.445" cy="17.525" r="0.85"/><circle cx="22.605" cy="17.525" r="0.85"/><circle cx="13.715" cy="14.985" r="0.75"/><circle cx="20.065" cy="12.445" r="0.75"/><rect x="15.575" y="20.875" width="3.9" height="3.5" rx="0.2"/><circle cx="36.575" cy="17.525" r="2"/><circle cx="31.495" cy="17.525" r="0.85"/><circle cx="41.655" cy="17.525" r="0.85"/><circle cx="32.765" cy="14.985" r="0.75"/><circle cx="39.115" cy="12.445" r="0.75"/><rect x="34.625" y="20.875" width="3.9" height="3.5" rx="0.2"/><circle cx="27.050" cy="36.575" r="2"/><circle cx="21.970" cy="36.575" r="0.85"/><circle cx="32.130" cy="36.575" r="0.85"/><circle cx="23.240" cy="34.035" r="0.75"/><circle cx="29.590" cy="31.495" r="0.75"/><rect x="25.100" y="39.925" width="3.9" height="3.5" rx="0.2"/><circle cx="15.150" cy="29.475" r="1.5"/><circle cx="15.150" cy="44.875" r="2"/><circle cx="38.950" cy="29.475" r="1.5"/><circle cx="38.950" cy="44.875" r="2"/><circle cx="55.625" cy="17.525" r="2"/><circle cx="50.545" cy="17.525" r="0.85"/><circle cx="60.705" cy="17.525" r="0.85"/><circle cx="51.815" cy="14.985" r="0.75"/><circle cx="58.165" cy="12.445" r="0.75"/><rect x="53.675" y="20.875" width="3.9" height="3.5" rx="0.2"/></g>
+</svg>"
+`;
+
+exports[`generatePCB > socket solder type snapshot 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
+  <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
+  <!-- FR4 base panel -->
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <!-- Copper pour area -->
+  <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
+  <!-- Holes group: white fill, transparent interior via mask -->
+  <g fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15"><circle cx="17.525" cy="17.525" r="2"/><circle cx="12.445" cy="17.525" r="0.85"/><circle cx="22.605" cy="17.525" r="0.85"/><circle cx="13.715" cy="14.985" r="1.5"/><circle cx="20.065" cy="12.445" r="1.5"/><circle cx="36.575" cy="17.525" r="2"/><circle cx="31.495" cy="17.525" r="0.85"/><circle cx="41.655" cy="17.525" r="0.85"/><circle cx="32.765" cy="14.985" r="1.5"/><circle cx="39.115" cy="12.445" r="1.5"/><circle cx="27.050" cy="36.575" r="2"/><circle cx="21.970" cy="36.575" r="0.85"/><circle cx="32.130" cy="36.575" r="0.85"/><circle cx="23.240" cy="34.035" r="1.5"/><circle cx="29.590" cy="31.495" r="1.5"/><circle cx="15.150" cy="29.475" r="1.5"/><circle cx="15.150" cy="44.875" r="2"/><circle cx="38.950" cy="29.475" r="1.5"/><circle cx="38.950" cy="44.875" r="2"/><circle cx="55.625" cy="17.525" r="2"/><circle cx="50.545" cy="17.525" r="0.85"/><circle cx="60.705" cy="17.525" r="0.85"/><circle cx="51.815" cy="14.985" r="1.5"/><circle cx="58.165" cy="12.445" r="1.5"/></g>
+</svg>"
+`;
+
+exports[`generatePCB > stepped solder type snapshot 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
+  <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
+  <!-- FR4 base panel -->
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <!-- Copper pour area -->
+  <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
+  <!-- Holes group: white fill, transparent interior via mask -->
+  <g fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15"><circle cx="17.525" cy="17.525" r="1.8"/><circle cx="12.445" cy="17.525" r="0.85"/><circle cx="22.605" cy="17.525" r="0.85"/><circle cx="36.575" cy="17.525" r="1.8"/><circle cx="31.495" cy="17.525" r="0.85"/><circle cx="41.655" cy="17.525" r="0.85"/><circle cx="27.050" cy="36.575" r="1.8"/><circle cx="21.970" cy="36.575" r="0.85"/><circle cx="32.130" cy="36.575" r="0.85"/><circle cx="15.150" cy="29.475" r="1.5"/><circle cx="15.150" cy="44.875" r="2"/><circle cx="38.950" cy="29.475" r="1.5"/><circle cx="38.950" cy="44.875" r="2"/><circle cx="55.625" cy="17.525" r="1.8"/><circle cx="50.545" cy="17.525" r="0.85"/><circle cx="60.705" cy="17.525" r="0.85"/></g>
+</svg>"
+`;

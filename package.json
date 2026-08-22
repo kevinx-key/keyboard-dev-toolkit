@@ -1,0 +1,84 @@
+{
+  "name": "custom-key-pcb-tool",
+  "version": "1.0.26",
+  "private": true,
+  "description": "Keyboard Dev Toolkit — 键盘配列编辑器 + PCB/定位板自动生成工具 (KLE 兼容)",
+  "author": "K星团队",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/kevinxu93/keyboard-editor"
+  },
+  "homepage": "https://gitee.com/kevinxu93/keyboard-editor",
+  "bugs": {
+    "url": "https://gitee.com/kevinxu93/keyboard-editor/issues"
+  },
+  "keywords": [
+    "keyboard-layout-editor",
+    "custom-keyboard",
+    "pcb-design",
+    "keyboard-plate",
+    "keyboard-layout",
+    "kicad",
+    "qmk",
+    "nextjs",
+    "kle"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "postinstall": "node scripts/fetch-pro.mjs --stub",
+    "pro:fetch": "node scripts/fetch-pro.mjs",
+    "pro:stub": "node scripts/fetch-pro.mjs --stub",
+    "pro:sync-stub": "node scripts/fetch-pro.mjs --sync-stub",
+    "build": "node scripts/sync-version.mjs && next build && node scripts/obfuscate-build.mjs",
+    "build:dev": "node scripts/sync-version.mjs && next build",
+    "version:bump": "node scripts/sync-version.mjs --bump",
+    "version:sync": "node scripts/sync-version.mjs --sync-only",
+    "tag": "node -e \"const v='v'+require('./package.json').version; require('child_process').execSync('git tag '+v,{stdio:'inherit'}); console.log('Tag '+v+' created');\"",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "check:full": "npm run test && npm run check",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "node scripts/sync-version.mjs && tauri build",
+    "tauri:build:win": "node scripts/sync-version.mjs && tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:mac": "node scripts/sync-version.mjs && tauri build --target x86_64-apple-darwin",
+    "tauri:build:mac-arm": "node scripts/sync-version.mjs && tauri build --target aarch64-apple-darwin",
+    "tauri:build:linux": "node scripts/sync-version.mjs && tauri build --target x86_64-unknown-linux-gnu"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "font-awesome": "^4.7.0",
+    "lucide-react": "^1.6.0",
+    "next": "16.2.1",
+    "polygon-clipping": "^0.15.7",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "javascript-obfuscator": "^5.4.3",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  }
+}

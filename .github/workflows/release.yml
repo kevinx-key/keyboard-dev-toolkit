@@ -1,0 +1,151 @@
+name: Release (Mac/Linux)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Build & bundle Tauri desktop app ──
+  tauri-build:
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bundle: dmg
+            arch: arm64
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bundle: dmg
+            arch: x64
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bundle: appimage
+            arch: x64
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundle: nsis
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          # Only cache the release build for the current target
+          # Each platform's cache is ~200-400MB; with 4 platforms that
+          # easily exceeds GitHub Free's 500 MB Actions storage limit.
+          # By only keeping the current target, we reduce overhead.
+          key: ${{ matrix.target }}
+          cache-all-crates: false
+          cache-targets: true
+          cache-on-failure: false
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            javascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            libfuse2
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri (${{ matrix.target }})
+        # beforeBuildCommand in tauri.conf.json runs npm run build automatically
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-key-pcb-tool-${{ matrix.target }}-${{ matrix.bundle }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+            !src-tauri/target/${{ matrix.target }}/release/bundle/**/.wix*
+          retention-days: 1
+
+  # ── Create GitHub Release ──
+  create-release:
+    needs: tauri-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: custom-key-pcb-tool-*
+          merge-multiple: false
+
+      - name: Collect installer files only
+        shell: bash
+        run: |
+          mkdir -p installers/
+          # Only copy the actual installer files — skip AppImage exploded contents
+          find artifacts/ -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) -exec cp {} installers/ \;
+          echo "=== Installer files ==="
+          ls -lh installers/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Keyboard Dev Toolkit ${{ github.ref_name }}
+          body: |
+            ## Keyboard Dev Toolkit ${{ github.ref_name }}
+
+            ### 📦 Downloads
+
+            | Platform | File |
+            |----------|------|
+            | 🪟 Windows x64 | `.exe` (NSIS setup) / `.msi` |
+            | 🍎 macOS Intel | `.dmg` (x86_64) |
+            | 🍎 macOS Apple Silicon | `.dmg` (arm64) |
+            | 🐧 Linux x64 | `.AppImage` |
+
+            > ⚠️ **无代码签名说明**：本项目为开源社区项目，安装包未经数字签名。
+            >
+            > - **Windows**：SmartScreen 可能提示"未知发布者"，点"更多信息 → 仍要运行"
+            > - **macOS**：打开时提示"无法验证开发者"，请右键 → 打开，或用 `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"` 解除隔离
+            > - **Linux**：AppImage 可直接运行，无需额外操作
+          draft: true
+          files: |
+            installers/**/*

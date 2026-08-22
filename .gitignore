@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+.next/
+out/
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Claude Code local config (entire directory)
+.claude/
+
+# Local temp files
+temp/
+_backup_20260703/
+
+# Build artifacts
+dist-portable/*.exe
+dist-portable/*.zip
+
+# Temporary working documents
+LOOP_ENGINE_ALIOCR.md
+OCR_REVIEW_REPORT.md
+ocr-raw-result.json
+ocr-scan-result.json
+ocr-scan-round2.json
+ocr-scan-round3.json
+aliocr-v2.md
+
+# Generated test reports
+playwright-report/
+test-results/
+
+# Pro 私有源码（由 scripts/fetch-pro.mjs 注入；公开仓使用 pro-stub/ 占位）
+# ⚠ 这些路径永不提交——真实源码在私有仓 keyboard-editor-pro
+src/plugins/qmk-export/
+src/lib/kicad-export.ts
+src/lib/kicad-types.ts
+src/lib/lceda-export.ts
+tests/qmk-export.test.ts
+tests/kicad-export.test.ts
+/plugins/

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f2ee"/>
+      <stop offset="0.5" stop-color="#eceae4"/>
+      <stop offset="1" stop-color="#e3e0d8"/>
+    </linearGradient>
+    <linearGradient id="vein1" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0" stop-color="#cfc9bc" stop-opacity="0"/>
+      <stop offset="0.3" stop-color="#cfc9bc" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#b5ae9e" stop-opacity="0.9"/>
+      <stop offset="0.8" stop-color="#cfc9bc" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#cfc9bc" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M-10 40 C 60 20, 110 70, 180 48 C 210 38, 240 46, 266 40" stroke="url(#vein1)" stroke-width="7"/>
+    <path d="M-10 130 C 70 110, 140 150, 210 128 C 235 120, 250 126, 266 124" stroke="url(#vein1)" stroke-width="5"/>
+    <path d="M-10 210 C 60 195, 130 225, 200 205 C 225 197, 245 202, 266 200" stroke="url(#vein1)" stroke-width="9"/>
+    <path d="M40 -10 C 60 40, 30 90, 55 140 C 70 175, 45 220, 60 266" stroke="url(#vein1)" stroke-width="6"/>
+    <path d="M160 -10 C 175 50, 150 110, 170 170 C 182 210, 168 240, 178 266" stroke="url(#vein1)" stroke-width="4"/>
+  </g>
+  <g fill="#d8d3c8" opacity="0.35">
+    <circle cx="90" cy="60" r="2"/><circle cx="200" cy="170" r="2.5"/><circle cx="140" cy="250" r="2"/>
+  </g>
+</svg>
