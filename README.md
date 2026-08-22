@@ -13,7 +13,7 @@ Keyboard Dev Toolkit is a keyboard design tool that runs **entirely in your brow
 1. **Draw the layout** — drag-and-drop key placement like KLE, with rotated clusters, stepped/homing/decal keys and more
 2. **Generate the plate** — one-click plate geometry, exported as DXF for CNC / laser cutting
 3. **Generate the PCB** — automatic switch, stabilizer and mounting-hole placement, producing the design files your PCB manufacturer needs
-4. **Export a 3D model** — STEP format for case / enclosure design
+4. **Export 3D models** — production-grade STEP (STP) models of the PCB, the plate and the components on them, ready to import into any 3D software
 
 Everything is computed locally in your browser — no server involved, fully usable offline.
 
@@ -25,6 +25,7 @@ Everything is computed locally in your browser — no server involved, fully usa
 | Reluctant to share unreleased designs | Runs 100% locally on your device — no server, fully offline |
 | High switching costs to new tools | Fully KLE-compatible — import your existing layouts and migrate with zero friction |
 | "Free" tools that are painful to use | Modern UI (Next.js / React): marquee select, drag, zoom/pan, undo/redo, context menus, 9 UI languages |
+| No accurate 3D models for case design | Standard, production-grade, high-precision STEP models of the PCB and its components — no more guessing |
 | Fragmented file formats | Unified exports: JSON / SVG / PNG / JPG / DXF / STEP |
 
 ## Features
@@ -43,6 +44,12 @@ Auto-generates plate geometry from your layout: per-key cutout size and rotation
 Auto-generates the PCB: switch footprints, stabilizer cutouts, mounting holes, and matrix wiring assignment (shared `matrix-core` engine with orphan-key detection) — export the design files and send them to your PCB manufacturer.
 
 ![PCB editor](./docs/screenshots/pcb-editor.png)
+
+### 📐 Production-grade STEP models
+
+Export **standard STEP (STP) 3D models** of both the PCB itself and the components on it — switches, stabilizers, and every part your design needs, all in one file set.
+
+This matters more than it sounds: many keyboard designers get stuck at exactly this step, unable to find accurate models to import into their 3D software for case design — or worse, relying on rough approximations that silently produce wrong production files. Every model here is **standard, reliable, production-valid and high-precision**: what you see in your 3D software is what comes out of the factory, so your case, gaskets and enclosures fit the real product.
 
 ## Who is it for?
 
@@ -169,5 +176,6 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**全程本地运行、可离线使用**。
 
 - 画配列 → 出定位板（DXF 直接加工）→ 生成 PCB（直接交给厂家制造）→ 导出 STEP 3D 模型
+- **标准 STP 3D 模型**：PCB 板体与板上元器件（轴体、卫星轴等）均有高精度标准模型。很多作者卡在"拿不到准确的 3D 模型导入设计软件"这一步，或用了粗糙模型导致生产文件出错；我们的模型是标准的、可靠的生产有效模型，3D 软件里看到的与工厂实际生产出的产品一致，外壳、垫片、结构件按它设计不会偏差
 - 浏览器即可使用，无需安装；已发布 Windows / macOS / Linux 三平台安装包，见 GitHub [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases)
 - 免费开源（AGPL-3.0），本地部署指南见上方英文部分
