@@ -57,9 +57,18 @@ Auto-generates the PCB: switch footprints, stabilizer cutouts, mounting holes, a
 
 Use the hosted web version directly in your browser — no installation needed.
 
-### 🖥️ Desktop app (coming soon)
+### 🖥️ Desktop app
 
-A Windows installer (`.exe`) will be published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page: double-click to install, works offline, opens local files directly. Watch the Releases page for updates.
+Windows, macOS and Linux installers are published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page (latest: **v1.0.26**):
+
+| Platform | File |
+|----------|------|
+| 🪟 Windows x64 | `.exe` (NSIS installer) / `.msi` |
+| 🍎 macOS Intel | `.dmg` (x86_64) |
+| 🍎 macOS Apple Silicon | `.dmg` (arm64) |
+| 🐧 Linux x64 | `.AppImage` |
+
+> Note: installers are unsigned (open-source community builds). On Windows, SmartScreen may show "Unknown publisher" — click **More info → Run anyway**. On macOS, right-click → **Open** if "unverified developer" appears, or run `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`. Linux AppImage runs directly.
 
 ### 🛠️ Run it locally (step by step)
 
@@ -160,5 +169,5 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**全程本地运行、可离线使用**。
 
 - 画配列 → 出定位板（DXF 直接加工）→ 生成 PCB（直接交给厂家制造）→ 导出 STEP 3D 模型
-- 浏览器即可使用，无需安装；Windows 安装版（.exe）即将在 Releases 发布
+- 浏览器即可使用，无需安装；已发布 Windows / macOS / Linux 三平台安装包，见 GitHub [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases)
 - 免费开源（AGPL-3.0），本地部署指南见上方英文部分
