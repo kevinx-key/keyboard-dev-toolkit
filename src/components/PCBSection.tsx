@@ -59,7 +59,7 @@ const MODEL_LINKS_DEF: { labelKey: string; filename: string | null }[] = [
   { labelKey: "model.4p", filename: "4p-connector-3d.stp" },
   { labelKey: "model.mcu", filename: "mcu-3d.step" },
   { labelKey: "model.switch", filename: "switch.step" },
-  { labelKey: "model.stab", filename: null },
+  { labelKey: "model.stab", filename: "PCB-Stabilizer-Model.stp" },
 ];
 
 export default function PCBSection({
