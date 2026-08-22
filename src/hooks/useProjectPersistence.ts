@@ -87,6 +87,8 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     setPcbConfig,
   } = params;
 
+  const { t } = useI18n();
+
   // ── Project backup dialog state ─────────────────────
 
   const [projectBkDialogOpen, setProjectBkDialogOpen] = useState(false);
@@ -183,12 +185,12 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         mimeType: "application/json",
       });
       if (path) {
-        alert(`✅ 项目文件保存成功！\n文件: ${path}`);
+        alert(t("msg.projectSaved").replace("{{path}}", path));
       }
     } catch (err) {
       logger.error("handleSaveAll failed", err);
     }
-  }, [layout, plateRotations, switchRotations, stabRotations, pcbConfig]);
+  }, [layout, plateRotations, switchRotations, stabRotations, pcbConfig, t]);
 
   // ── Upload All ──────────────────────────────────────
 
@@ -199,7 +201,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
 
       const parsed = deserializeProjectFile(text);
       if (!parsed) {
-        alert("项目文件格式无效或不兼容的版本。");
+        alert(t("msg.projectInvalid"));
         return;
       }
 
@@ -215,7 +217,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         }
       } catch (e) {
         logger.error("useProjectPersistence: UploadAll KLE parse failed", e);
-        alert("KLE 布局数据解析失败。");
+        alert(t("msg.kleParseFail"));
         return;
       }
 
@@ -229,7 +231,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     } catch (err) {
       logger.error("handleUploadAll failed", err);
     }
-  }, [loadLayout, setPlateRotations, setSwitchRotations, setStabRotations, setPcbConfig]);
+  }, [loadLayout, setPlateRotations, setSwitchRotations, setStabRotations, setPcbConfig, t]);
 
   // ── Project Backup Dialog ───────────────────────────
 
@@ -247,7 +249,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     async (projectData: string) => {
       const parsed = deserializeProjectFile(projectData);
       if (!parsed) {
-        alert("备份文件格式无效。");
+        alert(t("msg.backupInvalid"));
         return;
       }
       try {
@@ -265,7 +267,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
           message: "useProjectPersistence: project backup restore parse failed",
           stack: (e as Error)?.stack,
         });
-        alert("KLE 布局数据解析失败。");
+        alert(t("msg.kleParseFail"));
         return;
       }
       setPlateRotations(parsed.plateRotations);

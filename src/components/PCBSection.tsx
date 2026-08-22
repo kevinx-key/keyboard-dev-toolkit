@@ -193,7 +193,7 @@ export default function PCBSection({
     setKicadMsg(null);
     if (!kicadExportEnabled) {
       setKicadSaving(false);
-      setKicadMsg({ ok: false, text: "🔒 导出 KiCad/立创EDA 为专业版功能。\n专业版含 KiCad / 立创EDA / QMK 固件生产级导出。" });
+      setKicadMsg({ ok: false, text: t("export.kicadProOnly") });
       return;
     }
     const name = layout.meta.name || "keyboard";
