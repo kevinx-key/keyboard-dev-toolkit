@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headed",
+        "--browser",
+        "chromium",
+        "--viewport-size",
+        "1440,900",
+        "--caps",
+        "vision"
+      ]
+    },
+    "kdt": {
+      "command": "npx",
+      "args": ["tsx", "tools/mcp-server.ts"],
+      "env": {
+        "KDT_WORKSPACE": "kdt-workspace"
+      }
+    }
+  }
+}

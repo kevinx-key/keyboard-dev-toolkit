@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ruler, Tag, Palette, Keyboard, Wrench, FileText, Image, Type, Brush, BarChart3 } from "lucide-react";
+import { Ruler, Tag, Palette, Keyboard, Wrench, FileText, Image, Type, Brush, BarChart3, Bot } from "lucide-react";
 import type { KeyProps, KLEMeta, KLELayout } from "../lib";
 import { useI18n } from "../lib/i18n";
 import { PropertiesTab } from "./toolbelt/PropertiesTab";
@@ -14,10 +14,11 @@ import { SvgTab } from "./toolbelt/SvgTab";
 import { CharsTab } from "./toolbelt/CharsTab";
 import { CssTab } from "./toolbelt/CssTab";
 import { SummaryTab } from "./toolbelt/SummaryTab";
+import { AiTab } from "./toolbelt/AiTab";
 
 type TabKey =
   | "properties" | "labels" | "colors" | "keyboard" | "tools"
-  | "rawdata" | "svg" | "chars" | "css" | "summary";
+  | "rawdata" | "svg" | "chars" | "css" | "summary" | "ai";
 
 interface TabDef {
   key: TabKey;
@@ -36,6 +37,7 @@ const ALL_TABS: TabDef[] = [
   { key: "chars", icon: <Type size={14} strokeWidth={2} />, labelKey: "tb.tab.chars" },
   { key: "css", icon: <Brush size={14} strokeWidth={2} />, labelKey: "tb.tab.css" },
   { key: "summary", icon: <BarChart3 size={14} strokeWidth={2} />, labelKey: "tb.tab.summary" },
+  { key: "ai", icon: <Bot size={14} strokeWidth={2} />, labelKey: "tb.tab.ai" },
 ];
 
 interface ToolBeltProps {
@@ -101,6 +103,9 @@ export default function ToolBelt(props: ToolBeltProps) {
         )}
         {activeTab === "summary" && (
           <SummaryTab keys={props.keys} />
+        )}
+        {activeTab === "ai" && (
+          <AiTab layout={props.layout} onSetMeta={props.onSetMeta} onLoadLayout={props.onLoadLayout} />
         )}
       </div>
     </>
