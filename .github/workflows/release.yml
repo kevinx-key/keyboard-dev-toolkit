@@ -82,20 +82,7 @@ jobs:
             librsvg2-dev \
             javascriptcoregtk-4.1-dev \
             libsoup-3.0-dev \
-            libfuse2 \
-            libocct-data-exchange-dev \
-            libocct-modeling-algorithms-dev \
-            libocct-foundation-dev
-
-      - name: Install OpenCASCADE (macOS)
-        if: matrix.os == 'macos-latest'
-        run: brew install opencascade
-
-      - name: Install OpenCASCADE (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          vcpkg install opencascade:x64-windows
-        shell: bash
+            libfuse2
 
       - name: Install npm dependencies
         run: npm ci
@@ -106,18 +93,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          # Set OCCT_ROOT based on platform
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            export OCCT_ROOT="$(brew --prefix opencascade)"
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            export OCCT_ROOT="/usr"
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            export OCCT_ROOT="C:/vcpkg/installed/x64-windows"
-          fi
-          echo "OCCT_ROOT=$OCCT_ROOT"
-          npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
-        shell: bash
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
