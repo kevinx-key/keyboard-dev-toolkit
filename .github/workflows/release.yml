@@ -92,16 +92,16 @@ jobs:
         run: |
           TGT=$(echo "${{ matrix.target }}" | tr '-' '_')
           DIR="src-tauri/target/occt-8_0_0_rev3-$TGT"
-          if [ ! -f "$DIR/include/opencascade/TopoDS_Shape.hxx" ]; then
+          if [ -f "$DIR/include/opencascade/TopoDS_Shape.hxx" ] || [ -f "$DIR/inc/TopoDS_Shape.hxx" ] || [ -f "$DIR/include/TopoDS_Shape.hxx" ]; then
+            echo "OCCT cache OK: $DIR"
+          else
             echo "OCCT cache incomplete at $DIR — re-downloading"
             rm -rf "$DIR"
             URL="https://github.com/lzpel/cadrum/releases/download/occt-8_0_0_rev3/occt-8_0_0_rev3-$TGT.tar.gz"
             curl -L --fail --retry 3 -o occt.tar.gz "$URL"
             tar -xzf occt.tar.gz -C src-tauri/target
             rm -f occt.tar.gz
-            ls -la "$DIR/include/opencascade/TopoDS_Shape.hxx"
-          else
-            echo "OCCT cache OK: $DIR"
+            find "$DIR" -name "TopoDS_Shape.hxx" | head -5
           fi
 
       - name: Build Tauri (${{ matrix.target }})
