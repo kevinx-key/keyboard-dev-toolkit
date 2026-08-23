@@ -1,6 +1,6 @@
 [package]
 name = "custom-key-pcb-tool"
-version = "1.0.28"
+version = "1.0.29"
 description = "Keyboard Dev Toolkit — 自定义键盘 PCB 设计工具 (Tauri 桌面版)"
 authors = ["K星团队"]
 license = "MIT"
