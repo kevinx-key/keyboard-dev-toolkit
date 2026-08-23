@@ -84,6 +84,10 @@ jobs:
             libsoup-3.0-dev \
             libfuse2
 
+      - name: Install OpenCASCADE (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install opencascade
+
       - name: Install npm dependencies
         run: npm ci
 
