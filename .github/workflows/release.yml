@@ -83,16 +83,15 @@ jobs:
             javascriptcoregtk-4.1-dev \
             libsoup-3.0-dev \
             libfuse2 \
-            libocct-*--dev
+            cmake \
+            libfreetype-dev \
+            libgl-dev \
+            libxmu-dev \
+            libxrender-dev
 
-      - name: Install OpenCASCADE (macOS)
+      - name: Install OpenCASCADE build deps (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install opencascade
-
-      - name: Install OpenCASCADE (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          choco install opencascade -y --no-progress
+        run: brew install cmake freetype
 
       - name: Install npm dependencies
         run: npm ci
