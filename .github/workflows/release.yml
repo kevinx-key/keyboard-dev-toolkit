@@ -87,6 +87,23 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Verify OCCT prebuilt cache (self-heal)
+        shell: bash
+        run: |
+          TGT=$(echo "${{ matrix.target }}" | tr '-' '_')
+          DIR="src-tauri/target/occt-8_0_0_rev3-$TGT"
+          if [ ! -f "$DIR/include/opencascade/TopoDS_Shape.hxx" ]; then
+            echo "OCCT cache incomplete at $DIR — re-downloading"
+            rm -rf "$DIR"
+            URL="https://github.com/lzpel/cadrum/releases/download/occt-8_0_0_rev3/occt-8_0_0_rev3-$TGT.tar.gz"
+            curl -L --fail --retry 3 -o occt.tar.gz "$URL"
+            tar -xzf occt.tar.gz -C src-tauri/target
+            rm -f occt.tar.gz
+            ls -la "$DIR/include/opencascade/TopoDS_Shape.hxx"
+          else
+            echo "OCCT cache OK: $DIR"
+          fi
+
       - name: Build Tauri (${{ matrix.target }})
         # beforeBuildCommand in tauri.conf.json runs npm run build automatically
         # 设置签名密钥环境变量后，tauri CLI 会自动为安装包生成 .sig 签名文件
