@@ -294,6 +294,42 @@ function computePCBKeyPositions(
   return { keyInfos, holeMinX, holeMinY, holeMaxX, holeMaxY, stabCount };
 }
 
+/** 由键孔位边界计算 PCB 成品板框尺寸（mm）—— 计价器与 PCB 编辑器共用的唯一板框数据源 */
+function computePCBBoundsFromExtents(
+  keys: import("./kle-types").KeyProps[],
+  config: PCBConfig, edge: number,
+  holeMinX: number, holeMinY: number, holeMaxX: number, holeMaxY: number,
+): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+  // 旋转感知边界——用于板框大小（扩大板框以覆盖旋转键的角点）
+  const bboxKu = computeLayoutBBoxInUnits(keys);
+  const boardMinX = Math.min(holeMinX, bboxKu.minX * U - edge);
+  const boardMinY = Math.min(holeMinY, bboxKu.minY * U - edge);
+  const boardMaxX = Math.max(holeMaxX, bboxKu.maxX * U + edge);
+  const boardMaxY = Math.max(holeMaxY, bboxKu.maxY * U + edge);
+  // 扩展板框以包含组件（Type-C 故意排除——伸出板边）
+  const expanded = expandPCBComponentBoundary(config, edge, boardMinX, boardMinY, boardMaxX, boardMaxY);
+  return {
+    width: expanded.maxX - expanded.minX,
+    height: expanded.maxY - expanded.minY,
+    minX: expanded.minX, minY: expanded.minY,
+    maxX: expanded.maxX, maxY: expanded.maxY,
+  };
+}
+
+/**
+ * 计算 PCB 成品板框尺寸（mm）—— 计价「从 PCB 编辑器取尺寸」的唯一数据源。
+ * 与 generatePCB 的 boardW/boardH 完全一致（含边距、旋转感知边界、组件扩展）。空配列返回 null。
+ */
+export function computePCBBounds(
+  layout: KLELayout,
+  config: PCBConfig,
+): { width: number; height: number } | null {
+  const { keys } = layout;
+  if (keys.length === 0) return null;
+  const { holeMinX, holeMinY, holeMaxX, holeMaxY } = computePCBKeyPositions(keys, config, U);
+  return computePCBBoundsFromExtents(keys, config, config.edgeDistance, holeMinX, holeMinY, holeMaxX, holeMaxY);
+}
+
 /** M3 抽取：扩展 PCB 边界以包含组件（Type-C/4P/MCU） */
 function expandPCBComponentBoundary(
   config: PCBConfig, edge: number,
@@ -377,17 +413,12 @@ export function generatePCB(
   // M3: Compute key positions via extracted helper
   const { keyInfos, holeMinX, holeMinY, holeMaxX, holeMaxY, stabCount } = computePCBKeyPositions(keys, config, U);
 
-  // 旋转感知边界——用于板框大小（扩大板框以覆盖旋转键的角点）
-  const bboxKu = computeLayoutBBoxInUnits(keys);
-  const boardMinX = Math.min(holeMinX, bboxKu.minX * U - edge);
-  const boardMinY = Math.min(holeMinY, bboxKu.minY * U - edge);
-  const boardMaxX = Math.max(holeMaxX, bboxKu.maxX * U + edge);
-  const boardMaxY = Math.max(holeMaxY, bboxKu.maxY * U + edge);
-
-  // M3: Expand board boundary to include components
-  const expanded = expandPCBComponentBoundary(config, edge, boardMinX, boardMinY, boardMaxX, boardMaxY);
-  const boardW = expanded.maxX - expanded.minX;
-  const boardH = expanded.maxY - expanded.minY;
+  // 板框尺寸（含边距/旋转感知/组件扩展）——与 computePCBBounds 同一数据源
+  const {
+    width: boardW, height: boardH,
+    minX: boardAbsMinX, minY: boardAbsMinY,
+    maxX: boardAbsMaxX, maxY: boardAbsMaxY,
+  } = computePCBBoundsFromExtents(keys, config, edge, holeMinX, holeMinY, holeMaxX, holeMaxY);
   const keyCount = keyInfos.length;
 
   // 孔位偏移基准：用非旋转边界的 minX/minY（保持键位位置不变）
@@ -954,8 +985,8 @@ export function generatePCB(
   // ── 构建 STP 3D 挤出几何数据 (绝对 mm) ──
   const stpData: StpExtrudeData = {
     boundary: [
-      [expanded.minX, -expanded.minY], [expanded.maxX, -expanded.minY],
-      [expanded.maxX, -expanded.maxY], [expanded.minX, -expanded.maxY],
+      [boardAbsMinX, -boardAbsMinY], [boardAbsMaxX, -boardAbsMinY],
+      [boardAbsMaxX, -boardAbsMaxY], [boardAbsMinX, -boardAbsMaxY],
     ],
     polyHoles: stpPolyHoles,
     circleHoles: stpCircleHoles,

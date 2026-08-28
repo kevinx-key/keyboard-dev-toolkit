@@ -10,6 +10,7 @@ import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import InteractivePlatePreview from "./InteractivePlatePreview";
+import PlatePricingSection from "./PlatePricingSection";
 
 // ─── PlateConfig extended with swillkb controls ──────────
 
@@ -353,6 +354,13 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
             {t("plate.hint")}
           </div>
         )}
+      </div>
+
+      {/* v2.6.0 定位板独立报价（跟随定位板编辑器尺寸，独立数量） */}
+      <div style={{ padding: "0 12px 12px 12px" }}>
+        <PlatePricingSection
+          plateSize={drawn && plateResult ? { width: plateResult.width, height: plateResult.height } : null}
+        />
       </div>
     </div>
   );
