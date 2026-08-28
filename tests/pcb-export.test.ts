@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { generatePCB } from '@/lib/pcb-export';
+import { generatePCB, computePCBBounds } from '@/lib/pcb-export';
 import type { PCBConfig } from '@/lib/pcb-export';
 import { DEFAULT_PROPS, DEFAULT_META } from '@/lib/kle-types';
 import type { KeyProps, KLELayout } from '@/lib/kle-types';
@@ -659,5 +659,43 @@ describe("rotatePoint", () => {
       const newDist = Math.sqrt(r.x * r.x + r.y * r.y);
       expect(newDist).toBeCloseTo(dist, 10);
     }
+  });
+});
+
+// ── computePCBBounds（计价「从 PCB 取尺寸」数据源） ──
+
+describe("computePCBBounds", () => {
+  it("与 generatePCB 输出的 boardW/boardH 完全一致", () => {
+    const pcb = generatePCB(fixtureLayout, defaultConfig);
+    const bounds = computePCBBounds(fixtureLayout, defaultConfig);
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeCloseTo(pcb.width, 6);
+    expect(bounds!.height).toBeCloseTo(pcb.height, 6);
+  });
+
+  it("edgeDistance 变化 → 板框随之变化（±2×Δ）", () => {
+    const b3 = computePCBBounds(fixtureLayout, defaultConfig)!;
+    const b6 = computePCBBounds(fixtureLayout, { ...defaultConfig, edgeDistance: 6 })!;
+    expect(b6.width - b3.width).toBeCloseTo(2 * 3, 6);
+    expect(b6.height - b3.height).toBeCloseTo(2 * 3, 6);
+  });
+
+  it("空配列 → null", () => {
+    expect(computePCBBounds(makeLayout([]), defaultConfig)).toBeNull();
+  });
+
+  it("旋转键会扩大板框（旋转感知边界）", () => {
+    const rotated = makeLayout([mk({ x: 0, y: 0, w: 6, h: 1, r: 90, rx: 3, ry: 0.5 })]);
+    const bRot = computePCBBounds(rotated, defaultConfig)!;
+    const plain = makeLayout([mk({ x: 0, y: 0, w: 6, h: 1 })]);
+    const bPlain = computePCBBounds(plain, defaultConfig)!;
+    expect(bRot.height).toBeGreaterThan(bPlain.height);
+  });
+
+  it("组件（MCU/4P）扩展板框", () => {
+    const withMcU = computePCBBounds(fixtureLayout, { ...defaultConfig, needMCU: true, mcuX: 500, mcuY: 500 })!;
+    const without = computePCBBounds(fixtureLayout, defaultConfig)!;
+    expect(withMcU.width).toBeGreaterThan(without.width);
+    expect(withMcU.height).toBeGreaterThan(without.height);
   });
 });

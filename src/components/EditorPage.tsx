@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Save, Upload, FolderOpen, Zap } from "lucide-react";
 import { useKeyboardEditor, type StepConfig } from "../hooks/useKeyboardEditor";
 import TopBar from "./TopBar";
@@ -9,6 +9,7 @@ import KeyboardCanvas from "./KeyboardCanvas";
 import ToolBelt from "./ToolBelt";
 import PlateSection from "./PlateSection";
 import PCBSection from "./PCBSection";
+import PricingSection from "./PricingSection";
 import HelpDialog from "./HelpDialog";
 import BackupDialog from "./BackupDialog";
 import ProjectBackupDialog from "./ProjectBackupDialog";
@@ -26,6 +27,7 @@ import type { KLEMeta } from "../lib/kle-types";
 import { DEFAULT_META } from "../lib/kle-types";
 import type { PlateRotationOverrides } from "../lib/plate-export";
 import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb-export";
+import { computePCBBounds } from "../lib/pcb-export";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import { useStpExport } from "../hooks/useStpExport";
 
@@ -63,6 +65,12 @@ export default function EditorPage() {
     typeCX: -1.5, typeCY: 16, fourPX: 196, fourPY: 17.5, mcuX: 91, mcuY: 62,
     typeCRot: 270, fourPRot: 270, mcuRot: 45,
   });
+
+  // PCB 成品板框尺寸（mm）——计价「从 PCB 编辑器取尺寸」的唯一数据源
+  const pcbBounds = useMemo(
+    () => computePCBBounds(state.layout, projectPcbConfig),
+    [state.layout, projectPcbConfig],
+  );
 
   // Cross-region selection sync
   const [clearNonCanvasEpoch, setClearNonCanvasEpoch] = useState(0);
@@ -354,6 +362,9 @@ export default function EditorPage() {
           onClearCanvasSelection={editor.clearSelection}
           clearNonCanvasEpoch={clearNonCanvasEpoch}
         />
+
+        {/* ═══ Pricing Section ═══ */}
+        <PricingSection layout={state.layout} rgbEnabled={projectPcbConfig.needLed} pcbSize={pcbBounds} />
 
         {/* ═══ Footer Actions ═══ */}
         <div style={{
