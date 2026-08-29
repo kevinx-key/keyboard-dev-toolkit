@@ -551,6 +551,35 @@ describe("v2.6.0 定位板独立报价（calculatePlateQuote）", () => {
   it("无材质配置 → null", () => {
     expect(calculatePlateQuote(rules, [], PLATE_L, PLATE_W, 10, "fr4")).toBeNull();
   });
+
+  it("v2.7.0 加工费下限：3 张×36.75=110.25 < 300 → 按 300", () => {
+    const q = calculatePlateQuote(rules, materials, PLATE_L, PLATE_W, 5, "black_core", 1, 300);
+    expect(q!.ok).toBe(true);
+    expect(q!.sheets).toBe(3);
+    expect(q!.boardCost).toBeCloseTo(3 * 36.75 + 300, 2);
+  });
+
+  it("v2.7.0 加工费超下限时按实际（不受下限影响）", () => {
+    const q = calculatePlateQuote(rules, materials, PLATE_L, PLATE_W, 100, "black_core", 1, 300);
+    expect(q!.mode).toBe("panel");
+    const expectedFee = q!.sheets * 294;
+    expect(expectedFee).toBeGreaterThan(300);
+    expect(q!.boardCost).toBeCloseTo(q!.sheets * 294 + expectedFee, 2);
+  });
+
+  it("v2.7.0 计价乘数：totalPrice = boardCost × multiplier，unitPrice = totalPrice ÷ 数量", () => {
+    const q = calculatePlateQuote(rules, materials, PLATE_L, PLATE_W, 10, "fr4", 2.5, 300);
+    expect(q!.multiplier).toBe(2.5);
+    expect(q!.totalPrice).toBeCloseTo(q!.boardCost * 2.5, 2);
+    expect(q!.unitPrice).toBeCloseTo(q!.totalPrice / q!.effectiveQty, 2);
+  });
+
+  it("v2.7.0 乘数缺省 1（向后兼容）", () => {
+    const q = calculatePlateQuote(rules, materials, PLATE_L, PLATE_W, 10, "fr4");
+    expect(q!.multiplier).toBe(1);
+    expect(q!.totalPrice).toBeCloseTo(q!.boardCost, 1);
+    expect(q!.unitPrice).toBeCloseTo(q!.boardCost / q!.effectiveQty, 1);
+  });
 });
 
 describe("v2.6.0 calculatePrice 集成 plateQuote", () => {

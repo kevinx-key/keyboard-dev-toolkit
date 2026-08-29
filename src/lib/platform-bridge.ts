@@ -276,7 +276,7 @@ export function registerProtocolHandler(): void {
 // ─── App Info ────────────────────────────────────────────────────
 
 /** 应用版本号（同步常量，用于 UI 直接展示） */
-export const APP_VERSION = "1.0.36";
+export const APP_VERSION = "1.0.37";
 
 /**
  * Get the app version string.

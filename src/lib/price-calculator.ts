@@ -89,7 +89,8 @@ export interface QuoteResult {
   plateQuote: PlateQuote | null;
 }
 
-/** v2.6.0 定位板独立报价结果（只含板材费：材质板价 + 加工费，不计终端倍率） */
+/** v2.6.0 定位板独立报价结果（独立于 PCB 总价）
+ * boardCost = 成本（材质板费 + 加工费）；v2.7.0 totalPrice = boardCost × multiplier，unitPrice = totalPrice ÷ 数量 */
 export interface PlateQuote {
   ok: boolean;
   reason?: string;
@@ -100,7 +101,13 @@ export interface PlateQuote {
   boardsPerSheet: number;
   sheets: number;
   areaSqm: number;
+  /** 成本（料板价×张数 + 加工费，加工费有下限 minProcessFee） */
   boardCost: number;
+  /** v2.7.0 计价乘数 */
+  multiplier: number;
+  /** v2.7.0 终端价 = boardCost × multiplier */
+  totalPrice: number;
+  /** v2.7.0 终端单价 = totalPrice ÷ effectiveQty */
   unitPrice: number;
 }
 
@@ -154,7 +161,8 @@ const reject = (reason: string): QuoteResult => ({
 
 /**
  * v2.6.0 定位板报价（复用 PCB 板材逻辑：大板/分料板模式、0.8 利用率、辅助边、超限检查）
- * 尺寸/数量由调用方传入 resolved 值；不参与 PCB 总价与终端倍率
+ * v2.7.0：加工费下限 minProcessFee（低于按下限）、计价乘数 multiplier（终端价 = 成本 × 乘数）
+ * 尺寸/数量由调用方传入 resolved 值；独立于 PCB 总价
  */
 export function calculatePlateQuote(
   rules: PricingConfig["panelRules"],
@@ -163,6 +171,8 @@ export function calculatePlateQuote(
   widthMm: number,
   quantity: number,
   materialKey: string,
+  multiplier = 1,
+  minProcessFee = 0,
 ): PlateQuote | null {
   if (quantity <= 0 || lengthMm <= 0 || widthMm <= 0) return null;
   const effectiveQty = Math.ceil(quantity / rules.qtyStep) * rules.qtyStep;
@@ -182,19 +192,23 @@ export function calculatePlateQuote(
     const maxDim = Math.max(lengthMm, widthMm);
     const minDim = Math.min(lengthMm, widthMm);
     if (maxDim > rules.partial.lengthMm * rules.partial.limitFactor || minDim > rules.partial.widthMm * rules.partial.limitFactor) {
-      return { ok: false, reason: PANEL_OVER_LIMIT_MSG, mode: "partial", effectiveQty, wasteQty, chargeSizeMm: { l, w }, boardsPerSheet: 0, sheets: 0, areaSqm: 0, boardCost: 0, unitPrice: 0 };
+      return { ok: false, reason: PANEL_OVER_LIMIT_MSG, mode: "partial", effectiveQty, wasteQty, chargeSizeMm: { l, w }, boardsPerSheet: 0, sheets: 0, areaSqm: 0, boardCost: 0, multiplier, totalPrice: 0, unitPrice: 0 };
     }
   }
 
   const boardsPerSheet = Math.floor(usableArea / chargeArea);
   if (boardsPerSheet <= 0) {
-    return { ok: false, reason: BOARD_TOO_LARGE_MSG, mode: isPanel ? "panel" : "partial", effectiveQty, wasteQty, chargeSizeMm: { l, w }, boardsPerSheet: 0, sheets: 0, areaSqm: 0, boardCost: 0, unitPrice: 0 };
+    return { ok: false, reason: BOARD_TOO_LARGE_MSG, mode: isPanel ? "panel" : "partial", effectiveQty, wasteQty, chargeSizeMm: { l, w }, boardsPerSheet: 0, sheets: 0, areaSqm: 0, boardCost: 0, multiplier, totalPrice: 0, unitPrice: 0 };
   }
 
   const sheets = Math.ceil(effectiveQty / boardsPerSheet);
   const unitPrice = isPanel ? material.panelPrice : material.partialPrice;
-  const boardCost = sheets * (unitPrice + sheet.processFee);
+  // v2.7.0 加工费下限：低于 minProcessFee 按下限收（如 5 张样品只有 73.5 元加工费 → 按 300）
+  const processFee = Math.max(sheets * sheet.processFee, minProcessFee);
+  const boardCost = sheets * unitPrice + processFee;
   const areaSqm = (sheets * sheet.lengthMm * sheet.widthMm) / 1e6;
+  const totalPrice = boardCost * multiplier;
+  const qtyDiv = effectiveQty > 0 ? effectiveQty : 1;
 
   return {
     ok: true,
@@ -206,7 +220,9 @@ export function calculatePlateQuote(
     sheets,
     areaSqm: round2(areaSqm),
     boardCost: round2(boardCost),
-    unitPrice: round2(effectiveQty > 0 ? boardCost / effectiveQty : 0),
+    multiplier,
+    totalPrice: round2(totalPrice),
+    unitPrice: round2(totalPrice / qtyDiv),
   };
 }
 
