@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Calculator, RefreshCw, Check, Copy, Ruler, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { Calculator, RefreshCw, Check, Copy, Ruler, AlertTriangle, ChevronDown, ChevronUp, MessageCircle, Mail } from "lucide-react";
 import type { KLELayout } from "../lib";
 import { SectionHeader } from "./toolbelt/shared/SectionHeader";
 import { useI18n } from "../lib/i18n";
@@ -619,6 +619,30 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   >
                     <Copy size={12} /> {copied ? t("pricing.copied") : t("pricing.copyQuote")}
                   </button>
+                  {/* v2.7.0 人工报价联系方式 */}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10.5, color: "var(--theme-text-muted)" }}>{t("pricing.manualQuoteContact")}</span>
+                    {cfg.contacts?.discord && (
+                      <a
+                        className="kle-btn"
+                        href={cfg.contacts.discord}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ padding: "3px 10px", fontSize: 10.5, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      >
+                        <MessageCircle size={11} /> Discord
+                      </a>
+                    )}
+                    {cfg.contacts?.email && (
+                      <a
+                        className="kle-btn"
+                        href={`mailto:${cfg.contacts.email}`}
+                        style={{ padding: "3px 10px", fontSize: 10.5, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      >
+                        <Mail size={11} /> Email
+                      </a>
+                    )}
+                  </div>
                   <div style={{ marginTop: 8, fontSize: 9.5, color: "var(--theme-text-dim)", fontFamily: "var(--theme-font-mono)", lineHeight: 1.5 }}>
                     v{info.version} · {t("pricing.updatedAt")} {info.updatedAt}
                     {info.cachedAt ? ` · ${t("pricing.fetchedAt")} ${new Date(info.cachedAt).toLocaleString("zh-CN")}` : ""}

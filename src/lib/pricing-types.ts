@@ -81,9 +81,18 @@ export const ExtrasSchema = z.object({
   tracing: z.record(z.string(), OptionItemSchema).default({}),
 });
 
-/** v2.6.0：定位板报价（独立于 PCB，材质复用 MaterialSchema 大板/料板价） */
+/** v2.6.0：定位板报价（独立于 PCB，材质复用 MaterialSchema 大板/料板价）
+ * v2.7.0：multiplier 计价乘数（终端价 = 板材费 × multiplier）、minProcessFee 加工费下限/单 */
 export const PlateQuoteSchema = z.object({
+  multiplier: z.number().min(1).default(2.5),
+  minProcessFee: z.number().min(0).default(300),
   materials: z.array(MaterialSchema).default([]),
+});
+
+/** v2.7.0：人工报价联系方式（Discord / Email 跳转链接） */
+export const ContactsSchema = z.object({
+  discord: z.string().url().optional(),
+  email: z.string().optional(),
 });
 
 export const PricingConfigSchema = z.object({
@@ -132,8 +141,10 @@ export const PricingConfigSchema = z.object({
   terminalMultiplier: z.number().min(1).default(1),
   /** v2.6.0：附加组件（小板/排线/固件/走线） */
   extras: ExtrasSchema.default({ subBoard: {}, cable: {}, firmware: {}, tracing: {} }),
-  /** v2.6.0：定位板报价配置（材质价格复用大板/料板价结构） */
-  plate: PlateQuoteSchema.default({ materials: [] }),
+  /** v2.6.0：定位板报价配置（材质价格复用大板/料板价结构；v2.7.0 乘数+加工费下限） */
+  plate: PlateQuoteSchema.default({ multiplier: 2.5, minProcessFee: 300, materials: [] }),
+  /** v2.7.0：人工报价联系方式 */
+  contacts: ContactsSchema.default({}),
   discounts: z.array(z.unknown()).default([]),
 });
 

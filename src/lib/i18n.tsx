@@ -839,6 +839,7 @@ export const DICT: Dict = {
   "pricing.plateSizeNone": { en: "not generated", zh: "未生成", "zh-TW": "未生成" },
   "pricing.plateSizeDisabledTip": { en: "Draw the plate first to enable quoting", zh: "请先在上方绘制定位板后启用报价", "zh-TW": "請先在上方繪製定位板後啟用報價" },
   "pricing.plateQtyMin": { en: "Quantity must be ≥ 5", zh: "数量必须 ≥ 5", "zh-TW": "數量必須 ≥ 5" },
+  "pricing.manualQuoteContact": { en: "Manual quote:", zh: "人工报价：", "zh-TW": "人工報價：" },
 };
 
 // ─── React Context ─────────────────────────────────────
