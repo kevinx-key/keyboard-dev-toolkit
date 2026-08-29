@@ -345,7 +345,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                           onChange={() => toggleIn("communication", key)}
                         />
                         {item.name}
-                        {item.feePerPcs ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerPcs)}/PCS</span> : ""}
                       </label>
                     ))}
                   </div>
@@ -356,9 +355,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                       <input type="checkbox" checked={form.hotswap} onChange={(e) => set("hotswap", e.target.checked)} />
                       {cfg.options.solder["hotswap"]?.name}
-                      <span style={{ color: "var(--theme-text-dim)" }}>
-                        {keyCount} 键 × {fmt(cfg.options.solder["hotswap"]?.feePerPcsPerKey ?? 0)}/PCS
-                      </span>
                     </label>
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}>
                       <input type="checkbox" checked disabled /> {cfg.options.solder["smd"]?.name}
@@ -380,7 +376,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                           onChange={(e) => set("encoderCount", Math.max(0, Math.floor(Number(e.target.value))))}
                         />
                       )}
-                      <span style={{ color: "var(--theme-text-dim)" }}>{fmt(cfg.options.encoder.feePerPcs ?? 0)}/个/PCS</span>
                     </label>
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                       <input type="checkbox" checked={form.oled} onChange={(e) => set("oled", e.target.checked)} />
@@ -435,7 +430,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                     .map(([key, item]) => (
                       <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                         <input type="checkbox" checked={form.packaging.includes(key)} onChange={() => toggleIn("packaging", key)} /> {item.name}
-                        {item.feePerPcs ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerPcs)}/PCS</span> : ""}
                       </label>
                     ))}
                 </div>
@@ -455,7 +449,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                         <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                           <input type="radio" name="pricing-subboard" checked={form.subBoard === key} onChange={() => set("subBoard", key)} />
                           {item.name}
-                          {item.feePerPcs ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerPcs)}/PCS</span> : ""}
                         </label>
                       ))}
                   </div>
@@ -483,7 +476,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                         <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: subBoardDisabled ? "not-allowed" : "pointer" }}>
                           <input type="radio" name="pricing-cable" disabled={subBoardDisabled} checked={form.cableType === key} onChange={() => set("cableType", key)} />
                           {item.name}
-                          {item.feePerPcs ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerPcs)}/PCS</span> : ""}
                         </label>
                       ))}
                   </div>
@@ -505,7 +497,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                         <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                           <input type="checkbox" checked={form.firmware.includes(key)} onChange={() => toggleIn("firmware", key)} />
                           {item.name}
-                          {item.feePerOrder ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerOrder)}/单</span> : ""}
                           {item.reject && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.manualOnly")}</span>}
                         </label>
                       ))}
@@ -518,7 +509,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                     .map(([key, item]) => (
                       <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                         <input type="radio" name="pricing-tracing" checked={form.tracing === key} onChange={() => set("tracing", key)} /> {item.name}
-                        {item.feePerOrder ? <span style={{ color: "var(--theme-text-dim)" }}>+{fmt(item.feePerOrder)}/单</span> : ""}
                       </label>
                     ))}
                   <div style={{ fontSize: 9.5, color: "var(--theme-text-dim)", marginTop: 3 }}>{t("pricing.tracingCustomTip")}</div>
@@ -575,42 +565,10 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                         <span>{quote.wasteQty} PCS</span>
                       </div>
                     )}
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{t("pricing.boardCost")}</span>
-                      <span>¥ {fmt(quote.boardCost)}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{t("pricing.processFee")}</span>
-                      <span>¥ {fmt(quote.processFee)}</span>
-                    </div>
-                    {quote.breakdown.map((b, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-muted)" }}>
-                        <span title={b.detail}>{b.name}</span>
-                        <span>+¥ {fmt(b.amount)}</span>
-                      </div>
-                    ))}
                     <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-dim)" }}>
                       <span>{t("pricing.size")}</span>
                       <span>{resolvedL} × {resolvedW} mm → {quote.chargeSizeMm.l} × {quote.chargeSizeMm.w}</span>
                     </div>
-                    {quote.terminalMultiplier !== 1 && (
-                      <>
-                        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-dim)", borderTop: "1px dashed var(--theme-border-light)", paddingTop: 6, marginTop: 2 }}>
-                          <span>{t("pricing.rawTotal")}</span>
-                          <span>¥ {fmt(quote.rawTotal)}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-muted)" }}>
-                          <span>{t("pricing.terminalMultiplier")}</span>
-                          <span>× {quote.terminalMultiplier}</span>
-                        </div>
-                        {quote.exclTotal > 0 && (
-                          <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-muted)" }}>
-                            <span title={t("pricing.exclTip")}>{t("pricing.exclTotal")}</span>
-                            <span>+¥ {fmt(quote.exclTotal)}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
                   </div>
                   <button
                     className="kle-btn"
@@ -687,11 +645,6 @@ function buildQuoteText(
     form.firmware.length > 0 ? `自定义固件: ${form.firmware.map((f) => cfg.extras.firmware[f]?.name ?? f).join(" + ")}` : "",
     tracing && tracing.name !== "圆角走线" ? `走线: ${tracing.name}` : "",
     "---",
-    `板费: ¥${quote.boardCost.toFixed(2)}`,
-    `工艺费: ¥${quote.processFee.toFixed(2)}`,
-    quote.terminalMultiplier !== 1
-      ? `成本小计: ¥${quote.rawTotal.toFixed(2)}（计入倍率 ¥${quote.baseTotal.toFixed(2)} × ${quote.terminalMultiplier}${quote.exclTotal > 0 ? ` + 不计倍率 ¥${quote.exclTotal.toFixed(2)}` : ""}）`
-      : "",
     `总价(终端报价): ¥${quote.totalPrice.toFixed(2)}`,
     `单价: ¥${quote.unitPrice.toFixed(2)} / PCS`,
     ...(quote.notice ? [`提示: ${quote.notice}`] : []),
@@ -708,7 +661,7 @@ function buildPlateText(plate: NonNullable<QuoteResult["plateQuote"]>, materialN
     "定位板报价（独立）",
     `定位板材质: ${materialName ?? ""} · 数量: ${plate.effectiveQty} PCS${plate.wasteQty > 0 ? `（含报废 ${plate.wasteQty}）` : ""}`,
     `定位板: ${plate.mode === "panel" ? "大板" : "分料板"} × ${plate.sheets} 张（每张 ${plate.boardsPerSheet} 块）`,
-    `定位板费用: ¥${plate.boardCost.toFixed(2)}`,
+    `定位板总价: ¥${plate.totalPrice.toFixed(2)}`,
     `定位板单价: ¥${plate.unitPrice.toFixed(2)} / PCS`,
   ];
 }
