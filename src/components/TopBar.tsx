@@ -69,7 +69,7 @@ function LangDropdown({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => voi
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const ALL_LANGS: Lang[] = ["en", "zh", "ko", "ja", "zh-TW", "ru", "fr", "pt", "es"];
+  const ALL_LANGS: Lang[] = ["en", "zh", "ko", "ja", "zh-HK", "ru", "fr", "pt", "es"];
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>

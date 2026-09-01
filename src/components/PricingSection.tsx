@@ -1,24 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Calculator, RefreshCw, Check, Copy, Ruler, AlertTriangle, ChevronDown, ChevronUp, MessageCircle, Mail } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Calculator, RefreshCw, Copy, Ruler, AlertTriangle, ChevronDown, ChevronUp, MessageCircle, Mail } from "lucide-react";
 import type { KLELayout } from "../lib";
 import { SectionHeader } from "./toolbelt/shared/SectionHeader";
 import { useI18n } from "../lib/i18n";
-import {
-  calculatePrice,
-  validatePricingInput,
-  type PricingFormData,
-  type QuoteResult,
-} from "../lib/price-calculator";
-import {
-  getCurrentConfig,
-  getPricingInfo,
-  checkPricingUpdate,
-  applyPricingUpdate,
-  type PricingInfo,
-  type PricingUpdateResult,
-} from "../lib/pricing-loader";
+import { LANG_CURRENCY, formatMoney, type CurrencyCode } from "../lib/currency";
+import { useFxRates } from "../lib/use-fx-rates";
+import { getMeta, requestQuote, quoteUnavailable, QuoteServiceError, type QuoteRequest, type QuoteResponse, type MetaResponse } from "../lib/quote-api";
 
 interface PricingSectionProps {
   layout: KLELayout;
@@ -28,7 +17,7 @@ interface PricingSectionProps {
   pcbSize?: { width: number; height: number } | null;
 }
 
-function defaultForm(keyCount: number): PricingFormData {
+function defaultForm(keyCount: number): QuoteRequest {
   return {
     // 尺寸 0 = 跟随 PCB 编辑器成品板框（pcbSize）；>0 为手动填写值
     lengthMm: 0,
@@ -81,37 +70,61 @@ const psec: React.CSSProperties = {
 };
 
 export default function PricingSection({ layout, rgbEnabled = false, pcbSize = null }: PricingSectionProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const currency: CurrencyCode = LANG_CURRENCY[lang];
+  const fx = useFxRates();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const cfg = useMemo(() => getCurrentConfig(), []);
   // 键数始终跟随当前配列（与 PCB 编辑器一致：排除 decal 装饰键）；不信任 form.keyCount 快照
   const keyCount = layout.keys.filter((k) => !k.d).length;
-  const [form, setForm] = useState<PricingFormData>(() => defaultForm(keyCount));
-  const [info, setInfo] = useState<PricingInfo>(() => getPricingInfo());
-  const [updateState, setUpdateState] = useState<"idle" | "checking" | "confirm" | "applying">("idle");
-  const [updateResult, setUpdateResult] = useState<PricingUpdateResult | null>(null);
+  const [form, setForm] = useState<QuoteRequest>(() => defaultForm(keyCount));
   const [copied, setCopied] = useState(false);
+  const [meta, setMeta] = useState<MetaResponse | null>(null);
+  const [metaError, setMetaError] = useState(false);
+  const [quoteState, setQuoteState] = useState<{ quoting: boolean; error: string | null; resp: QuoteResponse | null }>({
+    quoting: false,
+    error: null,
+    resp: null,
+  });
+
+  useEffect(() => {
+    getMeta()
+      .then((m) => { setMeta(m); setMetaError(false); })
+      .catch(() => { setMetaError(true); });
+  }, []);
 
   // 尺寸派生：手动填写值 >0 时用手动值，否则跟随 PCB 编辑器成品板框
   const resolvedL = form.lengthMm > 0 ? form.lengthMm : (pcbSize ? Math.round(pcbSize.width) : 0);
   const resolvedW = form.widthMm > 0 ? form.widthMm : (pcbSize ? Math.round(pcbSize.height) : 0);
 
-  const quote = useMemo<QuoteResult | null>(() => {
-    return calculatePrice(cfg, { ...form, rgb: rgbEnabled, lengthMm: resolvedL, widthMm: resolvedW, keyCount });
-  }, [cfg, form, rgbEnabled, resolvedL, resolvedW, keyCount]);
-
-  const errors = useMemo(
-    () => validatePricingInput({ ...form, lengthMm: resolvedL, widthMm: resolvedW, keyCount }),
-    [form, resolvedL, resolvedW, keyCount],
-  );
+  // 防抖 500ms 请求报价（API 端校验；未就绪返回不可用状态）
+  const serviceDownMsg = t("pricing.quoteServiceDown");
+  useEffect(() => {
+    if (!open) return;
+    if (!form.lengthMm && !form.widthMm && !pcbSize) return;
+    if (!form.quantity || form.quantity < 5) return;
+    const timer = setTimeout(() => {
+      setQuoteState((s) => ({ ...s, quoting: true, error: null }));
+      requestQuote({ ...form, rgb: rgbEnabled, lengthMm: resolvedL, widthMm: resolvedW, keyCount })
+        .then((resp) => setQuoteState({ quoting: false, error: null, resp }))
+        .catch((e: unknown) =>
+          setQuoteState({
+            quoting: false,
+            error: quoteUnavailable(e instanceof QuoteServiceError ? e.message : serviceDownMsg).reason,
+            resp: null,
+          }),
+        );
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form, rgbEnabled, resolvedL, resolvedW, keyCount, open, pcbSize, serviceDownMsg]);
 
   // v2.6.0：未选小板或板载 USB（自带 USB 无需排线）时，线长/排线类型禁用
   const subBoardDisabled = form.subBoard === "none" || form.subBoard === "onboardUsb";
 
-  const set = <K extends keyof PricingFormData>(k: K, v: PricingFormData[K]) => {
+  const set = <K extends keyof QuoteRequest>(k: K, v: QuoteRequest[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
-  };  const toggleIn = (key: "communication" | "packaging" | "firmware", value: string) => {
+  };
+  const toggleIn = (key: "communication" | "packaging" | "firmware", value: string) => {
     setForm((f) => {
       const arr = f[key];
       return {
@@ -134,25 +147,9 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
     });
   };
 
-  const handleCheckUpdate = async () => {
-    setUpdateState("checking");
-    setUpdateResult(null);
-    const r = await checkPricingUpdate();
-    setUpdateResult(r);
-    setUpdateState(r.status === "updated" ? "confirm" : "idle");
-  };
-
-  const handleApplyUpdate = async () => {
-    setUpdateState("applying");
-    const r = await applyPricingUpdate();
-    setUpdateResult(r);
-    setInfo(getPricingInfo());
-    setUpdateState("idle");
-  };
-
   const handleCopyQuote = async () => {
-    if (!quote || !quote.ok) return;
-    const text = buildQuoteText(quote, { ...form, lengthMm: resolvedL, widthMm: resolvedW, keyCount }, info, cfg);
+    if (!quoteState.resp || !quoteState.resp.ok) return;
+    const text = buildQuoteText(quoteState.resp, { ...form, lengthMm: resolvedL, widthMm: resolvedW, keyCount }, meta, currency, fx.rates.rates);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -162,8 +159,10 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
     }
   };
 
-  const fmt = (n: number) => n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const commOpts = Object.entries(cfg.options.communication).sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99));
+  const fmtMoney = (cny: number) => formatMoney(cny, currency, fx.rates.rates);
+  const commOpts = meta ? Object.entries(meta.options.communication).sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99)) : [];
+  const quote = quoteState.resp;
+  const quoteError = !meta ? (metaError ? t("pricing.quoteServiceDown") : null) : null;
 
   return (
     <div ref={panelRef} className="kle-panel" style={{
@@ -193,61 +192,17 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
           {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />} {t("pricing.generateBtn")}
         </button>
         <span style={{ fontSize: 11, color: "var(--theme-text-muted)", fontFamily: "var(--theme-font-mono)" }}>
-          {t("pricing.watermark")} v{info.version} · {t("pricing.updatedAt")} {info.updatedAt}
-          {info.cachedAt ? ` · ${t("pricing.fetchedAt")} ${new Date(info.cachedAt).toLocaleString("zh-CN")}` : ""}
-          {info.source === "bundled" ? ` · ${t("pricing.bundled")}` : ""}
+          {t("pricing.watermark")} v{meta?.version ?? "—"} · {t("pricing.updatedAt")} {meta?.updatedAt ?? "—"}
         </span>
-        <button
-          className="kle-btn"
-          onClick={handleCheckUpdate}
-          disabled={!open || updateState === "checking" || updateState === "applying"}
-          style={{ marginLeft: "auto", padding: "4px 12px", fontSize: 11, cursor: open ? "pointer" : "not-allowed", opacity: open ? 1 : 0.5 }}
-        >
-          <RefreshCw size={12} /> {updateState === "checking" ? t("pricing.checking") : t("pricing.updateBtn")}
-        </button>
       </div>
 
       {open && (
         <div style={{ padding: "10px 12px 12px 12px", display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
           {/* ── 左列：表单 ── */}
           <div style={{ flex: "1 1 420px", display: "flex", flexDirection: "column", gap: 10, minWidth: 320 }}>
-            {/* 更新结果 */}
-            {updateResult && (
-              <div className="psec" style={{ ...psec, fontSize: 11, color: "var(--theme-text)" }}>
-                {updateResult.status === "updated" && (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                      <Check size={13} style={{ color: "var(--theme-success)" }} />
-                      <b>{updateResult.message}</b>
-                    </div>
-                    {updateResult.diff && updateResult.diff.length > 0 && (
-                      <ul style={{ margin: "4px 0 8px 18px", padding: 0 }}>
-                        {updateResult.diff.map((d) => (
-                          <li key={d.path}>
-                            {d.name}: <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{d.from}</span> →{" "}
-                            <b>{d.to}</b>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {updateState === "confirm" && (
-                      <button className="kle-btn kle-btn-success" onClick={handleApplyUpdate} style={{ padding: "4px 14px", fontSize: 11, cursor: "pointer" }}>
-                        {t("pricing.confirmApply")}
-                      </button>
-                    )}
-                  </>
-                )}
-                {updateResult.status === "up_to_date" && <div>✓ {t("pricing.upToDate")}</div>}
-                {updateResult.status === "rejected" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--theme-warning)" }}>
-                    <AlertTriangle size={13} /> {updateResult.message}
-                  </div>
-                )}
-                {updateResult.status === "failed" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--theme-danger)" }}>
-                    <AlertTriangle size={13} /> {t("pricing.failed")}: {updateResult.message}
-                  </div>
-                )}
+            {quoteError && (
+              <div className="psec" style={{ ...psec, fontSize: 11, color: "var(--theme-warning)", display: "flex", alignItems: "center", gap: 6 }}>
+                <AlertTriangle size={13} /> {quoteError}
               </div>
             )}
 
@@ -265,7 +220,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   <br />
                   <input type="number" style={inputStyle} value={resolvedW || ""} min={1} max={10000} placeholder={pcbSize ? String(Math.round(pcbSize.height)) : ""} onChange={(e) => set("widthMm", Number(e.target.value))} />
                 </label>
-                <button className="kle-btn" onClick={fillFromLayout} disabled={!pcbSize} title={pcbSize ? t("pricing.autoSizeTip") : t("pricing.autoSizeDisabledTip")} style={{ padding: "4px 10px", fontSize: 11, cursor: pcbSize ? "pointer" : "not-allowed", opacity: pcbSize ? 1 : 0.5 }}>
+                <button className="kle-btn" onClick={fillFromLayout} disabled={!pcbSize} style={{ padding: "4px 10px", fontSize: 11, cursor: pcbSize ? "pointer" : "not-allowed", opacity: pcbSize ? 1 : 0.5 }}>
                   <Ruler size={12} /> {t("pricing.autoSize")}
                 </button>
                 <label style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>
@@ -277,7 +232,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   {t("pricing.material")}
                   <br />
                   <select style={{ ...selectStyle, width: 130 }} value={form.material} onChange={(e) => set("material", e.target.value)}>
-                    {cfg.materials.map((m) => (
+                    {(meta?.materials ?? []).map((m) => (
                       <option key={m.key} value={m.key}>{m.name}</option>
                     ))}
                   </select>
@@ -291,13 +246,6 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   </select>
                 </label>
               </div>
-              {errors.length > 0 && (
-                <div style={{ marginTop: 8, fontSize: 11, color: "var(--theme-danger)" }}>
-                  {errors.map((e) => (
-                    <div key={e}>⚠ {e}</div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* ② 工艺：表面处理 + 颜色 */}
@@ -307,11 +255,11 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.surfaceFinish")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {Object.entries(cfg.surfaceFinish)
-                      .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                      .map(([key, f]) => (
-                        <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                          <input type="radio" checked={form.surfaceFinish === key} onChange={() => set("surfaceFinish", key)} />
+                    {(meta?.surfaceFinish ?? [])
+                      .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                      .map((f) => (
+                        <label key={f.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                          <input type="radio" checked={form.surfaceFinish === f.key} onChange={() => set("surfaceFinish", f.key)} />
                           {f.name}
                           {f.reject && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.manualOnly")}</span>}
                         </label>
@@ -321,7 +269,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.solderColor")}</div>
                   <select style={{ ...selectStyle, width: 130 }} value={form.solderColor} onChange={(e) => set("solderColor", e.target.value)}>
-                    {cfg.solderColors.map((c) => (
+                    {(meta?.solderColors ?? []).map((c) => (
                       <option key={c.key} value={c.key}>{c.name}</option>
                     ))}
                   </select>
@@ -354,10 +302,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                       <input type="checkbox" checked={form.hotswap} onChange={(e) => set("hotswap", e.target.checked)} />
-                      {cfg.options.solder["hotswap"]?.name}
-                    </label>
-                    <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}>
-                      <input type="checkbox" checked disabled /> {cfg.options.solder["smd"]?.name}
+                      {meta?.options.solder.find((o) => o.key === "hotswap")?.name ?? "热插拔"}
                     </label>
                   </div>
                 </div>
@@ -366,7 +311,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                       <input type="checkbox" checked={form.encoderCount > 0} onChange={(e) => set("encoderCount", e.target.checked ? 1 : 0)} />
-                      {cfg.options.encoder.name}
+                      {meta?.options.encoder.name ?? "Encoder"}
                       {form.encoderCount > 0 && (
                         <input
                           type="number"
@@ -379,7 +324,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                     </label>
                     <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                       <input type="checkbox" checked={form.oled} onChange={(e) => set("oled", e.target.checked)} />
-                      {cfg.options.oled.name}
+                      {meta?.options.oled.name ?? "OLED"}
                       {form.oled && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.manualOnly")}</span>}
                     </label>
                   </div>
@@ -393,43 +338,42 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
               <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.logo")}</div>
-                  {Object.entries(cfg.options.logo)
-                    .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                    .map(([key, item]) => (
-                      <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="radio" name="pricing-logo" checked={form.logo === key} onChange={() => set("logo", key)} /> {item.name}
+                  {(meta?.options.logo ?? [])
+                    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                    .map((item) => (
+                      <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="radio" name="pricing-logo" checked={form.logo === item.key} onChange={() => set("logo", item.key)} /> {item.name}
                       </label>
                     ))}
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.protection")}</div>
-                  {Object.entries(cfg.options.protection)
-                    .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                    .map(([key, item]) => (
-                      <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="radio" name="pricing-protection" checked={form.protection === key} onChange={() => set("protection", key)} /> {item.name}
+                  {(meta?.options.protection ?? [])
+                    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                    .map((item) => (
+                      <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="radio" name="pricing-protection" checked={form.protection === item.key} onChange={() => set("protection", item.key)} /> {item.name}
                         {item.reject && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.manualOnly")}</span>}
                       </label>
                     ))}
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.test")}</div>
-                  {Object.entries(cfg.options.test)
-                    .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                    .map(([key, item]) => (
-                      <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="radio" name="pricing-test" checked={form.test === key} onChange={() => set("test", key)} /> {item.name}
+                  {(meta?.options.test ?? [])
+                    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                    .map((item) => (
+                      <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="radio" name="pricing-test" checked={form.test === item.key} onChange={() => set("test", item.key)} /> {item.name}
                       </label>
                     ))}
-                  <div style={{ fontSize: 9.5, color: "var(--theme-text-dim)", marginTop: 3 }}>{t("pricing.qcNote")}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.packaging")}</div>
-                  {Object.entries(cfg.options.packaging)
-                    .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                    .map(([key, item]) => (
-                      <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="checkbox" checked={form.packaging.includes(key)} onChange={() => toggleIn("packaging", key)} /> {item.name}
+                  {(meta?.options.packaging ?? [])
+                    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                    .map((item) => (
+                      <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="checkbox" checked={form.packaging.includes(item.key)} onChange={() => toggleIn("packaging", item.key)} /> {item.name}
                       </label>
                     ))}
                 </div>
@@ -443,16 +387,15 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.subBoard")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {Object.entries(cfg.extras.subBoard)
-                      .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                      .map(([key, item]) => (
-                        <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                          <input type="radio" name="pricing-subboard" checked={form.subBoard === key} onChange={() => set("subBoard", key)} />
+                    {(meta?.extras.subBoard ?? [])
+                      .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                      .map((item) => (
+                        <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                          <input type="radio" name="pricing-subboard" checked={form.subBoard === item.key} onChange={() => set("subBoard", item.key)} />
                           {item.name}
                         </label>
                       ))}
                   </div>
-                  <div style={{ fontSize: 9.5, color: "var(--theme-text-dim)", marginTop: 3 }}>{t("pricing.subBoardHint")}</div>
                   <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
                     <span style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>{t("pricing.cableLength")}</span>
                     <input
@@ -470,16 +413,15 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.cable")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3, opacity: subBoardDisabled ? 0.4 : 1 }}>
-                    {Object.entries(cfg.extras.cable)
-                      .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                      .map(([key, item]) => (
-                        <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: subBoardDisabled ? "not-allowed" : "pointer" }}>
-                          <input type="radio" name="pricing-cable" disabled={subBoardDisabled} checked={form.cableType === key} onChange={() => set("cableType", key)} />
+                    {(meta?.extras.cable ?? [])
+                      .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                      .map((item) => (
+                        <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: subBoardDisabled ? "not-allowed" : "pointer" }}>
+                          <input type="radio" name="pricing-cable" disabled={subBoardDisabled} checked={form.cableType === item.key} onChange={() => set("cableType", item.key)} />
                           {item.name}
                         </label>
                       ))}
                   </div>
-                  <div style={{ fontSize: 9.5, color: "var(--theme-text-dim)", marginTop: 3 }}>{t("pricing.cableHint")}</div>
                 </div>
               </div>
             </div>
@@ -491,11 +433,11 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.firmware")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {Object.entries(cfg.extras.firmware)
-                      .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                      .map(([key, item]) => (
-                        <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                          <input type="checkbox" checked={form.firmware.includes(key)} onChange={() => toggleIn("firmware", key)} />
+                    {(meta?.extras.firmware ?? [])
+                      .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                      .map((item) => (
+                        <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                          <input type="checkbox" checked={form.firmware.includes(item.key)} onChange={() => toggleIn("firmware", item.key)} />
                           {item.name}
                           {item.reject && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.manualOnly")}</span>}
                         </label>
@@ -504,14 +446,13 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginBottom: 4 }}>{t("pricing.tracing")}</div>
-                  {Object.entries(cfg.extras.tracing)
-                    .sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99))
-                    .map(([key, item]) => (
-                      <label key={key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                        <input type="radio" name="pricing-tracing" checked={form.tracing === key} onChange={() => set("tracing", key)} /> {item.name}
+                  {(meta?.extras.tracing ?? [])
+                    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                    .map((item) => (
+                      <label key={item.key} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                        <input type="radio" name="pricing-tracing" checked={form.tracing === item.key} onChange={() => set("tracing", item.key)} /> {item.name}
                       </label>
                     ))}
-                  <div style={{ fontSize: 9.5, color: "var(--theme-text-dim)", marginTop: 3 }}>{t("pricing.tracingCustomTip")}</div>
                 </div>
               </div>
             </div>
@@ -523,8 +464,27 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
               <SectionHeader>
                 <Calculator size={11} style={{ display: "inline", verticalAlign: "-1px" }} /> {t("pricing.priceCard")}
               </SectionHeader>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 10, color: "var(--theme-text-dim)", marginBottom: 6 }}>
+                <span>{t("pricing.fxStatus")}: {currency}</span>
+                <span style={{ fontFamily: "var(--theme-font-mono)" }}>
+                  {t("pricing.fxUpdated")} {fx.rates.date}
+                  {fx.status === "live" && fx.rates.source === "frankfurter" ? ` (${t("pricing.fxSource")} CBD)` : fx.status === "live" ? ` (${t("pricing.fxSource")} ER-API)` : fx.status === "cached" ? ` (${t("pricing.fxCached")})` : ` (${t("pricing.fxBundled")})`}
+                </span>
+                {fx.status === "error" && <span style={{ color: "var(--theme-warning)" }}>{t("pricing.fxError")}</span>}
+                <button
+                  className="kle-btn"
+                  onClick={() => void fx.refresh()}
+                  disabled={fx.status === "loading"}
+                  title={t("pricing.fxRefresh")}
+                  style={{ marginLeft: "auto", padding: "2px 8px", fontSize: 10, cursor: fx.status === "loading" ? "not-allowed" : "pointer", opacity: fx.status === "loading" ? 0.5 : 1 }}
+                >
+                  <RefreshCw size={11} /> {fx.status === "loading" ? t("pricing.fxLoading") : t("pricing.fxRefresh")}
+                </button>
+              </div>
               {!quote ? (
-                <div style={{ fontSize: 11, color: "var(--theme-danger)" }}>{t("pricing.invalid")}</div>
+                <div style={{ fontSize: 11, color: "var(--theme-text-muted)", padding: "8px 0" }}>
+                  {quoteState.quoting ? t("pricing.quoting") : quoteError ?? t("pricing.invalid")}
+                </div>
               ) : !quote.ok ? (
                 <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)" }}>
                   <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -544,31 +504,30 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 12, color: "var(--theme-text-muted)" }}>{t("pricing.unit")}</div>
                     <div style={{ fontSize: 30, fontWeight: 800, color: "var(--theme-primary)", lineHeight: 1.2 }}>
-                      ¥ {fmt(quote.unitPrice)} <span style={{ fontSize: 12, fontWeight: 400, color: "var(--theme-text-muted)" }}>/ PCS</span>
+                      {fmtMoney(quote.unitPrice)} <span style={{ fontSize: 12, fontWeight: 400, color: "var(--theme-text-muted)" }}>/ PCS</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--theme-text-muted)", marginTop: 1 }}>
+                      {t("pricing.unitPriceNote").replace("{deliveryQty}", String(quote.deliveryQty))}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--theme-text-muted)", marginTop: 2 }}>
-                      {t("pricing.total")}: ¥ {fmt(quote.totalPrice)}
+                      {t("pricing.total")}: {fmtMoney(quote.totalPrice)}
                     </div>
                   </div>
                   <div style={{ marginTop: 10, borderTop: "1px solid var(--theme-border-light)", paddingTop: 8, fontSize: 11, display: "flex", flexDirection: "column", gap: 4, color: "var(--theme-text)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{t("pricing.mode")}</span>
-                      <span>{quote.mode === "panel" ? t("pricing.mode.panel") : t("pricing.mode.partial")}</span>
+                      <span>{t("pricing.deliveryQty")}</span>
+                      <span>{quote.deliveryQty} PCS</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-muted)" }}>
                       <span>{t("pricing.sheets")}</span>
-                      <span>{quote.sheets} {quote.mode === "panel" ? t("pricing.mode.panel") : t("pricing.mode.partial")} ({quote.boardsPerSheet} {t("pricing.perSheet")})</span>
+                      <span>{quote.sheets} {t("pricing.sheetUnit")}</span>
                     </div>
-                    {quote.wasteQty > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-warning)" }}>
-                        <span>{t("pricing.wasteQty")}</span>
-                        <span>{quote.wasteQty} PCS</span>
+                    {quote.plate && (
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-muted)" }}>
+                        <span>{t("pricing.plate")}</span>
+                        <span>{quote.plate.ok ? `${fmtMoney(quote.plate.totalPrice ?? 0)} × ${quote.plate.deliveryQty ?? 0} PCS` : quote.plate.reason ?? ""}</span>
                       </div>
                     )}
-                    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--theme-text-dim)" }}>
-                      <span>{t("pricing.size")}</span>
-                      <span>{resolvedL} × {resolvedW} mm → {quote.chargeSizeMm.l} × {quote.chargeSizeMm.w}</span>
-                    </div>
                   </div>
                   <button
                     className="kle-btn"
@@ -580,10 +539,10 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   {/* v2.7.0 人工报价联系方式 */}
                   <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10.5, color: "var(--theme-text-muted)" }}>{t("pricing.manualQuoteContact")}</span>
-                    {cfg.contacts?.discord && (
+                    {meta?.contacts.discord && (
                       <a
                         className="kle-btn"
-                        href={cfg.contacts.discord}
+                        href={meta.contacts.discord}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ padding: "3px 10px", fontSize: 10.5, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
@@ -591,10 +550,10 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                         <MessageCircle size={11} /> Discord
                       </a>
                     )}
-                    {cfg.contacts?.email && (
+                    {meta?.contacts.email && (
                       <a
                         className="kle-btn"
-                        href={`mailto:${cfg.contacts.email}`}
+                        href={`mailto:${meta.contacts.email}`}
                         style={{ padding: "3px 10px", fontSize: 10.5, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
                       >
                         <Mail size={11} /> Email
@@ -602,9 +561,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                     )}
                   </div>
                   <div style={{ marginTop: 8, fontSize: 9.5, color: "var(--theme-text-dim)", fontFamily: "var(--theme-font-mono)", lineHeight: 1.5 }}>
-                    v{info.version} · {t("pricing.updatedAt")} {info.updatedAt}
-                    {info.cachedAt ? ` · ${t("pricing.fetchedAt")} ${new Date(info.cachedAt).toLocaleString("zh-CN")}` : ""}
-                    {info.source === "bundled" ? ` · ${t("pricing.bundled")}` : ""}
+                    v{quote.version} · {t("pricing.updatedAt")} {meta?.updatedAt ?? ""}
                   </div>
                 </>
               )}
@@ -617,51 +574,50 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
 }
 
 function buildQuoteText(
-  quote: QuoteResult,
-  form: PricingFormData,
-  info: PricingInfo,
-  cfg: ReturnType<typeof getCurrentConfig>,
+  quote: Extract<QuoteResponse, { ok: true }>,
+  form: QuoteRequest,
+  meta: MetaResponse | null,
+  currency: CurrencyCode,
+  fxRates: Record<string, number>,
 ): string {
-  const material = cfg.materials.find((m) => m.key === form.material)?.name ?? form.material;
-  const surface = cfg.surfaceFinish[form.surfaceFinish]?.name ?? form.surfaceFinish;
-  const color = cfg.solderColors.find((c) => c.key === form.solderColor)?.name ?? form.solderColor;
-  const subBoard = cfg.extras.subBoard[form.subBoard];
-  const cable = cfg.extras.cable[form.cableType];
-  const tracing = cfg.extras.tracing[form.tracing];
-  const plateMaterial = cfg.plate.materials.find((m) => m.key === form.plateMaterial);
+  const material = meta?.materials.find((m) => m.key === form.material)?.name ?? form.material;
+  const surface = meta?.surfaceFinish.find((f) => f.key === form.surfaceFinish)?.name ?? form.surfaceFinish;
+  const color = meta?.solderColors.find((c) => c.key === form.solderColor)?.name ?? form.solderColor;
+  const subBoard = meta?.extras.subBoard.find((o) => o.key === form.subBoard);
+  const cable = meta?.extras.cable.find((o) => o.key === form.cableType);
+  const tracing = meta?.extras.tracing.find((o) => o.key === form.tracing);
+  const plateMaterial = meta?.plateMaterials.find((m) => m.key === form.plateMaterial);
   const lines = [
     "Kindlestar PCBA 报价单",
-    `尺寸: ${form.lengthMm} × ${form.widthMm} mm（含辅助边: ${quote.chargeSizeMm.l} × ${quote.chargeSizeMm.w}）`,
-    `层数: 2层 · 板厚: ${form.thicknessMm}mm · 材质: ${material}`,
-    `数量: ${quote.effectiveQty} PCS${quote.wasteQty > 0 ? `（含报废 ${quote.wasteQty}）` : ""}`,
-    `板材: ${quote.mode === "panel" ? "大板" : "分料板"} × ${quote.sheets} 张（每张 ${quote.boardsPerSheet} 块）`,
+    `尺寸: ${form.lengthMm} × ${form.widthMm} mm·层数: 2层 · 板厚: ${form.thicknessMm}mm · 材质: ${material}`,
+    `交付数量: ${quote.deliveryQty} PCS`,
+    `预计用板张数: ${quote.sheets} 张`,
     `表面处理: ${surface} · 颜色: ${color}`,
-    ...form.communication.map((c) => `通信: ${cfg.options.communication[c]?.name ?? c}`),
+    ...form.communication.map((c) => `通信: ${meta?.options.communication.find((o) => o.key === c)?.name ?? c}`),
     form.hotswap ? `焊接: 热插拔 (${form.keyCount} 键)` : "",
     form.encoderCount > 0 ? `外设: 旋钮 ×${form.encoderCount}` : "",
-    `测试: ${cfg.options.test[form.test]?.name ?? form.test}`,
+    `测试: ${meta?.options.test.find((o) => o.key === form.test)?.name ?? form.test}`,
     subBoard && subBoard.name !== "无" ? `额外小板: ${subBoard.name}${form.cableLengthMm > 0 ? `（线长 ${form.cableLengthMm}mm）` : ""}` : "",
     subBoard && subBoard.name !== "无" && cable ? `排线: ${cable.name}` : "",
-    form.firmware.length > 0 ? `自定义固件: ${form.firmware.map((f) => cfg.extras.firmware[f]?.name ?? f).join(" + ")}` : "",
+    form.firmware.length > 0 ? `自定义固件: ${form.firmware.map((f) => meta?.extras.firmware.find((o) => o.key === f)?.name ?? f).join(" + ")}` : "",
     tracing && tracing.name !== "圆角走线" ? `走线: ${tracing.name}` : "",
     "---",
-    `总价(终端报价): ¥${quote.totalPrice.toFixed(2)}`,
-    `单价: ¥${quote.unitPrice.toFixed(2)} / PCS`,
+    `总价(终端报价): ${formatMoney(quote.totalPrice, currency, fxRates)}`,
+    `单价: ${formatMoney(quote.unitPrice, currency, fxRates)} / PCS（按实交 ${quote.deliveryQty} PCS 分摊）`,
     ...(quote.notice ? [`提示: ${quote.notice}`] : []),
-    ...(quote.plateQuote ? buildPlateText(quote.plateQuote, plateMaterial?.name) : []),
-    `价格版本 v${info.version} · 清单更新 ${info.updatedAt} · ${new Date().toLocaleString("zh-CN")}`,
+    ...(quote.plate ? buildPlateText(quote.plate, plateMaterial?.name, currency, fxRates) : []),
+    `价格版本 v${quote.version} · 更新于 ${meta?.updatedAt ?? ""} · ${new Date().toLocaleString("zh-CN")}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
 
-function buildPlateText(plate: NonNullable<QuoteResult["plateQuote"]>, materialName?: string): string[] {
-  if (!plate.ok) return [`定位板: 无法计价（${plate.reason}）`];
+function buildPlateText(plate: NonNullable<Extract<QuoteResponse, { ok: true }>["plate"]>, materialName: string | undefined, currency: CurrencyCode, fxRates: Record<string, number>): string[] {
+  if (!plate?.ok) return [`定位板: 无法计价（${plate?.reason ?? ""}）`];
   return [
     "---",
     "定位板报价（独立）",
-    `定位板材质: ${materialName ?? ""} · 数量: ${plate.effectiveQty} PCS${plate.wasteQty > 0 ? `（含报废 ${plate.wasteQty}）` : ""}`,
-    `定位板: ${plate.mode === "panel" ? "大板" : "分料板"} × ${plate.sheets} 张（每张 ${plate.boardsPerSheet} 块）`,
-    `定位板总价: ¥${plate.totalPrice.toFixed(2)}`,
-    `定位板单价: ¥${plate.unitPrice.toFixed(2)} / PCS`,
+    `定位板材质: ${materialName ?? ""} · 交付数量: ${plate.deliveryQty ?? 0} PCS`,
+    `定位板总价: ${formatMoney(plate.totalPrice ?? 0, currency, fxRates)}`,
+    `定位板单价: ${formatMoney(plate.unitPrice ?? 0, currency, fxRates)} / PCS（按实交 ${plate.deliveryQty ?? 0} PCS 分摊）`,
   ];
 }
