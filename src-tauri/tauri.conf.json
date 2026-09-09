@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Keyboard Dev Toolkit",
-  "version": "1.0.40",
+  "version": "1.0.43",
   "identifier": "com.kstar.pcb-tool",
   "build": {
     "frontendDist": "../out",
