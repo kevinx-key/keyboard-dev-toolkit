@@ -97,6 +97,7 @@ jobs:
           else
             echo "OCCT cache incomplete at $DIR — re-downloading"
             rm -rf "$DIR"
+            mkdir -p src-tauri/target
             URL="https://github.com/lzpel/cadrum/releases/download/occt-8_0_0_rev3/occt-8_0_0_rev3-$TGT.tar.gz"
             curl -L --fail --retry 3 -o occt.tar.gz "$URL"
             tar -xzf occt.tar.gz -C src-tauri/target
