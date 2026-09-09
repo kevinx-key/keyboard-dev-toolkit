@@ -71,3 +71,6 @@ src/lib/lceda-export.ts
 tests/qmk-export.test.ts
 tests/kicad-export.test.ts
 /plugins/
+/计价方式.md
+
+/调试手册.md

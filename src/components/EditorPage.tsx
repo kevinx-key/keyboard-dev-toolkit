@@ -7,6 +7,7 @@ import TopBar from "./TopBar";
 import FloatingToolbar, { type SpecialKeyDef } from "./FloatingToolbar";
 import KeyboardCanvas from "./KeyboardCanvas";
 import ToolBelt from "./ToolBelt";
+import AiFloatingPanel from "./AiFloatingPanel";
 import PlateSection from "./PlateSection";
 import PCBSection from "./PCBSection";
 import PricingSection from "./PricingSection";
@@ -98,15 +99,15 @@ export default function EditorPage() {
     c: k.c, t: k.t,
   }));
 
-  // Auto-load ANSI 104 as default layout
+  // Auto-load first default preset (Default 60%) as default layout
   const autoLoadDoneRef = useRef(false);
   useEffect(() => {
     if (autoLoadDoneRef.current) return;
     if (state.layout.keys.length === 0 && ALL_PRESETS.length > 0) {
-      const ansi104 = ALL_PRESETS[0]!;
-      const keys = parseLayoutJSON(ansi104.data);
-      const meta: KLEMeta = { ...DEFAULT_META, name: ansi104.name, backcolor: "#eeeeee" };
-      editor.loadLayout({ meta, keys, _sourceCache: ansi104.data as unknown[] });
+      const defaultPreset = ALL_PRESETS[0]!;
+      const keys = parseLayoutJSON(defaultPreset.data);
+      const meta: KLEMeta = { ...DEFAULT_META, name: defaultPreset.name, backcolor: "#eeeeee" };
+      editor.loadLayout({ meta, keys, _sourceCache: defaultPreset.data as unknown[] });
     }
     autoLoadDoneRef.current = true;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -274,6 +275,7 @@ export default function EditorPage() {
               hasSelection={state.selectedIds.length > 0}
               hasClipboard={state.clipboard !== null}
               stepConfig={stepRef.current}
+              layoutName={state.layout.meta.name}
               onStepChange={(steps) => { stepRef.current = steps; forceUpdate(n => n + 1); }}
               onAddKeys={editor.addKeys}
               onAddSpecialKey={handleAddSpecialKey}
@@ -447,6 +449,8 @@ export default function EditorPage() {
         onClose={() => setProjectBkDialogOpen(false)}
         onRestore={handleRestoreFromProjectBackup}
       />
+
+      <AiFloatingPanel layout={state.layout} onAiCommit={editor.commitLayout} />
     </>
   );
 }

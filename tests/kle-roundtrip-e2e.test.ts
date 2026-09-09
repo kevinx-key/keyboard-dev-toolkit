@@ -16,6 +16,7 @@ import { exportJSON } from "@/lib/kle-export";
 import { editorReducer, createInitialState } from "@/lib/kle-reducer";
 import { keyPropsToIntermediate } from "@/lib/kle-parser";
 import { ALL_PRESETS } from "@/data/presets";
+import { DEFAULT_META } from "@/lib/kle-types";
 import type { KLELayout, KeyProps, EditorState } from "@/lib/kle-types";
 
 // ── Constants ──
@@ -631,5 +632,61 @@ describe("exportJSON round-trip", () => {
   it("exportJSON handles empty layout", () => {
     const empty: KLELayout = { meta: {} as any, keys: [] };
     expect(exportJSON(empty)).toBe("[]");
+  });
+});
+
+// ─── 预设默认顺序 + 默认配列派生自动重命名 ───
+
+describe("preset defaults & derived auto-rename", () => {
+  /** 模拟从预设下拉加载：meta.name 取预设名 */
+  function loadPreset(name: string): EditorState {
+    const preset = ALL_PRESETS.find((p) => p.name === name);
+    if (!preset) throw new Error(`preset not found: ${name}`);
+    const parsed = parseKLEJSON(preset.data)!;
+    const layout: KLELayout = { ...parsed, meta: { ...DEFAULT_META, name: preset.name } };
+    return editorReducer(createInitialState(), { type: "LOAD_LAYOUT", layout });
+  }
+
+  const moveFirstKey = (state: EditorState): EditorState => {
+    const withSel = editorReducer(state, { type: "SET_SELECTION", ids: ["0"] });
+    return editorReducer(withSel, { type: "MOVE_SELECTED", dx: 0.25, dy: 0 });
+  };
+
+  it("Default 60% 是第一个默认预设（画布默认载入）", () => {
+    expect(ALL_PRESETS[0]!.name).toBe("Default 60%");
+  });
+
+  it("在 Default 60% 上修改键位 → Keyboard Name 自动派生为 Default 60%(1)", () => {
+    const next = moveFirstKey(loadPreset("Default 60%"));
+    expect(next.layout.meta.name).toBe("Default 60%(1)");
+  });
+
+  it("已派生 (1) 后继续修改不再重命名", () => {
+    let state = moveFirstKey(loadPreset("Default 60%"));
+    expect(state.layout.meta.name).toBe("Default 60%(1)");
+    state = moveFirstKey(state);
+    expect(state.layout.meta.name).toBe("Default 60%(1)");
+  });
+
+  it("撤销回默认预设名后再次修改会重新派生 (1)", () => {
+    const mutated = moveFirstKey(loadPreset("Default 60%"));
+    expect(mutated.layout.meta.name).toBe("Default 60%(1)");
+    const undone = editorReducer(mutated, { type: "UNDO" });
+    expect(undone.layout.meta.name).toBe("Default 60%");
+    const again = moveFirstKey(undone);
+    expect(again.layout.meta.name).toBe("Default 60%(1)");
+  });
+
+  it("手动改名（非预设名）后修改不触发自动重命名", () => {
+    let state = loadPreset("Default 60%");
+    state = editorReducer(state, { type: "SET_META", meta: { name: "My Keeb" } });
+    const next = moveFirstKey(state);
+    expect(next.layout.meta.name).toBe("My Keeb");
+  });
+
+  it("纯 meta 修改（如背景色）不触发自动重命名", () => {
+    const state = loadPreset("Default 60%");
+    const next = editorReducer(state, { type: "SET_META", meta: { backcolor: "#ff0000" } });
+    expect(next.layout.meta.name).toBe("Default 60%");
   });
 });

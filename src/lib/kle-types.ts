@@ -274,6 +274,7 @@ export interface KLELayout {
 /** Reducer action types */
 export type EditorAction =
   | { type: "LOAD_LAYOUT"; layout: KLELayout }
+  | { type: "COMMIT_LAYOUT"; layout: KLELayout; label?: string }
   | { type: "SET_SELECTION"; ids: string[] }
   | { type: "TOGGLE_SELECTION"; id: string }
   | { type: "CLEAR_SELECTION" }
