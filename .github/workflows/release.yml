@@ -178,8 +178,10 @@ jobs:
 
             > ⚠️ **无代码签名说明**：本项目为开源社区项目，安装包未经数字签名。
             >
+            > **🍎 macOS 一键安装（推荐）**：`curl -fsSL https://raw.githubusercontent.com/709208969/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash`
+            >
             > - **Windows**：SmartScreen 可能提示"未知发布者"，点"更多信息 → 仍要运行"
-            > - **macOS**：打开时提示"无法验证开发者"，请右键 → 打开，或用 `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"` 解除隔离
+            > - **macOS**：提示"无法验证开发者"时，macOS 14 及以下右键 → 打开；macOS 15 及以上走 系统设置 → 隐私与安全性 →「仍然打开」；或 `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`
             > - **Linux**：AppImage 可直接运行，无需额外操作
           draft: true
           files: |

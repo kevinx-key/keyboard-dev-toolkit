@@ -69,7 +69,7 @@ Use the hosted web version directly in your browser — no installation needed.
 
 ### 🖥️ Desktop app
 
-Windows, macOS and Linux installers are published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page (latest: **v1.0.26**):
+Windows, macOS and Linux installers are published on the [Releases](https://github.com/709208969/keyboard-dev-toolkit/releases) page (latest: **v1.0.29**):
 
 | Platform | File |
 |----------|------|
@@ -78,7 +78,15 @@ Windows, macOS and Linux installers are published on the [Releases](https://gith
 | 🍎 macOS Apple Silicon | `.dmg` (arm64) |
 | 🐧 Linux x64 | `.AppImage` |
 
-> Note: installers are unsigned (open-source community builds). On Windows, SmartScreen may show "Unknown publisher" — click **More info → Run anyway**. On macOS, right-click → **Open** if "unverified developer" appears, or run `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`. Linux AppImage runs directly.
+> **macOS: one-line install (recommended)** — the unsigned community build is quarantined by Gatekeeper; this script downloads the latest `.dmg`, installs it and strips the quarantine flag automatically:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/709208969/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash
+> ```
+>
+> Manual fallbacks: right-click → **Open** (macOS ≤14), or **System Settings → Privacy & Security → Open Anyway** (macOS 15+), or run `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`.
+
+> Note: installers are unsigned (open-source community builds). On Windows, SmartScreen may show "Unknown publisher" — click **More info → Run anyway**. Linux AppImage runs directly.
 
 ### 🛠️ Run it locally (step by step)
 
