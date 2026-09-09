@@ -124,6 +124,13 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
       const selId = s.selectedIds.length > 0 ? parseInt(s.selectedIds[0]!) : -1;
       const selKey = selId >= 0 && selId < s.layout.keys.length ? s.layout.keys[selId]! : null;
 
+      // 快捷键守卫：页面存在非空文本选区（如 AI 面板对话、代码块）时，
+      // Ctrl+C/X 交给浏览器默认复制行为，避免劫持导致无法复制文本
+      const hasTextSelection = () => {
+        const sel = window.getSelection();
+        return !!sel && !sel.isCollapsed && sel.toString().trim().length > 0;
+      };
+
       switch (true) {
         case key === "Delete" || key === "Backspace":
           e.preventDefault();
@@ -138,10 +145,12 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
           dispatch({ type: "REDO" });
           break;
         case ctrl && key === "c":
+          if (hasTextSelection()) break;
           e.preventDefault();
           dispatch({ type: "COPY_SELECTED" });
           break;
         case ctrl && key === "x":
+          if (hasTextSelection()) break;
           e.preventDefault();
           dispatch({ type: "CUT_SELECTED" });
           break;
@@ -207,6 +216,11 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
 
   const loadLayout = useCallback((layout: KLELayout) => {
     dispatch({ type: "LOAD_LAYOUT", layout });
+  }, []);
+
+  /** AI 面板等成批结果的提交：保留撤销历史（区别于 loadLayout 的清空语义） */
+  const commitLayout = useCallback((layout: KLELayout) => {
+    dispatch({ type: "COMMIT_LAYOUT", layout });
   }, []);
 
   const loadRawData = useCallback((raw: string) => {
@@ -280,6 +294,7 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
     state,
     dispatch,
     loadLayout,
+    commitLayout,
     loadRawData,
     setSelection,
     toggleSelection,

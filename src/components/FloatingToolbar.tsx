@@ -9,7 +9,7 @@ import {
 import type { KLELayout } from "../lib";
 import { parseLayoutJSON } from "../lib/kle-serial";
 import { DEFAULT_META } from "../lib/kle-types";
-import { ALL_PRESETS } from "../data/presets";
+import { ALL_PRESETS, PRESET_NAMES } from "../data/presets";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
 
@@ -34,6 +34,8 @@ interface FloatingToolbarProps {
   hasSelection: boolean;
   hasClipboard: boolean;
   stepConfig: StepConfigType;
+  /** 当前布局的 Keyboard Name（layout.meta.name），用于预设下拉显示当前配列名 */
+  layoutName?: string;
   onStepChange: (steps: StepConfigType) => void;
   onAddKeys: (count: number) => void;
   onAddSpecialKey?: (keyDef: SpecialKeyDef) => void;
@@ -88,6 +90,15 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
     props.onLoadLayout({ meta, keys, _sourceCache: found.data as unknown[] });
   };
 
+  // 预设下拉当前值：名字等于某个默认预设名 → 显示该预设；名字非空且非默认占位（Untitled）→ 显示 Keyboard Name；
+  // 无名字 → 显示占位符
+  const layoutName = props.layoutName ?? "";
+  const effectiveName = layoutName !== "" && layoutName !== DEFAULT_META.name ? layoutName : "";
+  const presetSelectValue = PRESET_NAMES.has(effectiveName) ? effectiveName : effectiveName ? "__custom__" : "";
+  const handlePresetSelect = (value: string) => {
+    if (value && value !== "__custom__") handleLoadPreset(value);
+  };
+
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (addKeyRef.current && !addKeyRef.current.contains(e.target as Node)) setAddKeyOpen(false);
@@ -114,12 +125,16 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
         <select
           data-testid="preset-select"
           className="kle-input"
-          value=""
-          onChange={(e) => { if (e.target.value) handleLoadPreset(e.target.value); }}
+          value={presetSelectValue}
+          onChange={(e) => handlePresetSelect(e.target.value)}
           title={t("tip.presetSelect")}
           style={{ padding: "2px 6px", fontSize: 11.5, minHeight: 26, cursor: "pointer", minWidth: 128 }}
         >
-          <option value="">{t("navbar.preset")}…</option>
+          {presetSelectValue === "__custom__" ? (
+            <option value="__custom__">{effectiveName}</option>
+          ) : (
+            <option value="">{t("navbar.preset")}…</option>
+          )}
           {ALL_PRESETS.map((p) => (
             <option key={p.name} value={p.name}>{p.name}</option>
           ))}

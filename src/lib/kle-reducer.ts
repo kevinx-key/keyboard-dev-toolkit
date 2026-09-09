@@ -3,10 +3,21 @@
  * Manages the editor state with full undo/redo history
  */
 
-import type { EditorState, EditorAction, KeyProps, UndoSnapshot } from "./kle-types";
+import type { EditorState, EditorAction, KeyProps, KLEMeta, UndoSnapshot } from "./kle-types";
 import { DEFAULT_PROPS, DEFAULT_META } from "./kle-types";
+import { PRESET_NAMES } from "../data/presets";
 
 const MAX_HISTORY = 100;
+
+/**
+ * 布局源自某个默认预设配列（名字仍等于该预设名）时，键位一旦被修改就自动派生新的
+ * Keyboard Name，如 "Default 60%" → "Default 60%(1)"。名字与预设名不同（含用户手动
+ * 改名）后不再触发。未改名的布局返回原 meta。
+ */
+function deriveNameFromPreset(meta: KLEMeta): KLEMeta {
+  const name = meta.name;
+  return name && PRESET_NAMES.has(name) ? { ...meta, name: `${name}(1)` } : meta;
+}
 
 export function createInitialState(): EditorState {
   return {
@@ -32,6 +43,18 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         redoStack: [],
         isDirty: false,
       };
+    }
+
+    case "COMMIT_LAYOUT": {
+      // AI/工具层成批结果的提交。与 LOAD_LAYOUT 的区别：不清空撤销历史。
+      // 当前状态先压入 undo 栈 → 用户可 Ctrl+Z 一次性回退整个提交（历史可继续向前撤）。
+      // 若被提交前的布局仍保留默认预设名（如 Default 60%），提交后同样自动派生 (1) 名。
+      const committed = deriveNameFromPreset(state.layout.meta);
+      return pushUndo(state, {
+        layout: { ...action.layout, meta: { ...action.layout.meta, ...(committed.name !== state.layout.meta.name ? { name: committed.name } : {}) } },
+        selectedIds: [], // 与 LOAD_LAYOUT 一致：提交后清空画布选择
+        isDirty: true,
+      });
     }
 
     case "SET_SELECTION": {
@@ -98,7 +121,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return k;
       });
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         isDirty: true,
       });
     }
@@ -128,7 +151,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         nextX += 1; // 1u each (0 gap)
       }
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         isDirty: true,
       });
     }
@@ -139,7 +162,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const y = lastKey ? (lastKey.y ?? 0) : 0;
       const newKey: KeyProps = { ...DEFAULT_PROPS, x, y, ...action.props };
       return pushUndo(state, {
-        layout: { ...state.layout, keys: [...state.layout.keys, newKey], _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: [...state.layout.keys, newKey], _sourceCache: undefined },
         isDirty: true,
       });
     }
@@ -149,7 +172,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const selectedSet = new Set(state.selectedIds);
       const newKeys = state.layout.keys.filter((_, i) => !selectedSet.has(String(i)));
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         selectedIds: [],
         isDirty: true,
       });
@@ -166,7 +189,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return k;
       });
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         isDirty: true,
       });
     }
@@ -192,7 +215,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return true;
       });
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         selectedIds: [],
         clipboard: copied,
         isDirty: true,
@@ -213,7 +236,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         })),
       ];
       return pushUndo(state, {
-        layout: { ...state.layout, keys: newKeys, _sourceCache: undefined },
+        layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: newKeys, _sourceCache: undefined },
         isDirty: true,
       });
     }

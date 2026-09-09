@@ -202,8 +202,13 @@ export default function KeyboardCanvas({
       return;
     }
     // Issue 1: Don't start marquee on mousedown — only activate after drag threshold in mousemove
+    // 键盘预览界面（布局背景矩形）之外：左键不设置框选起点、也不影响当前选择
+    // （此前在预览区外按下会留下 pending 状态，移入预览区即意外启动框选）
+    const inBg = pos.x >= bgBounds.left && pos.x <= bgBounds.left + bgBounds.width
+      && pos.y >= bgBounds.top && pos.y <= bgBounds.top + bgBounds.height;
+    if (!inBg) return;
     pendingSelectRef.current = { x: pos.x, y: pos.y };
-  }, [readOnly, preview, selectedIds, panX, panY, keys, onSelectKey]);
+  }, [readOnly, preview, selectedIds, panX, panY, keys, onSelectKey, bgBounds]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
