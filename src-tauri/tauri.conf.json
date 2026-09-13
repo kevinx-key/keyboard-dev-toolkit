@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Keyboard Dev Toolkit",
-  "version": "1.0.53",
+  "version": "1.0.54",
   "identifier": "com.kstar.pcb-tool",
   "build": {
     "frontendDist": "../out",
@@ -30,12 +30,13 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDczRTk0Rjc3NkNGQ0RDRUQKUldUdDNQeHNkMC9wYzVnQ2RPQXJxbUx6Tk1pVkFMNFc5VEorc0dVNkg2L2RvL2JGMndvRVRYUGwK",
       "endpoints": [
-        "https://github.com/709208969/keyboard-dev-toolkit/releases/latest/download/latest.json"
+        "https://github.com/kevinx-key/keyboard-dev-toolkit/releases/latest/download/latest.json"
       ]
     }
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "msi"
     ],

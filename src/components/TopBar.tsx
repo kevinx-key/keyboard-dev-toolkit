@@ -9,7 +9,7 @@ import UpdateDialog from "./UpdateDialog";
 
 const iconProps = { size: 13, strokeWidth: 2 } as const;
 
-const GITHUB_RELEASES_URL = "https://github.com/709208969/keyboard-dev-toolkit/releases";
+const GITHUB_RELEASES_URL = "https://github.com/kevinx-key/keyboard-dev-toolkit/releases";
 
 export default function TopBar() {
   const { lang, setLang } = useI18n();
