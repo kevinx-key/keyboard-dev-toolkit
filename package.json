@@ -1,9 +1,9 @@
 {
   "name": "custom-key-pcb-tool",
-  "version": "1.0.49",
+  "version": "1.0.52",
   "private": true,
   "description": "Keyboard Dev Toolkit — 键盘配列编辑器 + PCB/定位板自动生成工具 (KLE 兼容)",
-  "author": "K星团队",
+  "author": "K Star Lab",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",

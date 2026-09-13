@@ -1,5 +1,11 @@
 // quote-api.ts — 报价服务 API 封装（无本地价格数据；搬运请求/响应）
-const API_BASE = "https://kindlestar-api.x709208969.workers.dev";
+//
+// API 入口：生产走 Shopify App Proxy（店铺域名 /apps/kle-checkout/* → Cloudflare Worker）。
+// 为什么不直连 *.workers.dev：国内不可达（直连超时、代理 CONNECT 隧道 502），
+// 而店铺域名国内可访问。Shopify 转发时会追加 shop / path_prefix / timestamp / signature，
+// Worker 侧据此校验来源（见 src/checkout/app-proxy.ts）。
+// 本地开发用 NEXT_PUBLIC_API_BASE 覆盖，例如 http://127.0.0.1:8787。
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://kindlestar.online/apps/kle-checkout";
 
 export interface QuoteRequest {
   lengthMm: number;

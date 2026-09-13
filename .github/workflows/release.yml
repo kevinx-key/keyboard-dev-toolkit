@@ -13,6 +13,11 @@ jobs:
   tauri-build:
     timeout-minutes: 60
 
+    # SignPath 签名凭据（开源项目免费，申请与配置见 docs/signpath-签名指南.md）
+    # 未配置 Secrets 时值为空 → Windows 签名步骤自动跳过，仍按未签名包发布，不会报错
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +118,47 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
 
+      # ── Windows Authenticode 签名（SignPath Foundation，开源项目免费）──────────
+      # 流程：上传未签名安装包 → SignPath 云端签名 → 替换本地文件 → 重签 Tauri 更新签名(.sig)
+      # 未配置 SIGNPATH_API_TOKEN 时以下三步全部跳过（保持未签名发布）
+      - name: Upload unsigned Windows installer
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        id: upload-unsigned-windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-installer
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign Windows installer (SignPath)
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: keyboard-dev-toolkit
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: nsis-installer
+          github-artifact-id: ${{ steps.upload-unsigned-windows.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-windows
+
+      - name: Replace installer with signed version
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $signed = Get-ChildItem "signed-windows/*.exe" | Select-Object -First 1
+          if (-not $signed) { throw "SignPath 未返回签名后的安装包" }
+          $target = Join-Path "src-tauri/target/${{ matrix.target }}/release/bundle/nsis" $signed.Name
+          Copy-Item $signed.FullName $target -Force
+          # Authenticode 签名改变了安装包字节 → 原 Tauri 更新签名(.sig)已失效，必须重新生成
+          Remove-Item "$target.sig" -ErrorAction SilentlyContinue
+          npx tauri signer sign "$target"
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -177,11 +223,11 @@ jobs:
             | 🍎 macOS Apple Silicon | `.dmg` (arm64) |
             | 🐧 Linux x64 | `.AppImage` |
 
-            > ⚠️ **无代码签名说明**：本项目为开源社区项目，安装包未经数字签名。
+            > ⚠️ **代码签名说明**：本项目为开源社区项目；Windows 安装包已接入 SignPath Foundation 开源免费签名（仓库配置签名密钥后生效，未配置时仍为未签名包）。
             >
             > **🍎 macOS 一键安装（推荐）**：`curl -fsSL https://raw.githubusercontent.com/709208969/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash`
             >
-            > - **Windows**：SmartScreen 可能提示"未知发布者"，点"更多信息 → 仍要运行"
+            > - **Windows**：若仍提示"未知发布者"（未启用签名 / 新证书信誉不足），点"更多信息 → 仍要运行"
             > - **macOS**：提示"无法验证开发者"时，macOS 14 及以下右键 → 打开；macOS 15 及以上走 系统设置 → 隐私与安全性 →「仍然打开」；或 `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`
             > - **Linux**：AppImage 可直接运行，无需额外操作
           draft: true

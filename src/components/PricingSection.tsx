@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calculator, RefreshCw, Copy, Ruler, AlertTriangle, ChevronDown, ChevronUp, MessageCircle, Mail } from "lucide-react";
 import type { KLELayout } from "../lib";
 import { SectionHeader } from "./toolbelt/shared/SectionHeader";
+import PricingTrustNote from "./PricingTrustNote";
 import { useI18n } from "../lib/i18n";
 import { LANG_CURRENCY, formatMoney, type CurrencyCode } from "../lib/currency";
 import { useFxRates } from "../lib/use-fx-rates";
@@ -121,6 +122,9 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
   // v2.6.0：未选小板或板载 USB（自带 USB 无需排线）时，线长/排线类型禁用
   const subBoardDisabled = form.subBoard === "none" || form.subBoard === "onboardUsb";
 
+  // 数量允许为空（空 = 0）；填了但 <5 时提示
+  const qtyInvalid = form.quantity > 0 && form.quantity < 5;
+
   const set = <K extends keyof QuoteRequest>(k: K, v: QuoteRequest[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
   };
@@ -226,7 +230,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                 <label style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>
                   {t("pricing.quantity")}
                   <br />
-                  <input type="number" style={inputStyle} value={form.quantity} min={5} step={5} onChange={(e) => set("quantity", Number(e.target.value))} />
+                  <input type="number" style={inputStyle} value={form.quantity || ""} min={5} step={5} placeholder="≥5" onChange={(e) => set("quantity", Number(e.target.value))} />
                 </label>
                 <label style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>
                   {t("pricing.material")}
@@ -246,6 +250,9 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   </select>
                 </label>
               </div>
+              {qtyInvalid && (
+                <div style={{ fontSize: 11, color: "var(--theme-danger)", marginTop: 8 }}>⚠ {t("pricing.plateQtyMin")}</div>
+              )}
             </div>
 
             {/* ② 工艺：表面处理 + 颜色 */}
@@ -565,6 +572,8 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   </div>
                 </>
               )}
+              {/* 报价结果区：默认隐藏的信任说明，点击才展开 */}
+              <PricingTrustNote />
             </div>
           </div>
         </div>
@@ -588,7 +597,7 @@ function buildQuoteText(
   const tracing = meta?.extras.tracing.find((o) => o.key === form.tracing);
   const plateMaterial = meta?.plateMaterials.find((m) => m.key === form.plateMaterial);
   const lines = [
-    "Kindlestar PCBA 报价单",
+    "K Star Lab PCBA 报价单",
     `尺寸: ${form.lengthMm} × ${form.widthMm} mm·层数: 2层 · 板厚: ${form.thicknessMm}mm · 材质: ${material}`,
     `交付数量: ${quote.deliveryQty} PCS`,
     `预计用板张数: ${quote.sheets} 张`,
