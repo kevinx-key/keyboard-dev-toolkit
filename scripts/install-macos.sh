@@ -3,7 +3,7 @@
 # Keyboard Dev Toolkit — macOS 一键安装脚本
 #
 # 用法:
-#   curl -fsSL https://raw.githubusercontent.com/709208969/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kevinx-key/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash
 #   bash scripts/install-macos.sh            # 安装最新版
 #   bash scripts/install-macos.sh v1.0.29    # 安装指定版本
 #
@@ -12,7 +12,7 @@
 # ============================================================================
 set -euo pipefail
 
-REPO="709208969/keyboard-dev-toolkit"
+REPO="kevinx-key/keyboard-dev-toolkit"
 BASE_URL="https://raw.githubusercontent.com/$REPO/main"
 API_URL="https://api.github.com/repos/$REPO/releases"
 

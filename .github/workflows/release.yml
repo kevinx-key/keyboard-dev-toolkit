@@ -225,7 +225,7 @@ jobs:
 
             > ⚠️ **代码签名说明**：本项目为开源社区项目；Windows 安装包已接入 SignPath Foundation 开源免费签名（仓库配置签名密钥后生效，未配置时仍为未签名包）。
             >
-            > **🍎 macOS 一键安装（推荐）**：`curl -fsSL https://raw.githubusercontent.com/709208969/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash`
+            > **🍎 macOS 一键安装（推荐）**：`curl -fsSL https://raw.githubusercontent.com/kevinx-key/keyboard-dev-toolkit/main/scripts/install-macos.sh | bash`
             >
             > - **Windows**：若仍提示"未知发布者"（未启用签名 / 新证书信誉不足），点"更多信息 → 仍要运行"
             > - **macOS**：提示"无法验证开发者"时，macOS 14 及以下右键 → 打开；macOS 15 及以上走 系统设置 → 隐私与安全性 →「仍然打开」；或 `xattr -dr com.apple.quarantine "/Applications/Keyboard Dev Toolkit.app"`

@@ -19,7 +19,7 @@
 
 | SignPath 要求 | 本项目情况 |
 |---|---|
-| 公开仓库（GitHub） | ✅ `709208969/keyboard-dev-toolkit` |
+| 公开仓库（GitHub） | ✅ `kevinx-key/keyboard-dev-toolkit` |
 | OSI 认可的开源协议、无商业双许可 | ✅ AGPL-3.0-only |
 | **不含闭源/专有代码** | ⚠️ 送签的构建必须是**纯公开仓代码**（私有仓 Pro 模块不能出现在送签安装包里，否则会被撤销资格） |
 | 项目活跃维护 | ✅ |
@@ -36,7 +36,7 @@
    | 字段 | 建议填写 |
    |---|---|
    | Project name | `Keyboard Dev Toolkit` |
-   | Repository URL | `https://github.com/709208969/keyboard-dev-toolkit` |
+   | Repository URL | `https://github.com/kevinx-key/keyboard-dev-toolkit` |
    | License | `AGPL-3.0` |
    | Contact email | 你能收邮件的邮箱 |
    | Description / 用途 | `Open-source keyboard layout editor & PCB/plate generator (Next.js + Tauri). We publish Windows/macOS/Linux installers on GitHub Releases and want to sign the Windows NSIS installer.` |
@@ -111,7 +111,7 @@
 ## 4. GitHub 仓库配置 Secrets（3 分钟）
 
 打开：
-`https://github.com/709208969/keyboard-dev-toolkit/settings/secrets/actions`
+`https://github.com/kevinx-key/keyboard-dev-toolkit/settings/secrets/actions`
 
 点击 **New repository secret**，添加两条：
 
