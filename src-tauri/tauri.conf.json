@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Keyboard Dev Toolkit",
-  "version": "1.0.49",
+  "version": "1.0.52",
   "identifier": "com.kstar.pcb-tool",
   "build": {
     "frontendDist": "../out",
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; script-src 'self'; font-src 'self'; connect-src 'self' https://data.jsdelivr.com https://cdn.jsdelivr.net https://raw.githubusercontent.com"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; script-src 'self'; font-src 'self'; connect-src 'self' https://kindlestar-api.x709208969.workers.dev https://api.frankfurter.dev https://open.er-api.com https://data.jsdelivr.com https://cdn.jsdelivr.net https://raw.githubusercontent.com https://api.deepseek.com https://dashscope.aliyuncs.com https://api.openai.com"
     }
   },
   "plugins": {

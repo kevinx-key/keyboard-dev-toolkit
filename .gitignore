@@ -58,6 +58,10 @@ ocr-scan-round2.json
 ocr-scan-round3.json
 aliocr-v2.md
 
+# 内部保密文档（含店铺/Worker/4PX 基础设施信息，禁止提交公开仓）
+docs/一键下单方案.md
+docs/报价体系保密化实施清单.md
+
 # Generated test reports
 playwright-report/
 test-results/

@@ -177,7 +177,7 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 ## License & Trademark
 
 - Code: **[GNU Affero General Public License v3.0](./LICENSE)** (AGPL-3.0-only). Any derivative — including hosted services — must be released under AGPL.
-- The project name "Keyboard Dev Toolkit" and the K星 logo belong to the K星 team. Forks and derived versions should use a different product name and must not present themselves as the original.
+- The project name "Keyboard Dev Toolkit" and the K Star Lab logo belong to K Star Lab. Forks and derived versions should use a different product name and must not present themselves as the original.
 - KLE format compatibility is independent of keyboard-layout-editor.com; that site is not affiliated with this project. Thanks to Ian Prest and the KLE community for the original inspiration.
 
 ---

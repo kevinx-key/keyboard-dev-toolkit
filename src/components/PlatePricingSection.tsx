@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Ruler, AlertTriangle, MessageCircle, Mail, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import PricingTrustNote from "./PricingTrustNote";
 import { LANG_CURRENCY, formatMoney } from "../lib/currency";
 import { useFxRates } from "../lib/use-fx-rates";
 import { requestQuote, quoteUnavailable, QuoteServiceError, type QuoteRequest, type QuoteResponse, type MetaResponse, getMeta } from "../lib/quote-api";
@@ -289,6 +290,8 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
               </a>
             )}
           </div>
+          {/* 报价结果区：默认隐藏的信任说明，点击才展开 */}
+          <PricingTrustNote />
         </>
       )}
     </div>
