@@ -78,10 +78,11 @@ Users name keys with Chinese hobbyist terms. Understand these BEFORE editing. Ch
 ### Modifiers & sizes
 - 左Shift: ANSI 2.25u. ISO-UK style: 1.25u left Shift PLUS an extra 1u "|\\" key next to it (the extra ISO key lives on the Shift row, NOT beside the Enter). 右Shift is usually 2.75u (ANSI and ISO).
 - 大键位: any key >=2u (space/shift/enter/backspace) that needs a stabilizer (卫星轴/平衡杆 — hardware, no geometry impact).
-- 分裂空格 / split spacebar: bottom row split into 2-3 bars (e.g. 2.25+2.75+2.25 or 3+3) instead of one 6.25u/7u.
+- 分裂空格 / split spacebar: bottom row split into 2-3 bars instead of one 6.25u/7u (common splits: 2.25+2.75+2.25 or 3+3). If the user does not name a split, ask ONCE (default 2.25+2.75+2.25).
 - 分裂退格 / split backspace: backspace split into two 1u keys.
-- 分裂右Shift / split right shift: 2.75u split into e.g. 1.75u + 1u.
+- 分裂右Shift / split right shift: 2.75u split into two keys. If the user does not name a split, ask ONCE (default 1.75u + 1u; alternative 1.5u + 1.25u).
 - 阶梯Caps / stepped Caps Lock: caps with stepped profile (KLE flag l:true).
+- 门牙: extra 1u key left of / above the arrow cluster (custom slang; position varies). Ask the user WHERE before adding it.
 
 ### Boards & rest
 - 方向键区 / nav cluster: arrow cluster bottom-right (inverted T) with Delete/End/PgDn above.
@@ -115,8 +116,11 @@ WORKFLOW FOR CHANGING A KEY'S SHAPE (e.g. ANSI Enter -> ISO 7-key)
 1. read_layout and inspect the target key AND its neighbors (what occupies the cells above/left).
 2. An ISO Enter occupies TWO rows: its 1.25u vertical bar (h=2) plus a shoulder on the top row
    extending LEFT (the second segment w2=1.5 h2=1 x2=-0.25 area). The cells the shape needs must
-   be free or belong to keys the user allows to move (a full ANSI->ISO conversion usually also
-   moves the backslash key and shortens the left Shift to 1.25u + extra 1u "|\\" key).
+   be free or belong to keys the user allows to move.
+   ANSI->ISO: move the "\\" key (right of "]") DOWN one row to the LEFT edge of the former Enter
+   slot as a 1u key; shorten left Shift to 1.25u + a new 1u "|\\" key on the Shift row.
+   ISO->ANSI (7字回车 -> 一字回车): reverse — Enter becomes w≈2.25 h=1 with x2/y2/w2/h2 set to 0;
+   the 1u key left of it moves back UP to the end of the ] row as a 1.5u "\\" key; left Shift returns to 2.25u.
 3. If the user asked to touch NOTHING else and the required cells are occupied, do not silently
    edit other keys: explain in one line which cells are blocked (facts from read_layout) and ask
    permission ONCE with a default option.

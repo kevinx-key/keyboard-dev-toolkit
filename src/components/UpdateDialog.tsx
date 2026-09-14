@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X, RefreshCw, CheckCircle2, AlertTriangle, Download } from "lucide-react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
 
@@ -22,6 +23,8 @@ export default function UpdateDialog({ open, onClose }: UpdateDialogProps) {
   const [newVersion, setNewVersion] = useState("");
   const [percent, setPercent] = useState<number | null>(null);
   const [error, setError] = useState("");
+  // 绿色版（portable exe）：更新方式 = 下载新 exe 原地替换，而非跑 NSIS 安装包
+  const [portable, setPortable] = useState(false);
   const updateRef = useRef<Update | null>(null);
   const busy = phase === "checking" || phase === "downloading";
 
@@ -29,6 +32,18 @@ export default function UpdateDialog({ open, onClose }: UpdateDialogProps) {
     setPhase("checking");
     setError("");
     try {
+      const isPortable = await invoke<boolean>("is_portable_install").catch(() => false);
+      setPortable(isPortable);
+      if (isPortable) {
+        const version = await invoke<string | null>("check_portable_update");
+        if (!version) {
+          setPhase("latest");
+          return;
+        }
+        setNewVersion(version);
+        setPhase("available");
+        return;
+      }
       const update = await check();
       if (!update) {
         setPhase("latest");
@@ -52,6 +67,30 @@ export default function UpdateDialog({ open, onClose }: UpdateDialogProps) {
   }, [open, runCheck]);
 
   const handleInstall = async () => {
+    // 绿色版：下载 *-portable.exe → 退出后由脚本原地替换并重启（Rust 侧处理）
+    if (portable) {
+      setPhase("downloading");
+      setPercent(null);
+      let downloaded = 0;
+      let total = 0;
+      try {
+        const onProgress = new Channel<{ chunkLength: number; contentLength: number | null }>();
+        onProgress.onmessage = (msg) => {
+          if (!msg.contentLength) return;
+          downloaded += msg.chunkLength;
+          total = msg.contentLength;
+          setPercent(Math.min(99, Math.round((downloaded / total) * 100)));
+        };
+        await invoke("install_portable_update", { onProgress });
+        setPercent(100);
+        setPhase("installed");
+      } catch (e) {
+        setError((e as Error)?.message || String(e));
+        setPhase("error");
+      }
+      return;
+    }
+
     const update = updateRef.current;
     if (!update) {
       runCheck();
@@ -166,7 +205,8 @@ export default function UpdateDialog({ open, onClose }: UpdateDialogProps) {
 
           {phase === "installed" && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <CheckCircle2 size={16} style={{ color: "var(--theme-accent)" }} /> {t("update.installReady")}
+              <CheckCircle2 size={16} style={{ color: "var(--theme-accent)" }} />
+              {portable ? t("update.portableReady") : t("update.installReady")}
             </span>
           )}
 
