@@ -17,7 +17,7 @@ const rules = [
   { key: "windows-x86_64", re: /_x64-setup\.exe$/ },
   { key: "windows-x86_64", re: /\.msi$/ },
   { key: "darwin-x86_64", re: /_x64\.app\.tar\.gz$/ },
-  { key: "darwin-aarch64", re: /_aarch64\.app\.tar\.gz$/ },
+  { key: "darwin-aarch64", re: /(_aarch64|_arm64)\.app\.tar\.gz$/ },
   { key: "linux-x86_64", re: /\.AppImage$/ },
 ];
 
