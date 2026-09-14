@@ -26,7 +26,7 @@ jobs:
             target: aarch64-apple-darwin
             bundle: dmg
             bundles: dmg,app
-            arch: arm64
+            arch: aarch64
 
           - os: macos-latest
             target: x86_64-apple-darwin
