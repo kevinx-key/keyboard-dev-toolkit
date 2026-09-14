@@ -25,21 +25,25 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             bundle: dmg
+            bundles: dmg,app
             arch: arm64
 
           - os: macos-latest
             target: x86_64-apple-darwin
             bundle: dmg
+            bundles: dmg,app
             arch: x64
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             bundle: appimage
+            bundles: appimage
             arch: x64
 
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             bundle: nsis
+            bundles: nsis
             arch: x64
 
     runs-on: ${{ matrix.os }}
@@ -116,7 +120,44 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      # ── macOS updater 产物重命名（.app.tar.gz 原名不含架构，x64/arm64 会同名冲突）──
+      - name: Rename macOS updater artifacts
+        if: startsWith(matrix.os, 'macos')
+        shell: bash
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          DIR="src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+          if [ ! -d "$DIR" ]; then echo "no macos bundle dir at $DIR"; exit 1; fi
+          cd "$DIR"
+          for f in *.app.tar.gz; do
+            [ -e "$f" ] || { echo "no .app.tar.gz found"; exit 1; }
+            mv "$f" "Keyboard.Dev.Toolkit_${V}_${{ matrix.arch }}.app.tar.gz"
+          done
+          for f in *.app.tar.gz.sig; do
+            [ -e "$f" ] || continue
+            mv "$f" "Keyboard.Dev.Toolkit_${V}_${{ matrix.arch }}.app.tar.gz.sig"
+          done
+          ls -la
+
+      # ── Windows 绿色版（portable）：裸 exe + updater 签名，随 release 一起发布 ──
+      - name: Prepare portable (green) Windows build
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          $src = "src-tauri/target/${{ matrix.target }}/release/custom-key-pcb-tool.exe"
+          if (-not (Test-Path $src)) { throw "portable source exe not found: $src" }
+          $destDir = "src-tauri/target/${{ matrix.target }}/release/bundle/portable"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          $dest = Join-Path $destDir "Keyboard.Dev.Toolkit_${v}_x64-portable.exe"
+          Copy-Item $src $dest -Force
+          npx tauri signer sign $dest
+          Get-ChildItem $destDir | Select-Object Name, Length
 
       # ── Windows Authenticode 签名（SignPath Foundation，开源项目免费）──────────
       # 流程：上传未签名安装包 → SignPath 云端签名 → 替换本地文件 → 重签 Tauri 更新签名(.sig)
@@ -193,7 +234,15 @@ jobs:
           mkdir -p installers/
           # Only copy the actual installer files — skip AppImage exploded contents
           # *.sig 为 Tauri updater 签名文件，必须与安装包一起上传
-          find artifacts/ -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" -o -name "*.sig" \) -exec cp {} installers/ \;
+          # *.app.tar.gz 为 macOS updater 产物（dmg 本身不参与自动更新）
+          find artifacts/ -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" -o -name "*.app.tar.gz" -o -name "*.sig" \) -exec cp {} installers/ \;
+          # GitHub Release 上传时会把资产名中的空格替换为点 → 本地先替换，保证 latest.json 里的 URL 与实际资产名一致
+          cd installers
+          for f in *; do
+            nf="${f// /.}"
+            if [ "$f" != "$nf" ]; then mv "$f" "$nf"; fi
+          done
+          cd ..
           echo "=== Installer files ==="
           ls -lh installers/
 

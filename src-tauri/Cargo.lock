@@ -857,7 +857,7 @@ checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
 
 [[package]]
 name = "custom-key-pcb-tool"
-version = "1.0.54"
+version = "1.0.55"
 dependencies = [
  "cadrum",
  "log",
@@ -872,6 +872,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "url",
 ]
 
 [[package]]

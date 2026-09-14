@@ -12,11 +12,12 @@ const base = `https://github.com/${repo}/releases/download/${tag}`;
 const files = fs.readdirSync(dir);
 
 // 平台匹配规则（exe 优先于 msi，后出现的同名平台会被跳过）
+// macOS 自动更新用 .app.tar.gz（dmg 不可被 updater 应用），由 release.yml 重命名带上架构
 const rules = [
   { key: "windows-x86_64", re: /_x64-setup\.exe$/ },
   { key: "windows-x86_64", re: /\.msi$/ },
-  { key: "darwin-x86_64", re: /_x64\.dmg$/ },
-  { key: "darwin-aarch64", re: /_aarch64\.dmg$/ },
+  { key: "darwin-x86_64", re: /_x64\.app\.tar\.gz$/ },
+  { key: "darwin-aarch64", re: /_aarch64\.app\.tar\.gz$/ },
   { key: "linux-x86_64", re: /\.AppImage$/ },
 ];
 
@@ -32,7 +33,7 @@ for (const f of files) {
   }
   platforms[rule.key] = {
     signature: fs.readFileSync(sigPath, "utf8").trim(),
-    url: `${base}/${f}`,
+    url: `${base}/${encodeURIComponent(f)}`,
   };
 }
 
@@ -51,3 +52,30 @@ const manifest = {
 
 fs.writeFileSync("latest.json", JSON.stringify(manifest, null, 2));
 console.log(`latest.json generated for ${version}: ${keys.join(", ")}`);
+
+// ── 绿色版（portable）自更新清单 ─────────────────────────────────────────────
+// Windows 绿色版点「检查更新」时，App 用这个清单（Rust 侧自定义 endpoint）下载
+// *-portable.exe 并原地替换；安装版仍走上面的 latest.json（NSIS 安装流程）。
+const portable = files.find((f) => /_x64-portable\.exe$/.test(f));
+if (portable) {
+  const sigPath = path.join(dir, portable + ".sig");
+  if (fs.existsSync(sigPath)) {
+    const portableManifest = {
+      version,
+      notes: `Keyboard Dev Toolkit ${version} (portable)`,
+      pub_date: new Date().toISOString(),
+      platforms: {
+        "windows-x86_64": {
+          signature: fs.readFileSync(sigPath, "utf8").trim(),
+          url: `${base}/${encodeURIComponent(portable)}`,
+        },
+      },
+    };
+    fs.writeFileSync(path.join(dir, "latest-portable.json"), JSON.stringify(portableManifest, null, 2));
+    console.log(`latest-portable.json generated for ${version}`);
+  } else {
+    console.error(`Missing signature for ${portable}, skipping portable manifest`);
+  }
+} else {
+  console.log("No portable exe found, skipping portable manifest");
+}
