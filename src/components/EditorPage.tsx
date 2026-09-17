@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Save, Upload, FolderOpen, Zap } from "lucide-react";
+import { Save, Upload, FolderOpen } from "lucide-react";
 import { useKeyboardEditor, type StepConfig } from "../hooks/useKeyboardEditor";
 import TopBar from "./TopBar";
 import FloatingToolbar, { type SpecialKeyDef } from "./FloatingToolbar";
@@ -398,14 +398,6 @@ export default function EditorPage() {
             style={{ padding: "8px 24px", fontWeight: 600, cursor: "pointer", color: "var(--theme-warning)" }}
           >
             <FolderOpen size={14} strokeWidth={2} /> {t("backup.openBtn")}
-          </button>
-          <button onClick={() => setQmkOverlayVisible(true)}
-            data-testid="footer-qmk"
-            title={t("tip.footerQmk")}
-            className="kle-btn btn-hover-accent"
-            style={{ padding: "8px 24px", fontWeight: 700, cursor: "pointer", letterSpacing: 0.3 }}
-          >
-            <Zap size={14} strokeWidth={2} /> {t("footer.qmkBtn")}
           </button>
         </div>
 
