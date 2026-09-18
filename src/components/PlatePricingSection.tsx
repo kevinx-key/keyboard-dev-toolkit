@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, Ruler, AlertTriangle, MessageCircle, Mail, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import PricingTrustNote from "./PricingTrustNote";
 import { LANG_CURRENCY, formatMoney } from "../lib/currency";
 import { useFxRates } from "../lib/use-fx-rates";
 import { requestQuote, quoteUnavailable, QuoteServiceError, type QuoteRequest, type QuoteResponse, type MetaResponse, getMeta } from "../lib/quote-api";
+import { tOption, tServerText, tQuoteReason, fill, LANG_LOCALE } from "../lib/pricing-i18n";
+import type { PlateOrderInfo } from "../lib/checkout-payload";
+
+type PlateQuoteResp = NonNullable<Extract<QuoteResponse, { ok: true }>["plate"]> & { version?: string };
 
 interface PlatePricingSectionProps {
   /** 定位板成品尺寸（mm），来自定位板编辑器 plateResult；null = 未生成 */
   plateSize?: { width: number; height: number } | null;
+  /** 定位板报价变化上报（供 PCBA 一键下单合并定位板；null = 不含定位板） */
+  onOrderInfoChange?: (info: PlateOrderInfo | null) => void;
 }
 
 const psec: React.CSSProperties = {
@@ -35,7 +41,7 @@ const inputStyle: React.CSSProperties = {
  * 默认折叠、点击展开；尺寸默认跟随定位板编辑器、可手动修改（0 = 跟随）；独立数量；
  * 报价经 /api/quote（plate 参数）；页面只显示交付数量/用板张数/总价/单价（不显示成本构成）；
  * 人工报价 Discord/Email 按钮 */
-export default function PlatePricingSection({ plateSize = null }: PlatePricingSectionProps) {
+export default function PlatePricingSection({ plateSize = null, onOrderInfoChange }: PlatePricingSectionProps) {
   const { t, lang } = useI18n();
   const currency = LANG_CURRENCY[lang];
   const fx = useFxRates();
@@ -47,7 +53,7 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
   // v2.7.0 手动尺寸：>0 用手动值，0 = 跟随定位板编辑器
   const [manualL, setManualL] = useState(0);
   const [manualW, setManualW] = useState(0);
-  const [plateQuote, setPlateQuote] = useState<{ quoting: boolean; error: string | null; resp: NonNullable<Extract<QuoteResponse, { ok: true }>["plate"]> | null }>({
+  const [plateQuote, setPlateQuote] = useState<{ quoting: boolean; error: string | null; errorCode?: string; resp: PlateQuoteResp | null }>({
     quoting: false,
     error: null,
     resp: null,
@@ -83,9 +89,9 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
       requestQuote(base)
         .then((resp) => {
           if (!resp.ok) {
-            setPlateQuote({ quoting: false, error: resp.reason, resp: null });
+            setPlateQuote({ quoting: false, error: resp.reason, errorCode: resp.code, resp: null });
           } else {
-            setPlateQuote({ quoting: false, error: null, resp: resp.plate ?? null });
+            setPlateQuote({ quoting: false, error: null, resp: resp.plate ? { ...resp.plate, version: resp.version } : null });
           }
         })
         .catch((e: unknown) =>
@@ -99,19 +105,46 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
     return () => clearTimeout(timer);
   }, [open, plateSize, quantity, material, resolvedL, resolvedW, serviceDownMsg]);
 
+  // 上报定位板报价（供 PCBA 一键下单合并）；内容不变时不重复上报，避免父级重渲染循环
+  const lastInfoKeyRef = useRef("");
+  useEffect(() => {
+    if (!onOrderInfoChange) return;
+    const resp = plateQuote.resp;
+    let info: PlateOrderInfo | null = null;
+    if (resp && resp.ok && quantity >= 5 && plateSize && resolvedL > 0 && resolvedW > 0) {
+      info = {
+        material,
+        quantity,
+        lengthMm: resolvedL,
+        widthMm: resolvedW,
+        actual: { width: plateSize.width, height: plateSize.height },
+        auto: manualL === 0 && manualW === 0,
+        totalPrice: resp.totalPrice ?? 0,
+        deliveryQty: resp.deliveryQty ?? 0,
+        version: resp.version ?? "",
+      };
+    }
+    const key = info ? JSON.stringify(info) : "";
+    if (key === lastInfoKeyRef.current) return;
+    lastInfoKeyRef.current = key;
+    onOrderInfoChange(info);
+  }, [onOrderInfoChange, plateQuote, quantity, material, resolvedL, resolvedW, plateSize, manualL, manualW]);
+
   const fmtMoney = (cny: number) => formatMoney(cny, currency, fx.rates.rates);
 
   const handleCopy = async () => {
     if (!plateQuote.resp || !plateQuote.resp.ok) return;
-    const materialName = meta?.plateMaterials.find((m) => m.key === material)?.name ?? material;
+    const plateMat = meta?.plateMaterials.find((m) => m.key === material);
+    const materialName = tOption(t, "plateMaterial", material, plateMat?.name);
     const p = plateQuote.resp;
     const lines = [
-      "定位板报价（独立）",
-      `定位板尺寸: ${resolvedL} × ${resolvedW} mm`,
-      `定位板材质: ${materialName} · 交付数量: ${p.deliveryQty ?? 0} PCS`,
-      `预计用板张数: ${p.sheets ?? 0} 张`,
-      `定位板总价: ${formatMoney(p.totalPrice ?? 0, currency, fx.rates.rates)}`,
-      `定位板单价: ${formatMoney(p.unitPrice ?? 0, currency, fx.rates.rates)} / PCS（按实交 ${p.deliveryQty ?? 0} PCS 分摊）`,
+      t("pricing.copy.plateTitle"),
+      fill(t("pricing.copy.plateSize"), { l: resolvedL, w: resolvedW }),
+      fill(t("pricing.copy.plateMaterial"), { name: materialName, n: p.deliveryQty ?? 0 }),
+      fill(t("pricing.copy.sheets"), { n: p.sheets ?? 0 }),
+      fill(t("pricing.copy.plateTotal"), { value: formatMoney(p.totalPrice ?? 0, currency, fx.rates.rates) }),
+      fill(t("pricing.copy.plateUnit"), { value: formatMoney(p.unitPrice ?? 0, currency, fx.rates.rates), n: p.deliveryQty ?? 0 }),
+      fill(t("pricing.copy.version"), { version: p.version ?? "—", date: new Date().toLocaleString(LANG_LOCALE[lang]) }),
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
@@ -164,7 +197,7 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
               <br />
               <select style={{ ...inputStyle, width: 180 }} value={material} onChange={(e) => setMaterial(e.target.value)}>
                 {(meta?.plateMaterials ?? []).map((m) => (
-                  <option key={m.key} value={m.key}>{m.name}</option>
+                  <option key={m.key} value={m.key}>{tOption(t, "plateMaterial", m.key, m.name)}</option>
                 ))}
               </select>
             </label>
@@ -229,13 +262,13 @@ export default function PlatePricingSection({ plateSize = null }: PlatePricingSe
           {plateQuote.error && (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)", marginTop: 8 }}>
               <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <div>{plateQuote.error}</div>
+              <div>{tQuoteReason(t, plateQuote.errorCode, plateQuote.error ?? "")}</div>
             </div>
           )}
           {plateQuote.resp && !plateQuote.resp.ok && (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)", marginTop: 8 }}>
               <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <div>{plateQuote.resp.reason}</div>
+              <div>{tServerText(t, plateQuote.resp.reason ?? "")}</div>
             </div>
           )}
           {plateQuote.resp && plateQuote.resp.ok && (

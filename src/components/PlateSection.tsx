@@ -11,6 +11,7 @@ import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import InteractivePlatePreview from "./InteractivePlatePreview";
 import PlatePricingSection from "./PlatePricingSection";
+import type { PlateOrderInfo } from "../lib/checkout-payload";
 
 // ─── PlateConfig extended with swillkb controls ──────────
 
@@ -48,9 +49,11 @@ interface PlateSectionProps {
   onClearCanvasSelection?: () => void;
   /** Issue 3: Incremented when canvas selection changes — clears local selection */
   clearNonCanvasEpoch?: number;
+  /** 定位板报价变化上报（供 PCBA 一键下单合并定位板） */
+  onPlateOrderChange?: (info: PlateOrderInfo | null) => void;
 }
 
-export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, clearNonCanvasEpoch }: PlateSectionProps) {
+export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, clearNonCanvasEpoch, onPlateOrderChange }: PlateSectionProps) {
   const { t } = useI18n();
   const [config, setConfig] = useState<PlateSectionConfig>({ ...DEFAULT_PLATE_CONFIG });
   const [drawn, setDrawn] = useState(false);
@@ -360,6 +363,7 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
       <div style={{ padding: "0 12px 12px 12px" }}>
         <PlatePricingSection
           plateSize={drawn && plateResult ? { width: plateResult.width, height: plateResult.height } : null}
+          onOrderInfoChange={onPlateOrderChange}
         />
       </div>
     </div>

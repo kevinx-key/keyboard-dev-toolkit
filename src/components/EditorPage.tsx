@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Save, Upload, FolderOpen } from "lucide-react";
 import { useKeyboardEditor, type StepConfig } from "../hooks/useKeyboardEditor";
 import TopBar from "./TopBar";
@@ -31,6 +31,8 @@ import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb
 import { computePCBBounds } from "../lib/pcb-export";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import { useStpExport } from "../hooks/useStpExport";
+import { serializeProjectFile } from "../lib/project-serial";
+import type { PlateOrderInfo } from "../lib/checkout-payload";
 
 declare global {
   interface Window {
@@ -72,6 +74,38 @@ export default function EditorPage() {
     () => computePCBBounds(state.layout, projectPcbConfig),
     [state.layout, projectPcbConfig],
   );
+
+  // 一键下单：定位板报价上报（PlateSection → 此处 → PricingSection 合并下单）
+  const [plateOrder, setPlateOrder] = useState<PlateOrderInfo | null>(null);
+  const handlePlateOrderChange = useCallback((info: PlateOrderInfo | null) => setPlateOrder(info), []);
+
+  // 一键下单：订单快照用完整项目文件（与「保存全部」同格式，生产端可回载继续）
+  const getProjectJson = useCallback((): unknown => {
+    try {
+      const json = serializeProjectFile({
+        name: state.layout.meta.name || "Keyboard",
+        kLayout: getRawRows(state.layout),
+        plateRotations: projectRotations,
+        switchRotations: projectSwitchRots,
+        stabRotations: projectStabRots,
+        needTypeC: projectPcbConfig.needTypeC,
+        need4P: projectPcbConfig.need4P,
+        needMCU: projectPcbConfig.needMCU,
+        typeCX: projectPcbConfig.typeCX,
+        typeCY: projectPcbConfig.typeCY,
+        fourPX: projectPcbConfig.fourPX,
+        fourPY: projectPcbConfig.fourPY,
+        mcuX: projectPcbConfig.mcuX,
+        mcuY: projectPcbConfig.mcuY,
+        typeCRot: projectPcbConfig.typeCRot,
+        fourPRot: projectPcbConfig.fourPRot,
+        mcuRot: projectPcbConfig.mcuRot,
+      });
+      return JSON.parse(json);
+    } catch {
+      return { kLayout: getRawRows(state.layout) };
+    }
+  }, [state.layout, projectRotations, projectSwitchRots, projectStabRots, projectPcbConfig]);
 
   // Cross-region selection sync
   const [clearNonCanvasEpoch, setClearNonCanvasEpoch] = useState(0);
@@ -348,6 +382,7 @@ export default function EditorPage() {
           onStpProgress={handleStpProgress}
           onClearCanvasSelection={editor.clearSelection}
           clearNonCanvasEpoch={clearNonCanvasEpoch}
+          onPlateOrderChange={handlePlateOrderChange}
         />
 
         {/* ═══ PCB Section ═══ */}
@@ -366,7 +401,13 @@ export default function EditorPage() {
         />
 
         {/* ═══ Pricing Section ═══ */}
-        <PricingSection layout={state.layout} rgbEnabled={projectPcbConfig.needLed} pcbSize={pcbBounds} />
+        <PricingSection
+          layout={state.layout}
+          rgbEnabled={projectPcbConfig.needLed}
+          pcbSize={pcbBounds}
+          getProjectJson={getProjectJson}
+          plateOrder={plateOrder}
+        />
 
         {/* ═══ Footer Actions ═══ */}
         <div style={{
