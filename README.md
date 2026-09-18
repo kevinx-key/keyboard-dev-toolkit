@@ -4,6 +4,12 @@
 
 **KLE-compatible · 100% client-side · works offline · free & open source**
 
+**[▶ Try it in your browser — no install needed](https://kevinx-key.github.io/keyboard-dev-toolkit/)**
+
+![Keyboard Dev Toolkit demo — open the app, switch the UI language, then ask the AI assistant to design a 60% keyboard layout](./docs/screenshots/demo.gif)
+
+*Demo: switch the UI language, then ask the AI assistant to design a 60% keyboard — the layout is drawn straight onto the canvas.*
+
 ---
 
 ## What is this?
@@ -65,11 +71,13 @@ This matters more than it sounds: many keyboard designers get stuck at exactly t
 
 ### 🌐 Online (try it first)
 
+**→ [kevinx-key.github.io/keyboard-dev-toolkit](https://kevinx-key.github.io/keyboard-dev-toolkit/)**
+
 Use the hosted web version directly in your browser — no installation needed.
 
 ### 🖥️ Desktop app
 
-Windows, macOS and Linux installers are published on the [Releases](https://github.com/kevinx-key/keyboard-dev-toolkit/releases) page (latest: **v1.0.29**):
+Windows, macOS and Linux installers are published on the [Releases](https://github.com/kevinx-key/keyboard-dev-toolkit/releases/latest) page:
 
 | Platform | File |
 |----------|------|
@@ -189,5 +197,5 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 - 画配列 → 出定位板（DXF 直接加工）→ 生成 PCB（直接交给厂家制造）→ 导出 STEP 3D 模型
 - **AI 助手**：用自然语言描述你想要的配列，AI 自动帮你设计（支持 DeepSeek、OpenAI 兼容接口）
 - **标准 STP 3D 模型**：PCB 板体与板上元器件（轴体、卫星轴等）均有高精度标准模型。很多作者卡在"拿不到准确的 3D 模型导入设计软件"这一步，或用了粗糙模型导致生产文件出错；我们的模型是标准的、可靠的生产有效模型，3D 软件里看到的与工厂实际生产出的产品一致，外壳、垫片、结构件按它设计不会偏差
-- 浏览器即可使用，无需安装；已发布 Windows / macOS / Linux 三平台安装包，见 GitHub [Releases](https://github.com/kevinx-key/keyboard-dev-toolkit/releases)
+- 浏览器即可使用，无需安装：[**在线试用 →**](https://kevinx-key.github.io/keyboard-dev-toolkit/)；已发布 Windows / macOS / Linux 三平台安装包，见 GitHub [Releases](https://github.com/kevinx-key/keyboard-dev-toolkit/releases)
 - 免费开源（AGPL-3.0），本地部署指南见上方英文部分
