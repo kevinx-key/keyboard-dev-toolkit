@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { KeyProps } from "../../lib";
 import { SectionHeader } from "./shared/SectionHeader";
 import { useI18n } from "../../lib/i18n";
@@ -10,10 +11,59 @@ interface PropertiesTabProps {
   onSetProp: (ids: string[], prop: keyof KeyProps, value: unknown) => void;
 }
 
-const SIZE_PRESETS = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.75, 6.25];
-const HEIGHT_PRESETS = [1, 1.5, 2, 2.5, 3];
+const SIZE_STEP = 0.25;
+const SIZE_MIN = 0.25;
 const ROTATION_PRESETS = [0, 90, 180, -90];
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 28, 34, 36];
+
+function SizeStepper({
+  value, disabled, label, title, min = SIZE_MIN, onCommit,
+}: {
+  value: number;
+  disabled: boolean;
+  label: string;
+  title: string;
+  min?: number;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const clamp = (n: number) => Math.max(min, Math.round(n * 100) / 100);
+  const step = (dir: number) => onCommit(clamp(value + dir * SIZE_STEP));
+
+  const btn: React.CSSProperties = {
+    width: 22, height: 22, padding: 0, fontSize: 13, lineHeight: "20px",
+    border: "1px solid var(--theme-border-input)", borderRadius: "var(--theme-radius-sm)",
+    background: "var(--theme-surface)", color: "var(--theme-text)",
+    cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.45 : 1,
+  };
+  const input: React.CSSProperties = {
+    width: 52, textAlign: "center", padding: "2px 4px", fontSize: 12,
+    border: "1px solid var(--theme-border-input)", borderRadius: "var(--theme-radius-sm)",
+    background: "var(--theme-input-bg)", color: "var(--theme-text)",
+    fontFamily: "var(--theme-font-mono)",
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 3 }} title={title}>
+      <button type="button" aria-label={`${label} -`} disabled={disabled} onClick={() => step(-1)} style={btn}>−</button>
+      <input
+        type="number" step={SIZE_STEP} min={min} value={draft} disabled={disabled}
+        aria-label={label}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const n = parseFloat(draft);
+          if (Number.isFinite(n)) onCommit(clamp(n));
+          else setDraft(String(value));
+        }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={input}
+      />
+      <button type="button" aria-label={`${label} +`} disabled={disabled} onClick={() => step(1)} style={btn}>+</button>
+    </div>
+  );
+}
 
 export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabProps) {
   const { t } = useI18n();
@@ -28,6 +78,8 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
 
   const curW = key?.w || 1;
   const curH = key?.h || 1;
+  const curW2 = key?.w2 ?? 0;
+  const curH2 = key?.h2 ?? 0;
   const curX = key?.x || 0;
   const curY = key?.y || 0;
   const curR = key?.r || 0;
@@ -53,30 +105,44 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
     background: "var(--theme-input-bg)", textAlign: "center", color: "var(--theme-text)",
     fontFamily: "var(--theme-font-mono)",
   };
+  const prow: React.CSSProperties = {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+  };
 
   return (
     <div className="belt-inner" style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
       {/* Size */}
       <div className="psec" style={psec}>
         <SectionHeader>{t("pt.size")}</SectionHeader>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={prow}>
             <label style={plabel}>{t("pt.width")}</label>
-            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-              {SIZE_PRESETS.map((s) => (
-                <span key={s} onClick={() => set("w", s)} title={t("tip.propW")} className={`kle-chip${curW === s ? " active" : ""}`}
-                  style={{ padding: "1px 7px", fontSize: 11, cursor: hasSelection ? "pointer" : "default", borderRadius: "var(--theme-radius-sm)" }}>{s}</span>
-              ))}
-            </div>
+            <SizeStepper
+              value={curW} disabled={!hasSelection} label={t("pt.width")} title={t("tip.propW")}
+              onCommit={(v) => set("w", v)}
+            />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={prow}>
             <label style={plabel}>{t("pt.height")}</label>
-            <div style={{ display: "flex", gap: 3 }}>
-              {HEIGHT_PRESETS.map((s) => (
-                <span key={s} onClick={() => set("h", s)} title={t("tip.propH")} className={`kle-chip${curH === s ? " active" : ""}`}
-                  style={{ padding: "1px 7px", fontSize: 11, cursor: hasSelection ? "pointer" : "default", borderRadius: "var(--theme-radius-sm)" }}>{s}</span>
-              ))}
-            </div>
+            <SizeStepper
+              value={curH} disabled={!hasSelection} label={t("pt.height")} title={t("tip.propH")}
+              onCommit={(v) => set("h", v)}
+            />
+          </div>
+          <div style={{ height: 1, background: "var(--theme-border-light)", margin: "1px 0" }} />
+          <div style={prow}>
+            <label style={plabel}>{t("pt.width2")}</label>
+            <SizeStepper
+              value={curW2} min={0} disabled={!hasSelection} label={t("pt.width2")} title={t("tt.width2")}
+              onCommit={(v) => set("w2", v)}
+            />
+          </div>
+          <div style={prow}>
+            <label style={plabel}>{t("pt.height2")}</label>
+            <SizeStepper
+              value={curH2} min={0} disabled={!hasSelection} label={t("pt.height2")} title={t("tt.height2")}
+              onCommit={(v) => set("h2", v)}
+            />
           </div>
         </div>
       </div>
