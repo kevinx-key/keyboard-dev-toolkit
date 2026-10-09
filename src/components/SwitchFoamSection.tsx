@@ -28,7 +28,8 @@ export default function SwitchFoamSection({
 }: SwitchFoamSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
-  const [fillet, setFillet] = useState(1);
+  const [fillet, setFillet] = useState(0);
+  const [holeFillet, setHoleFillet] = useState(0);
   const [thickness, setThickness] = useState(DEFAULT_FOAM_THICKNESS);
   const [drawn, setDrawn] = useState(false);
   const [selectedKeyIdx, setSelectedKeyIdx] = useState<number | null>(null);
@@ -37,8 +38,9 @@ export default function SwitchFoamSection({
     switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
     topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
     fillet,
+    holeFillet,
     thickness,
-  }), [fillet, thickness]);
+  }), [fillet, holeFillet, thickness]);
 
   const foamResult = useMemo((): PlateResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
@@ -116,9 +118,17 @@ export default function SwitchFoamSection({
       {/* ── Config bar (only Fillet + STP thickness) ── */}
       <div style={{ padding: "10px 12px 4px 12px", display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
         <label style={fieldLabel}>
-          <span>{t("plate.fillet")}</span>
+          <span>{t("fillet.holes")}</span>
           <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <input type="number" value={fillet} min={0} max={20} step={0.5} title={t("tip.plFillet")}
+            <input type="number" value={holeFillet} min={0} max={20} step={0.5} title={t("tip.filletHoles")}
+              onChange={(e) => setHoleFillet(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("fillet.outer")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={fillet} min={0} max={20} step={0.5} title={t("tip.filletOuter")}
               onChange={(e) => setFillet(parseFloat(e.target.value) || 0)} style={numInput} />
             <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
           </span>

@@ -11,7 +11,7 @@ const BASE: BottomFoamConfig = {
   needTypeC: false, typeCX: 0, typeCY: 0, typeCRot: 0,
   need4P: false, fourPX: 0, fourPY: 0, fourPRot: 0,
   needMCU: false, mcuX: 0, mcuY: 0, mcuRot: 0,
-  edgeDistance: 3, fillet: 1,
+  edgeDistance: 3, holeFillet: 1, outerFillet: 1,
 };
 const TWO = [mk({ x: 0, y: 0 }), mk({ x: 1, y: 0 })];
 
@@ -73,6 +73,12 @@ describe("generateBottomFoam", () => {
   it("adds user custom rectangles (rounded, rotatable)", () => {
     const r = generateBottomFoam(layout(TWO), { ...BASE, customRects: [{ cx: 100, cy: 100, w: 10, h: 6, r: 1, rot: 30 }] });
     expect(r.stpData!.polyHoles.length).toBe(3); // 2 hotswap + 1 custom
+  });
+
+  it("hotswap 圆角矩形的四角随「圆角」(holeFillet) 变化", () => {
+    const a = generateBottomFoam(layout(TWO), { ...BASE, holeFillet: 0 }).svg;
+    const b = generateBottomFoam(layout(TWO), { ...BASE, holeFillet: 2 }).svg;
+    expect(a).not.toBe(b);
   });
 
   it("matches snapshot", () => {

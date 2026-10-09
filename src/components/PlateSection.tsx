@@ -22,7 +22,8 @@ export interface PlateSectionConfig extends PlateConfig {
   lineWeight: number;
   dmz: number;
   padEnabled: boolean;
-  filletEnabled: boolean;
+  /** 「圆角」：外框以外的所有图形圆角 */
+  holeFillet: number;
   kerfEnabled: boolean;
   u1Enabled: boolean;
   lineColorEnabled: boolean;
@@ -33,8 +34,8 @@ export interface PlateSectionConfig extends PlateConfig {
 const DEFAULT_PLATE_CONFIG: PlateSectionConfig = {
   switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
   topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
-  fillet: 1, lineColor: "#000000", lineWeight: 0.05, dmz: 5,
-  padEnabled: false, filletEnabled: false, kerfEnabled: false,
+  fillet: 0, holeFillet: 0, lineColor: "#000000", lineWeight: 0.05, dmz: 5,
+  padEnabled: false, kerfEnabled: false,
   u1Enabled: false, lineColorEnabled: false, lineWeightEnabled: false,
   customPolygons: "",
 };
@@ -67,7 +68,7 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
       topPad: c.padEnabled ? c.topPad : 0, leftPad: c.padEnabled ? c.leftPad : 0,
       rightPad: c.padEnabled ? c.rightPad : 0, bottomPad: c.padEnabled ? c.bottomPad : 0,
       xGrow: c.xGrow, yGrow: c.yGrow,
-      fillet: c.filletEnabled ? c.fillet : 0,
+      fillet: c.fillet,
     };
   }, [config]);
 
@@ -76,8 +77,8 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
 
   const plateResult = useMemo((): PlateResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
-    return generatePlate(layout, effectiveConfig, rotationOverrides, { compatKeyIndices: compatDimIndices });
-  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices]);
+    return generatePlate(layout, effectiveConfig, rotationOverrides, { compatKeyIndices: compatDimIndices, holeFillet: config.holeFillet });
+  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices, config.holeFillet]);
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -220,7 +221,8 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
           <ConfigNumber label={t("plate.padBottom")} tip={t("tip.plPad")} value={config.bottomPad} enabled={config.padEnabled} onChange={v => update("bottomPad", v)} min={0} max={30} />
           <ConfigColor label={t("plate.lineColor")} tip={t("tip.plLineColor")} value={config.lineColor} enabled={config.lineColorEnabled} onToggle={v => update("lineColorEnabled", v)} onChange={v => update("lineColor", v)} />
           <ConfigNumber label={t("plate.lineWeight")} tip={t("tip.plLineWeight")} value={config.lineWeight} enabled={config.lineWeightEnabled} onToggle={v => update("lineWeightEnabled", v)} onChange={v => update("lineWeight", v)} min={0} max={1} step={0.01} />
-          <ConfigNumber label={t("plate.fillet")} tip={t("tip.plFillet")} value={config.fillet} enabled={config.filletEnabled} onToggle={v => update("filletEnabled", v)} onChange={v => update("fillet", v)} min={0} max={20} step={0.5} unit="mm" />
+          <ConfigNumber label={t("fillet.holes")} tip={t("tip.filletHoles")} value={config.holeFillet} onChange={v => update("holeFillet", v)} min={0} max={20} step={0.5} unit="mm" />
+          <ConfigNumber label={t("fillet.outer")} tip={t("tip.filletOuter")} value={config.fillet} onChange={v => update("fillet", v)} min={0} max={20} step={0.5} unit="mm" />
         </div>
       </div>
 

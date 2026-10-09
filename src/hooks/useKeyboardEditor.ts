@@ -241,7 +241,7 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
   }, []);
 
   // M15 修复：数字属性校验 — 防止 NaN/Infinity/null 穿透到 reducer
-  const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth"]);
+  const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth", "compatOption"]);
   const setProp = useCallback((ids: string[], prop: keyof KeyProps, value: unknown) => {
     if (NUMERIC_PROPS.has(prop) && (typeof value !== "number" || !isFinite(value))) {
       logger.error(`setProp: invalid numeric value for ${String(prop)}: ${String(value)}`);

@@ -15,7 +15,6 @@ import type { StpExtrudeData } from "./stp-export";
 import type { SolderType, PCBSwitchRotations } from "./pcb-export";
 import { computeBottomFoamGeometry } from "./pcb-export";
 import type { CustomRect } from "./pcb-export";
-import { filletPolygon } from "./plate-export";
 
 export interface BottomFoamConfig {
   solderType: SolderType;
@@ -25,14 +24,16 @@ export interface BottomFoamConfig {
   needMCU: boolean; mcuX: number; mcuY: number; mcuRot: number;
   /** 片材边距 (mm) */
   edgeDistance: number;
-  /** 外形圆角半径 (mm, 0 = 直角) */
-  fillet: number;
+  /** 「圆角」：所有挖孔（外框以外的图形）圆角半径 (mm, 0 = 直角) */
+  holeFillet: number;
+  /** 「外框圆角」：片材外框四角圆角半径 (mm, 0 = 直角) */
+  outerFillet: number;
   /** 用户自定义圆角矩形挖孔 */
   customRects?: CustomRect[];
 }
 
-/** 默认外形圆角 (mm) 与 STP 厚度 (mm) */
-export const DEFAULT_BOTTOM_FOAM_FILLET = 1;
+/** 默认圆角 (mm) 与 STP 厚度 (mm) */
+export const DEFAULT_BOTTOM_FOAM_FILLET = 0;
 export const DEFAULT_BOTTOM_FOAM_THICKNESS = 3;
 
 export interface BottomFoamResult {
@@ -106,15 +107,14 @@ export function generateBottomFoam(
   }
 
   const merged = anyOverlap(geo.polys) ? unionPolys(geo.polys) : geo.polys;
-  // 合并后所有直角 → 圆角 (R config.fillet)
-  const holes = config.fillet > 0
-    ? merged.map((p) => filletPolygon(p.map(([x, y]) => ({ x, y })), config.fillet, 4).map((q) => [q.x, q.y] as Pt2))
-    : merged;
+  // 「圆角」已在各挖孔自身的半径中体现（hotswap 轴座 / 组件圆角矩形），不再二次圆角
+  const holes = merged;
 
   const pad = 5;
   const svgW = width + pad * 2;
   const svgH = height + pad * 2;
-  const filletR = Math.min(config.fillet > 0 ? config.fillet : 0, width / 2, height / 2);
+  // 「外框圆角」
+  const outerR = Math.min(config.outerFillet > 0 ? config.outerFillet : 0, width / 2, height / 2);
   const vx = (x: number) => (x - geo.minX + pad).toFixed(3);
   const vy = (y: number) => (y - geo.minY + pad).toFixed(3);
 
@@ -122,7 +122,7 @@ export function generateBottomFoam(
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path{vector-effect:non-scaling-stroke}</style>
-  <rect x="${pad}" y="${pad}" width="${width}" height="${height}" rx="${filletR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
+  <rect x="${pad}" y="${pad}" width="${width}" height="${height}" rx="${outerR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
   <g fill="#fff" stroke="#888" stroke-width="0.3">`;
   for (const poly of holes) {
     const d = poly.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z";
@@ -134,9 +134,7 @@ export function generateBottomFoam(
   const compatRaw = geo.compatPolys ?? [];
   if (compatRaw.length > 0) {
     const compatMerged = anyOverlap(compatRaw) ? unionPolys(compatRaw) : compatRaw;
-    const compatHoles = config.fillet > 0
-      ? compatMerged.map((p) => filletPolygon(p.map(([x, y]) => ({ x, y })), config.fillet, 4).map((q) => [q.x, q.y] as Pt2))
-      : compatMerged;
+    const compatHoles = compatMerged;
     svg += `
   <g fill="lightgray" stroke="#888" stroke-width="0.3">`;
     for (const poly of compatHoles) {
@@ -150,7 +148,7 @@ export function generateBottomFoam(
 </svg>`;
 
   // ── DXF ──
-  const dxf = buildDXF(geo, holes, width, height, filletR);
+  const dxf = buildDXF(geo, holes, width, height, outerR);
 
   // ── STP ──
   const stpData: StpExtrudeData = {

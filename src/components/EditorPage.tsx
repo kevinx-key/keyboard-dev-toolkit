@@ -68,6 +68,7 @@ export default function EditorPage() {
   const [projectStabRots, setProjectStabRots] = useState<PCBStabRotations>({});
   const [projectPcbConfig, setProjectPcbConfig] = useState<PCBConfig>({
     solderType: "socket", needStab: true, needLed: false, edgeDistance: 5,
+    outerFillet: 0,
     needTypeC: false, need4P: false, needMCU: false,
     typeCX: -1.5, typeCY: 16, fourPX: 196, fourPY: 17.5, mcuX: 91, mcuY: 62,
     typeCRot: 270, fourPRot: 270, mcuRot: 45,

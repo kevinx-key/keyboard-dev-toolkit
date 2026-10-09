@@ -96,6 +96,8 @@ export interface PCBConfig {
   needLed: boolean;
   /** Edge distance from nearest switch hole to board edge (mm) */
   edgeDistance: number;
+  /** 「外框圆角」：PCB 板框四角圆角半径 (mm, 0 = 直角) */
+  outerFillet?: number;
   /** Include Type-C connector model (STP only) */
   needTypeC: boolean;
   /** Include 4P connector model (STP only) */
@@ -291,9 +293,9 @@ const TYPEC_SCREW_HOLES: [number, number, number][] = [
 // DXF 中的 5 个圆 (r2 中心 / 2×r1.5 / 2×r0.85) 是轴孔对位基准, 挖孔时剔除, 不参与切割。
 const HOTSWAP_CUT = { x0: -8.16, y0: -7.043, x1: 6.89, y1: 2.3, r: 1.0 };
 
-/** hotswap 挖孔多边形 (圆角矩形, 键中心相对坐标) */
-function hotswapCutout(seg = 6): [number, number][] {
-  const { x0, y0, x1, y1, r } = HOTSWAP_CUT;
+/** hotswap 挖孔多边形 (圆角矩形, 键中心相对坐标)。r 缺省取 HOTSWAP_CUT.r，可由「圆角」控制。 */
+function hotswapCutout(r = HOTSWAP_CUT.r, seg = 6): [number, number][] {
+  const { x0, y0, x1, y1 } = HOTSWAP_CUT;
   const R = Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2);
   const pts: [number, number][] = [];
   const arc = (cx: number, cy: number, a0: number, a1: number) => {
@@ -576,6 +578,8 @@ export function computeBottomFoamGeometry(
     need4P: boolean; fourPX: number; fourPY: number; fourPRot: number;
     needMCU: boolean; mcuX: number; mcuY: number; mcuRot: number;
     edgeDistance: number;
+    /** 「圆角」：hotswap 轴座与组件挖孔圆角矩形的半径 (mm) */
+    holeFillet: number;
     customRects?: CustomRect[];
   },
   switchRotations?: PCBSwitchRotations,
@@ -585,8 +589,8 @@ export function computeBottomFoamGeometry(
   const compatPolys: [number, number][][] = [];
   const { keys } = layout;
 
-  // 组件挖孔：以组件中心为心的圆角矩形
-  const compRect = (cx: number, cy: number, w: number, h: number, rot: number, r = 1) => {
+  // 组件挖孔：以组件中心为心的圆角矩形（圆角取「圆角」值）
+  const compRect = (cx: number, cy: number, w: number, h: number, rot: number, r = opts.holeFillet) => {
     polys.push(roundedRectPolygon(cx, cy, w, h, r, rot));
   };
 
@@ -597,7 +601,7 @@ export function computeBottomFoamGeometry(
       typeCX: 0, typeCY: 0, fourPX: 0, fourPY: 0, mcuX: 0, mcuY: 0, typeCRot: 0, fourPRot: 0, mcuRot: 0,
     };
     const { keyInfos } = computePCBKeyPositions(keys, posConfig, U);
-    const hotswapHole = hotswapCutout();
+    const hotswapHole = hotswapCutout(opts.holeFillet);
     for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
       const ki = keyInfos[keyIndex]!;
       const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
@@ -756,7 +760,7 @@ export function generatePCB(
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
   <!-- FR4 base panel -->
-  <rect x="${pad}" y="${pad}" width="${boardW}" height="${boardH}" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <rect x="${pad}" y="${pad}" width="${boardW}" height="${boardH}" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="${config.outerFillet ?? 0}"/>
   <!-- Copper pour area -->
   <rect x="${pad + 1}" y="${pad + 1}" width="${boardW - 2}" height="${boardH - 2}" fill="none" stroke="#6db86a" stroke-width="0.2"/>
   <!-- Holes group: white fill, transparent interior via mask -->

@@ -3,6 +3,8 @@ import {
   parseViaCompatTag,
   compatStackZ,
   compatVariantIndices,
+  applyCompatToLabels,
+  compatLabelSlot,
   COMPAT_Z_NEUTRAL,
   COMPAT_Z_TOP,
   COMPAT_Z_BELOW,
@@ -12,6 +14,8 @@ import {
   type KeyProps,
   type KLELayout,
 } from '@/lib/kle-types';
+import { editorReducer } from '@/lib/kle-reducer';
+import { mixColor, lighten, darken } from '@/lib/color-utils';
 import { parseKLEJSON } from '@/lib/kle-serial';
 import { keyPropsToIntermediate } from '@/lib/kle-parser';
 import { hitTestKey, getKeysInArea } from '@/components/canvas/CanvasInteraction';
@@ -38,6 +42,62 @@ describe('parseViaCompatTag', () => {
 
   it('slot 常量为 3', () => {
     expect(VIA_OPTION_LABEL_SLOT).toBe(3);
+  });
+});
+
+// ── 颜色混合（兼容着色用） ──────────────────────────────
+
+describe('mixColor / lighten / darken 支持 rgb()', () => {
+  it('mixColor 混合 hex 与 rgb 输入', () => {
+    expect(mixColor('#000000', '#ffffff', 0.5)).toBe('rgb(128,128,128)');
+    expect(mixColor('rgb(0,0,0)', 'rgb(255,255,255)', 0)).toBe('rgb(0,0,0)');
+    expect(mixColor('rgb(0,0,0)', 'rgb(255,255,255)', 1)).toBe('rgb(255,255,255)');
+  });
+
+  it('lighten / darken 接受 rgb() 输入', () => {
+    expect(lighten('rgb(0,0,0)', 100)).toBe('rgb(255,255,255)');
+    expect(darken('rgb(255,255,255)', 100)).toBe('rgb(0,0,0)');
+  });
+});
+
+// ── 组号（option index）写回标签槽 ──────────────────────
+
+describe('applyCompatToLabels / compatLabelSlot', () => {
+  const labels = Array(12).fill('');
+
+  it('align=4 时槽位为 8', () => {
+    expect(compatLabelSlot(4)).toBe(8);
+  });
+
+  it('写入 "<组号>,<值>"', () => {
+    expect(applyCompatToLabels(labels, 4, 1, 2)[8]).toBe('2,1');
+    expect(applyCompatToLabels(labels, 4, 0, undefined)[8]).toBe('0,0');
+  });
+
+  it('compat 为 undefined 时清空标记槽', () => {
+    const withTag = applyCompatToLabels(labels, 4, 1, 3);
+    expect(withTag[8]).toBe('3,1');
+    expect(applyCompatToLabels(withTag, 4, undefined, 3)[8]).toBe('');
+  });
+});
+
+describe('reducer SET_PROP 兼容字段同步标签', () => {
+  const mkState = () => ({
+    layout: { meta: { ...DEFAULT_META }, keys: [{ ...DEFAULT_PROPS, labels: Array(12).fill('') }] },
+    selectedIds: ['0'], clipboard: null, undoStack: [], redoStack: [], isDirty: false,
+  });
+
+  it('设置 compat=1 → 标签槽写 0,1', () => {
+    const next = editorReducer(mkState(), { type: 'SET_PROP', ids: ['0'], prop: 'compat', value: 1 });
+    expect(next.layout.keys[0]!.compat).toBe(1);
+    expect(next.layout.keys[0]!.labels[8]).toBe('0,1');
+  });
+
+  it('设置 compatOption=3 → 标签槽更新为 3,1', () => {
+    let state = editorReducer(mkState(), { type: 'SET_PROP', ids: ['0'], prop: 'compat', value: 1 });
+    state = editorReducer(state, { type: 'SET_PROP', ids: ['0'], prop: 'compatOption', value: 3 });
+    expect(state.layout.keys[0]!.compatOption).toBe(3);
+    expect(state.layout.keys[0]!.labels[8]).toBe('3,1');
   });
 });
 
@@ -73,6 +133,13 @@ describe('导出器浅灰重绘兼容键几何', () => {
     expect(gray(generatePlate(layout, {}, undefined, { compatKeyIndices: new Set([1]) }).svg)).toBe(true);
   });
 
+  it('generatePlate：圆角(挖孔) 与 外框圆角 可分别控制', () => {
+    const noHole = generatePlate(layout, {}).svg;
+    const withHole = generatePlate(layout, {}, undefined, { holeFillet: 2 }).svg;
+    expect(noHole).not.toBe(withHole);
+    expect(generatePlate(layout, { fillet: 3 }).svg).toContain('rx="3"');
+  });
+
   it('generateSwitchPad：指定兼容键后出现浅灰组', () => {
     const cfg = { solderType: 'sunken' as const, needStab: true, needLed: false, edgeDistance: 3, fillet: 1 };
     expect(gray(generateSwitchPad(layout, cfg).svg)).toBe(false);
@@ -83,7 +150,7 @@ describe('导出器浅灰重绘兼容键几何', () => {
     const cfg = { solderType: 'socket' as const, needLed: true,
       needTypeC: false, typeCX: 0, typeCY: 0, typeCRot: 0,
       need4P: false, fourPX: 0, fourPY: 0, fourPRot: 0,
-      needMCU: false, mcuX: 0, mcuY: 0, mcuRot: 0, edgeDistance: 3, fillet: 1 };
+      needMCU: false, mcuX: 0, mcuY: 0, mcuRot: 0, edgeDistance: 3, holeFillet: 1, outerFillet: 0 };
     expect(gray(generateBottomFoam(layout, cfg).svg)).toBe(false);
     expect(gray(generateBottomFoam(layout, cfg, undefined, new Set([1])).svg)).toBe(true);
   });

@@ -29,6 +29,8 @@ export default function BottomFoamSection({
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [thickness, setThickness] = useState(DEFAULT_BOTTOM_FOAM_THICKNESS);
+  const [holeFillet, setHoleFillet] = useState(DEFAULT_BOTTOM_FOAM_FILLET);
+  const [outerFillet, setOuterFillet] = useState(DEFAULT_BOTTOM_FOAM_FILLET);
   const [customRects, setCustomRects] = useState<CustomRect[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
@@ -54,12 +56,13 @@ export default function BottomFoamSection({
       need4P: pcbConfig.need4P, fourPX: pcbConfig.fourPX, fourPY: pcbConfig.fourPY, fourPRot: pcbConfig.fourPRot,
       needMCU: pcbConfig.needMCU, mcuX: pcbConfig.mcuX, mcuY: pcbConfig.mcuY, mcuRot: pcbConfig.mcuRot,
       edgeDistance: pcbConfig.edgeDistance,
-      fillet: DEFAULT_BOTTOM_FOAM_FILLET,
+      holeFillet,
+      outerFillet,
       customRects,
     };
     const r = generateBottomFoam(layout, cfg, switchRotations, compatDimIndices);
     return r.svg ? r : null;
-  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices]);
+  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet]);
 
   const safeSvg = useMemo(() => (foamResult?.svg ? sanitizeSvg(foamResult.svg) : ""), [foamResult]);
 
@@ -192,6 +195,22 @@ export default function BottomFoamSection({
           <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <input type="number" value={thickness} min={0.1} max={20} step={0.1} title={t("tip.bottomThickness")}
               onChange={(e) => setThickness(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("fillet.holes")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={holeFillet} min={0} max={20} step={0.5} title={t("tip.filletHoles")}
+              onChange={(e) => setHoleFillet(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("fillet.outer")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={outerFillet} min={0} max={20} step={0.5} title={t("tip.filletOuter")}
+              onChange={(e) => setOuterFillet(parseFloat(e.target.value) || 0)} style={numInput} />
             <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
           </span>
         </label>

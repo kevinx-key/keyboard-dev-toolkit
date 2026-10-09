@@ -6,7 +6,7 @@ import { KEY_UNIT, KEY_GAP } from "../../lib";
 import { KEY_TOP_LEFT, KEY_TOP_TOP, KEY_RX, STEPPED_NOTCH_RATIO, getKeyStrokeColor, getKeyFaceColor } from "../../lib/key-renderer";
 import { computeLShapeSvgPath } from "../../lib/lshape-path";
 import { rotatedBbox } from "../../lib/geometry-utils";
-import { lighten } from "../../lib/color-utils";
+import { lighten, mixColor } from "../../lib/color-utils";
 import { isValidHexColor } from "../../lib/sanitize";
 import LabelRenderer from "./LabelRenderer";
 
@@ -146,12 +146,17 @@ export default function KeyRenderer({
   const faceHeight = kbHeight - 12;
   const ktopRadius = isDSA ? 8 : 3;
   // Issue 2: Default keycap color #cccccc → top face should be white, not lightened gray
-  const lightBg = keyData.c && keyData.c !== "#cccccc" ? getKeyFaceColor(keyData.c) : "#ffffff";
+  const rawFace = keyData.c && keyData.c !== "#cccccc" ? getKeyFaceColor(keyData.c) : "#ffffff";
+  const rawBase = keyData.c || "#cccccc";
 
-  // ── Two-color gradient (per key) ──
-  const hasGradient = !!(keyData.c2 && isValidHexColor(keyData.c2));
+  // ── 兼容层：把标记色混入键帽底色/顶面（保留立体顶面与图例，不覆盖整键） ──
+  const compatFace = compatColor ? mixColor(compatColor, "rgb(255,255,255)", 0.5) : null;
+  const baseC = compatColor ? mixColor(rawBase, compatColor, compatOpacity) : rawBase;
+  const lightBg = compatColor && compatFace ? mixColor(rawFace, compatFace, compatOpacity) : rawFace;
+
+  // ── Two-color gradient (per key；兼容着色时用纯色，避免渐变干扰) ──
+  const hasGradient = !compatColor && !!(keyData.c2 && isValidHexColor(keyData.c2));
   const gradAngle = typeof keyData.cang === "number" ? keyData.cang : 135;
-  const baseC = keyData.c || "#cccccc";
   const bodyGradient = hasGradient ? keyGradient(gradAngle, baseC, keyData.c2!) : undefined;
   const faceGradient = hasGradient
     ? keyGradient(gradAngle, lighten(baseC, 18), lighten(keyData.c2!, 18))
@@ -483,24 +488,6 @@ export default function KeyRenderer({
             )}
           </>
         ) : null}
-
-        {/* ── 兼容层键帽覆盖色（兼容按键浅蓝 / 兼容常规键浅绿） ── */}
-        {compatColor && (
-          <div
-            style={{
-              position: "absolute",
-              left: hasExt ? 0 : bodyOffX,
-              top: hasExt ? 0 : bodyOffY,
-              width: hasExt ? bboxW : kbWidth,
-              height: hasExt ? bboxH : kbHeight,
-              backgroundColor: compatColor,
-              opacity: compatOpacity,
-              borderRadius: hasExt ? 0 : KEY_RX,
-              zIndex: 3,
-              pointerEvents: "none",
-            }}
-          />
-        )}
 
         {/* ── Labels ── */}
         <LabelRenderer
