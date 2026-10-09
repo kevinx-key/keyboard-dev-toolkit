@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getRawRows, parseKLEJSON } from "../lib/kle-serial";
 import { serializeProjectFile, deserializeProjectFile } from "../lib/project-serial";
-import type { ProjectFileOutput } from "../lib/project-serial";
+import type { ProjectFileOutput, ProjectFileDecal } from "../lib/project-serial";
 import { saveFile, openFile } from "../lib/platform-bridge";
 import { addLog, logger } from "../lib/error-logger";
 import {
@@ -69,6 +69,44 @@ function applyProjectPcbConfig(
     fourPRot: parsed.fourPRot,
     mcuRot: parsed.mcuRot,
   }));
+}
+
+/** Extract the decal (if any) from a layout's meta as a project-file decal. */
+function decalFromMeta(meta: KLELayout["meta"]): ProjectFileDecal | null {
+  if (!meta.decalImage) return null;
+  return {
+    image: meta.decalImage,
+    scale: meta.decalScale ?? 1,
+    x: meta.decalX ?? 0,
+    y: meta.decalY ?? 0,
+    dim: meta.decalDim ?? 0.4,
+    opacity: meta.decalOpacity ?? 1,
+    ...(meta.decalNatW != null ? { natW: meta.decalNatW } : {}),
+    ...(meta.decalNatH != null ? { natH: meta.decalNatH } : {}),
+  };
+}
+
+/** Apply a project-file decal onto a loaded layout's meta. */
+function applyDecalToLayout(layoutData: KLELayout, decal: ProjectFileDecal | null): void {
+  if (!decal) {
+    delete layoutData.meta.decalImage;
+    delete layoutData.meta.decalScale;
+    delete layoutData.meta.decalX;
+    delete layoutData.meta.decalY;
+    delete layoutData.meta.decalDim;
+    delete layoutData.meta.decalOpacity;
+    delete layoutData.meta.decalNatW;
+    delete layoutData.meta.decalNatH;
+    return;
+  }
+  layoutData.meta.decalImage = decal.image;
+  layoutData.meta.decalScale = decal.scale;
+  layoutData.meta.decalX = decal.x;
+  layoutData.meta.decalY = decal.y;
+  layoutData.meta.decalDim = decal.dim;
+  layoutData.meta.decalOpacity = decal.opacity;
+  if (decal.natW != null) layoutData.meta.decalNatW = decal.natW;
+  if (decal.natH != null) layoutData.meta.decalNatH = decal.natH;
 }
 
 // ─── Hook ─────────────────────────────────────────────────
@@ -132,6 +170,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
           typeCRot: pc.typeCRot,
           fourPRot: pc.fourPRot,
           mcuRot: pc.mcuRot,
+          decal: decalFromMeta(curLayout.meta),
         });
         saveProjectBackup(json, curLayout.meta.name || "Keyboard").catch((e) => {
           addLog({
@@ -174,6 +213,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         typeCRot: pcbConfig.typeCRot,
         fourPRot: pcbConfig.fourPRot,
         mcuRot: pcbConfig.mcuRot,
+        decal: decalFromMeta(layout.meta),
       });
       const safeName = (layout.meta.name || "keyboard")
         .replace(/[<>:"/\\|?*]/g, "_") // 去掉文件名非法字符
@@ -213,6 +253,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
           if (parsed.name) {
             layoutData.meta.name = parsed.name;
           }
+          applyDecalToLayout(layoutData, parsed.decal);
           loadLayout(layoutData);
         }
       } catch (e) {
@@ -259,6 +300,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
           if (parsed.name) {
             layoutData.meta.name = parsed.name;
           }
+          applyDecalToLayout(layoutData, parsed.decal);
           loadLayout(layoutData);
         }
       } catch (e) {

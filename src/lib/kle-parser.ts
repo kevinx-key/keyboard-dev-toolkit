@@ -68,7 +68,7 @@ export interface IntermediateLayoutItem {
   [key: string]: unknown;
   r?: number; rx?: number; ry?: number;
   a?: number; f?: number; f2?: number; fa?: number[];
-  p?: string; c?: string; t?: string;
+  p?: string; c?: string; c2?: string; cang?: number; t?: string;
   x?: number; y?: number; w?: number; h?: number;
   x2?: number; y2?: number; w2?: number; h2?: number;
   n?: boolean; l?: boolean; d?: boolean; g?: boolean;
@@ -98,6 +98,16 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
   if (meta.switchBrand) metaObj.switchBrand = meta.switchBrand;
   if (meta.switchType) metaObj.switchType = meta.switchType;
   if (meta.author) metaObj.author = meta.author;
+  if (meta.decalImage) {
+    metaObj.decalImage = meta.decalImage;
+    metaObj.decalScale = meta.decalScale ?? 1;
+    metaObj.decalX = meta.decalX ?? 0;
+    metaObj.decalY = meta.decalY ?? 0;
+    metaObj.decalDim = meta.decalDim ?? 0.4;
+    metaObj.decalOpacity = meta.decalOpacity ?? 1;
+    if (meta.decalNatW != null) metaObj.decalNatW = meta.decalNatW;
+    if (meta.decalNatH != null) metaObj.decalNatH = meta.decalNatH;
+  }
 
   if (Object.keys(metaObj).length > 0) {
     rows.push([metaObj]);
@@ -194,6 +204,9 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
       // Color
       emitPropDiff(props, "c", key.c, sticky.c);
       emitPropDiff(props, "t", key.t, sticky.t);
+      // Two-color gradient (sticky, with explicit empty-string clear)
+      emitPropDiff(props, "c2", key.c2 ?? "", sticky.c2);
+      if (key.c2) emitPropDiff(props, "cang", key.cang ?? 135, sticky.cang);
 
       // Misc boolean props
       emitPropBoolDiff(props, "g", key.g, sticky.g);
@@ -263,6 +276,8 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
       if (props.x !== undefined) sticky.x = key.x + key.w;
       if (props.c !== undefined) sticky.c = props.c as string;
       if (props.t !== undefined) sticky.t = props.t as string;
+      if (props.c2 !== undefined) sticky.c2 = props.c2 as string;
+      if (props.cang !== undefined) sticky.cang = props.cang as number;
       if (props.g !== undefined) sticky.g = props.g as boolean;
       if (props.l !== undefined) sticky.l = props.l as boolean;
       if (props.n !== undefined) sticky.n = props.n as boolean;
@@ -365,6 +380,10 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         // Colors
         key.c = (current.c as string) || DEFAULT_PROPS.c;
         key.t = (current.t as string) || DEFAULT_PROPS.t;
+        if (current.c2) {
+          key.c2 = current.c2 as string;
+          key.cang = (current.cang as number) ?? 135;
+        }
 
         // Text size
         key.labelSize = (current.labelSize as number) || DEFAULT_PROPS.labelSize;
@@ -455,6 +474,12 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         // Colors
         if (props.c !== undefined) {
           current.c = String(props.c);
+        }
+        if (props.c2 !== undefined) {
+          current.c2 = String(props.c2);
+        }
+        if (props.cang !== undefined) {
+          current.cang = props.cang as number;
         }
         if (props.t !== undefined) {
           const split = String(props.t).split("\n");
@@ -552,6 +577,7 @@ interface StickyState {
   w2: number; h2: number;
   r: number; rx: number; ry: number;
   c: string; t: string;
+  c2: string; cang: number;
   p: string;
   d: boolean; g: boolean; l: boolean; n: boolean;
   sm: string; sb: string; st: string;
@@ -566,6 +592,7 @@ function createDefaultSticky(): StickyState {
     x: 0, y: 0, w: 1, h: 1, x2: 0, y2: 0, w2: 0, h2: 0,
     r: 0, rx: 0, ry: 0,
     c: DEFAULT_PROPS.c, t: DEFAULT_PROPS.t,
+    c2: "", cang: 135,
     p: "",
     d: false, g: false, l: false, n: false,
     sm: "", sb: "", st: "",

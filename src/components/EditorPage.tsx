@@ -9,14 +9,16 @@ import KeyboardCanvas from "./KeyboardCanvas";
 import ToolBelt from "./ToolBelt";
 import AiFloatingPanel from "./AiFloatingPanel";
 import PlateSection from "./PlateSection";
+import SwitchFoamSection from "./SwitchFoamSection";
 import PCBSection from "./PCBSection";
+import SwitchPadSection from "./SwitchPadSection";
 import PricingSection from "./PricingSection";
 import HelpDialog from "./HelpDialog";
 import BackupDialog from "./BackupDialog";
 import ProjectBackupDialog from "./ProjectBackupDialog";
 import StpExportOverlay from "./StpExportOverlay";
 import QmkExportOverlay from "./QmkExportOverlay";
-import { downloadJSON, downloadSVG, downloadPNG, downloadJPG, exportSVG, renderSVGToBlob } from "../lib/kle-export";
+import { downloadJSON, downloadSVG, downloadPNG, downloadJPG, exportSVG, renderSVGToBlob, exportJSON } from "../lib/kle-export";
 import { installGlobalErrorHandler, addLog, downloadLog } from "../lib/error-logger";
 import { SAMPLES, ALL_PRESETS } from "../data/presets";
 import { getRawRows, parseKLEJSON, parseLayoutJSON } from "../lib/kle-serial";
@@ -25,7 +27,7 @@ import { initPluginSystem } from "../plugins";
 import { useTheme } from "../lib/theme";
 import { useI18n } from "../lib/i18n";
 import type { KLEMeta } from "../lib/kle-types";
-import { DEFAULT_META } from "../lib/kle-types";
+import { DEFAULT_META, getDecalConfig } from "../lib/kle-types";
 import type { PlateRotationOverrides } from "../lib/plate-export";
 import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb-export";
 import { computePCBBounds } from "../lib/pcb-export";
@@ -100,6 +102,10 @@ export default function EditorPage() {
         typeCRot: projectPcbConfig.typeCRot,
         fourPRot: projectPcbConfig.fourPRot,
         mcuRot: projectPcbConfig.mcuRot,
+        decal: (() => {
+          const d = getDecalConfig(state.layout.meta);
+          return d ? { image: d.image, scale: d.scale, x: d.x, y: d.y, dim: d.dim, opacity: d.opacity, natW: d.natW, natH: d.natH } : null;
+        })(),
       });
       return JSON.parse(json);
     } catch {
@@ -192,8 +198,7 @@ export default function EditorPage() {
 
   const handleDownloadJSON = async () => {
     if (getPlatform() === "tauri") {
-      const rows = getRawRows(state.layout);
-      const json = JSON.stringify(rows);
+      const json = exportJSON(state.layout);
       await saveFile(json, {
         defaultName: `${state.layout.meta.name || "keyboard-layout"}.json`,
         mimeType: "application/json",
@@ -345,6 +350,7 @@ export default function EditorPage() {
               radii={state.layout.meta.radii || undefined}
               css={state.layout.meta.css || undefined}
               keycapTopEffect={COMPLEX_SAMPLE_EFFECT[(state.layout.meta.name || "").toLowerCase()] || ""}
+              decal={getDecalConfig(state.layout.meta)}
               onDelete={editor.deleteSelected}
               onCopy={editor.copy}
               onCut={editor.cut}
@@ -385,6 +391,16 @@ export default function EditorPage() {
           onPlateOrderChange={handlePlateOrderChange}
         />
 
+        {/* ═══ Switch Foam Section（轴间棉） ═══ */}
+        <SwitchFoamSection
+          layout={state.layout}
+          rotationOverrides={projectRotations}
+          setRotationOverrides={setProjectRotations}
+          onStpExportingChange={handleStpExportingChange}
+          onStpProgress={handleStpProgress}
+          onClearCanvasSelection={editor.clearSelection}
+        />
+
         {/* ═══ PCB Section ═══ */}
         <PCBSection
           layout={state.layout}
@@ -398,6 +414,16 @@ export default function EditorPage() {
           onStpProgress={handleStpProgress}
           onClearCanvasSelection={editor.clearSelection}
           clearNonCanvasEpoch={clearNonCanvasEpoch}
+        />
+
+        {/* ═══ Switch Pad Section（轴下垫，依托 PCB 配置） ═══ */}
+        <SwitchPadSection
+          layout={state.layout}
+          pcbConfig={projectPcbConfig}
+          switchRotations={projectSwitchRots}
+          stabRotations={projectStabRots}
+          onStpExportingChange={handleStpExportingChange}
+          onStpProgress={handleStpProgress}
         />
 
         {/* ═══ Pricing Section ═══ */}

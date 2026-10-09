@@ -86,6 +86,14 @@ export interface PlateResult {
   regions: PreviewRegion[];
 }
 
+/** 生成选项：在复用同一管道的前提下切换形态（如轴间棉） */
+export interface PlateGenOptions {
+  /** 卫星轴孔改用「矩形（按当前复杂多边形的最大外包围盒）+ 顶部连接横槽」 */
+  foamStab?: boolean;
+  /** 对所有元素（外轮廓 + 所有挖孔）的直角施加的圆角半径 (mm) */
+  cornerFillet?: number;
+}
+
 // ─── Default config ─────────────────────────────────────
 
 const DEFAULT_CONFIG: PlateConfig = {
@@ -274,6 +282,50 @@ function getFulingStabPolygon(
   return result;
 }
 
+// ─── 轴间棉（foam）卫星轴孔：矩形 + 顶部连接横槽 ─────────
+
+/**
+ * 轴间棉专用卫星轴孔：把复杂的 Cherry/Costar/Fuling 多边形简化为
+ * 两个矩形（取当前复杂多边形的最大外边界），并加一条上移到
+ * 轴孔顶部（y = -7）的横向连接槽，使轴孔与两侧卫星轴孔连通。
+ */
+function getFoamStabPolygons(
+  offset: number, kerfHalf: number, isTall: boolean,
+): { x: number; y: number }[][] {
+  const o = kerfHalf;
+  // 矩形外边界：顶部与轴孔/横槽顶部(-7)齐平，避免台阶
+  const outerEdge = 3.375; // 靠近轴孔一侧
+  const innerEdge = 4.2;   // 外侧
+  const top = -7;
+  const bot = 7.75;
+
+  const rightRect = [
+    { x: offset - outerEdge - o, y: top - o },
+    { x: offset + innerEdge + o, y: top - o },
+    { x: offset + innerEdge + o, y: bot + o },
+    { x: offset - outerEdge - o, y: bot + o },
+  ];
+  const leftRect = [
+    { x: -offset - innerEdge - o, y: top - o },
+    { x: -offset + outerEdge + o, y: top - o },
+    { x: -offset + outerEdge + o, y: bot + o },
+    { x: -offset - innerEdge - o, y: bot + o },
+  ];
+  // 连接横槽：顶部与轴孔/卫星轴孔顶部齐平，高度 4mm，横向连通两侧矩形与轴孔
+  const barTop = -7 - o;
+  const barBot = barTop + 4;
+  const bar = [
+    { x: -offset + outerEdge + o, y: barTop },
+    { x: offset - outerEdge - o, y: barTop },
+    { x: offset - outerEdge - o, y: barBot },
+    { x: -offset + outerEdge + o, y: barBot },
+  ];
+
+  const polys = [rightRect, leftRect, bar];
+  if (isTall) for (const p of polys) rotatePoints(p, 90, { x: 0, y: 0 });
+  return polys;
+}
+
 // ─── 2D helpers ─────────────────────────────────────────
 
 function translatePoints(pts: { x: number; y: number }[], dx: number, dy: number) {
@@ -315,15 +367,64 @@ function mpToPaths(mp: ClipPoly[]): { x: number; y: number }[][] {
   return result;
 }
 
-/** Boolean union of multiple polygons (sequential merge, matches dwb-layout) */
+/** Boolean union of multiple polygons (single clipping op) */
 function unionAll(polys: { x: number; y: number }[][]): { x: number; y: number }[][] {
   if (polys.length === 0) return [];
   if (polys.length === 1) return [polys[0]!];
-  let result = pathToMP(polys[0]!);
-  for (let i = 1; i < polys.length; i++) {
-    result = polygonClipping.union(result, pathToMP(polys[i]!));
-  }
+  const [first, ...rest] = polys;
+  const result = polygonClipping.union(pathToMP(first!), ...rest.map((p) => pathToMP(p)));
   return mpToPaths(result);
+}
+
+/** 把多边形每个顶点替换为半径 r 的圆角（用折线近似圆弧；凸/凹角均适用） */
+function filletPolygon(
+  pts: { x: number; y: number }[], r: number, segments = 4,
+): { x: number; y: number }[] {
+  if (r <= 0 || pts.length < 3) return pts;
+  // 去除重复/首尾闭合点（否则重合顶点会被当作零长边而漏掉圆角）
+  const v: { x: number; y: number }[] = [];
+  for (const p of pts) {
+    const q = v[v.length - 1];
+    if (!q || Math.hypot(p.x - q.x, p.y - q.y) > 1e-6) v.push(p);
+  }
+  while (v.length > 1 && Math.hypot(v[0]!.x - v[v.length - 1]!.x, v[0]!.y - v[v.length - 1]!.y) <= 1e-6) v.pop();
+  const n = v.length;
+  if (n < 3) return pts;
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const cur = v[i]!;
+    const prev = v[(i - 1 + n) % n]!;
+    const next = v[(i + 1) % n]!;
+    let e1x = prev.x - cur.x, e1y = prev.y - cur.y;
+    let e2x = next.x - cur.x, e2y = next.y - cur.y;
+    const l1 = Math.hypot(e1x, e1y), l2 = Math.hypot(e2x, e2y);
+    if (l1 < 1e-9 || l2 < 1e-9) { out.push(cur); continue; }
+    e1x /= l1; e1y /= l1; e2x /= l2; e2y /= l2;
+    const theta = Math.acos(Math.max(-1, Math.min(1, e1x * e2x + e1y * e2y)));
+    if (theta < 1e-4 || theta > Math.PI - 1e-4) { out.push(cur); continue; } // 共线
+    const t = Math.min(r / Math.tan(theta / 2), l1 / 2, l2 / 2);
+    if (t <= 1e-9) { out.push(cur); continue; }
+    const p1 = { x: cur.x + e1x * t, y: cur.y + e1y * t };
+    const p2 = { x: cur.x + e2x * t, y: cur.y + e2y * t };
+    let bx = e1x + e2x, by = e1y + e2y;
+    const bl = Math.hypot(bx, by);
+    if (bl < 1e-9) { out.push(cur); continue; }
+    bx /= bl; by /= bl;
+    const d = r / Math.sin(theta / 2);
+    const ccx = cur.x + bx * d, ccy = cur.y + by * d;
+    const a1 = Math.atan2(p1.y - ccy, p1.x - ccx);
+    const a2 = Math.atan2(p2.y - ccy, p2.x - ccx);
+    let da = a2 - a1;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    out.push(p1);
+    for (let s = 1; s < segments; s++) {
+      const a = a1 + da * (s / segments);
+      out.push({ x: ccx + r * Math.cos(a), y: ccy + r * Math.sin(a) });
+    }
+    out.push(p2);
+  }
+  return out;
 }
 
 // ─── Main plate generation ──────────────────────────────
@@ -332,6 +433,7 @@ export function generatePlate(
   layout: KLELayout,
   config?: Partial<PlateConfig>,
   rotationOverrides?: PlateRotationOverrides,
+  options?: PlateGenOptions,
 ): PlateResult {
   const cfg: PlateConfig = { ...DEFAULT_CONFIG, ...config };
   const { keys, meta } = layout;
@@ -402,7 +504,7 @@ export function generatePlate(
 
   // Collect all cutouts — boolean union (switch + stab merged into one ring per key)
   const allSwitchHoles: { x: number; y: number }[][] = [];
-  const allMergedHoles: { x: number; y: number }[][] = [];
+  const rawHoles: { x: number; y: number }[][] = [];
   let totalCutLen = 0;
 
   // Regions accumulator: keyinfo-index → bounding polygon coords
@@ -438,7 +540,16 @@ export function generatePlate(
     if (needStab) {
       const stabOffset = getStabOffset(stabSize);
       if (stabOffset !== null) {
-        if (cfg.stabType === 5) {
+        if (options?.foamStab) {
+          for (const path of getFoamStabPolygons(stabOffset, kerfHalf, ki.isTall)) {
+            translatePoints(path, ki.cx, ki.cy);
+            if (ki.rot !== 0) {
+              const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
+              rotatePoints(path, ki.rot, ro);
+            }
+            keyPolys.push(path);
+          }
+        } else if (cfg.stabType === 5) {
           for (const path of getFulingStabPolygon(stabOffset, kerfHalf, ki.isTall)) {
             translatePoints(path, ki.cx, ki.cy);
             if (ki.rot !== 0) {
@@ -490,7 +601,7 @@ export function generatePlate(
     }
 
     for (const poly of merged) {
-      allMergedHoles.push(poly);
+      rawHoles.push(poly);
       totalCutLen += polygonPerimeter(poly);
     }
 
@@ -516,6 +627,9 @@ export function generatePlate(
     regionAccums.set(keyIndex, acc);
   }
 
+  // 跨键布尔合并：错位重合的轴孔/卫星轴孔应合并为同一挖孔，而非叠加
+  const allMergedHoles = unionAll(rawHoles);
+
   // ── SVG generation ──
   const pad = 5;
   const svgW = plateW + pad * 2;
@@ -529,7 +643,12 @@ export function generatePlate(
     }).join("") + "Z";
   }
 
-  const filletR = cfg.fillet > 0 ? cfg.fillet : 0;
+  const filletR = options?.cornerFillet ?? (cfg.fillet > 0 ? cfg.fillet : 0);
+
+  // 对所有挖孔施加统一圆角（轴间棉：所有元素直角 → cornerFillet）
+  const holesFinal = (options?.cornerFillet && options.cornerFillet > 0)
+    ? allMergedHoles.map((poly) => filletPolygon(poly, options.cornerFillet!, 4))
+    : allMergedHoles;
 
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
@@ -537,7 +656,7 @@ export function generatePlate(
   <rect x="${pad}" y="${pad}" width="${plateW}" height="${plateH}" rx="${filletR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
   <g fill="#fff" stroke="#888" stroke-width="0.3">`;
 
-  for (const hole of allMergedHoles) {
+  for (const hole of holesFinal) {
     svg += `<path d="${ptsToPath(hole)}"/>`;
   }
 
@@ -545,7 +664,7 @@ export function generatePlate(
 </svg>`;
 
   // ── DXF generation ──
-  const dxf = buildDXF(allMergedHoles, plateW, plateH, filletR, minX, minY, pad, keys.length, (meta.name || "").replace(/[<>"']/g, ""));
+  const dxf = buildDXF(holesFinal, plateW, plateH, filletR, minX, minY, pad, keys.length, (meta.name || "").replace(/[<>"']/g, ""));
 
   // ── 构建 STP 3D 挤出几何数据 ──
   // 所有坐标均为绝对 mm，与 DXF/SVG 的 offset 无关
@@ -558,7 +677,7 @@ export function generatePlate(
       [minX, -maxY],
     ],
     // 多边形孔洞: Y 翻转（SVG 预览 Y↓ → DXF/STP 标准 Y↑）
-    polyHoles: allMergedHoles.map((poly) => poly.map((p) => [p.x, -p.y])),
+    polyHoles: holesFinal.map((poly) => poly.map((p) => [p.x, -p.y])),
     // 定位板没有圆形独立孔洞 (所有孔洞都是多边形)
     circleHoles: [],
   };

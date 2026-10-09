@@ -129,6 +129,10 @@ export interface KeyProps {
   ry: number;
   /** Background color */
   c: string;
+  /** Gradient end color (hex). When set, keycap body/face render a two-color gradient from c → c2 */
+  c2?: string;
+  /** Gradient angle in degrees (0 = left→right, 90 = top→bottom). Default 135 */
+  cang?: number;
   /** Text color (can be overridden per-label via #rrggbb: prefix) */
   t: string;
   /** Per-position text color (normalized 0-11), overrides t when set */
@@ -171,7 +175,7 @@ export const DEFAULT_PROPS: KeyProps = {
 /** Set of all key property names used to distinguish key props from meta objects */
 export const KLE_KEY_PROPS = new Set([
   "r", "rx", "ry", "x", "y", "w", "h", "x2", "y2", "w2", "h2",
-  "a", "f", "f2", "fa", "p", "c", "t", "d", "g", "l", "n", "sm", "sb", "st", "stab",
+  "a", "f", "f2", "fa", "p", "c", "c2", "cang", "t", "d", "g", "l", "n", "sm", "sb", "st", "stab",
 ]);
 
 /** A fully computed key with absolute pixel positions */
@@ -196,6 +200,49 @@ export interface KLEMeta {
   switchBrand: string;
   switchType: string;
   css: string;
+  /** 图片贴花：base64 / data URL 彩色图片（全局单张，裁剪到所有键帽） */
+  decalImage?: string;
+  /** 贴花缩放（1 = 原始像素尺寸） */
+  decalScale?: number;
+  /** 贴花在画布坐标系中的 X 偏移（px） */
+  decalX?: number;
+  /** 贴花在画布坐标系中的 Y 偏移（px） */
+  decalY?: number;
+  /** 底面（键帽本体）相对顶面的暗度，0~1，默认 0.4 */
+  decalDim?: number;
+  /** 贴花整体不透明度，0~1，默认 1 */
+  decalOpacity?: number;
+  /** 贴花原始像素宽（用于导出/重载时确定几何） */
+  decalNatW?: number;
+  /** 贴花原始像素高 */
+  decalNatH?: number;
+}
+
+/** Resolved decal configuration for rendering (null when no image is set). */
+export interface DecalConfig {
+  image: string;
+  scale: number;
+  x: number;
+  y: number;
+  dim: number;
+  opacity: number;
+  natW: number;
+  natH: number;
+}
+
+/** Read a resolved decal config from meta, or null when no decal is set. */
+export function getDecalConfig(meta: KLEMeta | undefined | null): DecalConfig | null {
+  if (!meta || !meta.decalImage) return null;
+  return {
+    image: meta.decalImage,
+    scale: meta.decalScale ?? 1,
+    x: meta.decalX ?? 0,
+    y: meta.decalY ?? 0,
+    dim: meta.decalDim ?? 0.4,
+    opacity: meta.decalOpacity ?? 1,
+    natW: meta.decalNatW ?? 0,
+    natH: meta.decalNatH ?? 0,
+  };
 }
 
 /** Font size scale (index 0-9) */
