@@ -25,15 +25,18 @@ export function getKeyCategory(key: KeyProps): string {
  * Hit-test a single point (in key units) against all keys in reverse z-order.
  * Returns the index of the topmost key under the point, or null.
  * Accepts pixel coordinates and converts internally.
+ * `skipIndices` (e.g. 兼容层变淡的键) are ignored so clicks fall through to the key beneath.
  */
 export function hitTestKey(
   posX: number,
   posY: number,
   keys: KeyProps[],
+  skipIndices?: ReadonlySet<number>,
 ): number | null {
   const ux = posX / KEY_UNIT;
   const uy = posY / KEY_UNIT;
   for (let i = keys.length - 1; i >= 0; i--) {
+    if (skipIndices?.has(i)) continue;
     const k = keys[i]!;
     let testX = ux;
     let testY = uy;
@@ -67,6 +70,7 @@ export function hitTestKey(
 /**
  * Find all keys that intersect a rectangular selection area (in pixels).
  * Returns an array of key index strings.
+ * `skipIndices` (e.g. 兼容层变淡的键) are excluded from the marquee.
  */
 export function getKeysInArea(
   startX: number,
@@ -74,6 +78,7 @@ export function getKeysInArea(
   currentX: number,
   currentY: number,
   keys: KeyProps[],
+  skipIndices?: ReadonlySet<number>,
 ): string[] {
   const minX = Math.min(startX, currentX);
   const maxX = Math.max(startX, currentX);
@@ -81,6 +86,7 @@ export function getKeysInArea(
   const maxY = Math.max(startY, currentY);
   const hitIds: string[] = [];
   for (let i = 0; i < keys.length; i++) {
+    if (skipIndices?.has(i)) continue;
     const k = keys[i]!;
     const kx = k.x * KEY_UNIT;
     const ky = k.y * KEY_UNIT;

@@ -15,6 +15,11 @@ const SIZE_STEP = 0.25;
 const SIZE_MIN = 0.25;
 const ROTATION_PRESETS = [0, 90, 180, -90];
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 28, 34, 36];
+const COMPAT_STATES: { value: 0 | 1 | undefined; labelKey: string }[] = [
+  { value: undefined, labelKey: "compat.normal" },
+  { value: 0, labelKey: "compat.compatRegular" },
+  { value: 1, labelKey: "compat.compatKey" },
+];
 
 function SizeStepper({
   value, disabled, label, title, min = SIZE_MIN, onCommit,
@@ -86,6 +91,7 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
   const curRx = key?.rx;
   const curRy = key?.ry;
   const curFontSize = key?.labelSize || 9;
+  const curCompat = key?.compat;
 
   const psec: React.CSSProperties = {
     flex: 1,
@@ -203,12 +209,14 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
         </div>
       </div>
 
-      {/* Special keys */}
+      {/* 兼容区（替代原「特殊键」区块） */}
       <div className="psec" style={{ ...psec, flex: "0 0 200px" }}>
-        <SectionHeader>{t("toolbar.specialKeysHeader")}</SectionHeader>
+        <SectionHeader>{t("compat.header")}</SectionHeader>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {[t("toolbar.spBigEnter"), "ISO Enter", t("toolbar.spSteppedCaps"), t("toolbar.spCenterStepped"), t("toolbar.spLeds")].map(item => (
-            <span key={item} className="kle-chip" style={{ padding: "3px 10px", fontSize: 11, cursor: "default", borderRadius: "var(--theme-radius-sm)", justifyContent: "flex-start" }}>{item}</span>
+          {COMPAT_STATES.map(({ value, labelKey }) => (
+            <span key={labelKey} onClick={() => set("compat", value)} title={t("tip.compatState")}
+              className={`kle-chip${curCompat === value ? " active" : ""}`}
+              style={{ padding: "3px 10px", fontSize: 11, cursor: hasSelection ? "pointer" : "default", borderRadius: "var(--theme-radius-sm)", justifyContent: "flex-start" }}>{t(labelKey)}</span>
           ))}
         </div>
       </div>

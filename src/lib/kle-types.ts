@@ -159,6 +159,60 @@ export interface KeyProps {
   st: string;
   /** Stabilizer type */
   stab: string;
+  /** 兼容层状态：undefined=常规键（默认）；0=兼容常规键；1=兼容按键。
+   *  与 VIA layout option 的 value 一致（"<matrix>\n\n\n<option>,<value>"）。 */
+  compat?: 0 | 1;
+  /** VIA layout option 索引（layouts.labels 下标），用于往返写回键标签 */
+  compatOption?: number;
+}
+
+/** VIA 键标签中「options 标记」所在的序列化标签槽位：
+ *  "<matrix>\n\n\n<option>,<value>" 拆分后落在第 4 段（index 3）。 */
+export const VIA_OPTION_LABEL_SLOT = 3;
+
+/** 解析 VIA 键标签里的 options 兼容标记（serialLabels[3] = "<option>,<value>"）。 */
+export function parseViaCompatTag(
+  serialLabels: string[],
+): { option: number; value: 0 | 1 } | null {
+  const tag = serialLabels[VIA_OPTION_LABEL_SLOT];
+  if (!tag) return null;
+  const m = /^(\d+)\s*,\s*([01])$/.exec(tag.trim());
+  if (!m) return null;
+  return { option: parseInt(m[1]!, 10), value: m[2] === "1" ? 1 : 0 };
+}
+
+/** 画布键帽覆盖色：兼容按键=浅蓝，兼容常规键=浅绿（用 rgb() 形式，避免内联 hex）。 */
+export const COMPAT_KEY_COLOR = "rgb(187, 222, 251)";
+export const COMPAT_REGULAR_COLOR = "rgb(200, 230, 201)";
+
+/** 兼容层叠放 z 值：置顶组 / 中性键 / 垫底组 */
+export const COMPAT_Z_TOP = 3;
+export const COMPAT_Z_NEUTRAL = 1;
+export const COMPAT_Z_BELOW = 0;
+
+/**
+ * 兼容层的叠放层次（与开关联动）：
+ *   开 → 兼容按键(1) 置顶
+ *   关 → 兼容常规键(0) 置顶
+ * 另一组垫底，普通键（无标志）为中性。垫底组同时不拦截画布命中。
+ */
+export function compatStackZ(compat: 0 | 1 | undefined, open: boolean): number {
+  if (compat === undefined) return COMPAT_Z_NEUTRAL;
+  const onTopValue = open ? 1 : 0;
+  return compat === onTopValue ? COMPAT_Z_TOP : COMPAT_Z_BELOW;
+}
+
+/**
+ * 需要「浅灰标记」的键索引集合（其他编辑器预览用）。
+ * 仅标记兼容按键（compat=1），与兼容常规键（0，保持原白色）区分开。
+ */
+export function compatVariantIndices(
+  keys: Pick<KeyProps, "compat">[],
+  open: boolean,
+): Set<number> {
+  const s = new Set<number>();
+  if (open) keys.forEach((k, i) => { if (k.compat === 1) s.add(i); });
+  return s;
 }
 
 /** Default key properties */

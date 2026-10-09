@@ -6,7 +6,7 @@
  *
  * Features:
  * - MX switch cutouts (14×14mm)
- * - Stabilizer cutouts (Cherry/Costar/Fuling)
+ * - Stabilizer cutouts (Cherry / PCB stab / Fuling)
  * - Configurable edge padding
  * - SVG preview
  * - DXF export
@@ -21,10 +21,10 @@ import { rotatePoint, rotatePoints, computeLayoutBBoxInUnits } from "./coordinat
 // ─── Types ──────────────────────────────────────────────
 
 export interface PlateConfig {
-  /** Switch cutout type: 1=MX, 2=MX+Alps, 3=MX-H, 4=Alps */
+  /** Switch cutout type: 1=MX（当前仅开放 MX；2=MX+Alps, 3=MX-H, 4=Alps 保留备用） */
   switchType: 1 | 2 | 3 | 4;
-  /** Stabilizer type: 0=None, 1=Cherry+Costar, 2=Cherry, 3=Costar, 4=Alps, 5=Fuling */
-  stabType: 0 | 1 | 2 | 3 | 4 | 5;
+  /** Stabilizer type: 0=None, 1=Cherry, 2=PCB stab, 3=Fuling(腹灵) */
+  stabType: 0 | 1 | 2 | 3;
   /** Key unit in mm (default 19.05) */
   u1: number;
   /** Kerf compensation (mm) */
@@ -92,6 +92,8 @@ export interface PlateGenOptions {
   foamStab?: boolean;
   /** 对所有元素（外轮廓 + 所有挖孔）的直角施加的圆角半径 (mm) */
   cornerFillet?: number;
+  /** 兼容层：这些键（layout.keys 下标）的挖孔额外以浅灰重绘（预览区分用，不影响 DXF/STP） */
+  compatKeyIndices?: Set<number>;
 }
 
 // ─── Default config ─────────────────────────────────────
@@ -156,52 +158,74 @@ function getSwitchPolygon(type: PlateConfig["switchType"], kerfHalf: number): { 
   }
 }
 
-// ─── Cherry+CStar stabilizer polygon (universal) ────────
-function getStabPolygonCherryCostar(
-  offset: number, kerfHalf: number, isTall: boolean,
+// ─── 通用几何辅助（kerf 偏移 / 圆角矩形） ───────────────
+
+/** 多边形有向面积（用于判定绕向；CCW 为正） */
+function signedArea(pts: { x: number; y: number }[]): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    a += pts[i]!.x * pts[j]!.y - pts[j]!.x * pts[i]!.y;
+  }
+  return a / 2;
+}
+
+/**
+ * 将多边形整体沿外法线偏移 d（正 d = 挖孔扩大，用于 kerf 补偿）。
+ * 顶点按两邻边角平分线做 miter 外移；对直角/轴对齐多边形精确。
+ */
+function offsetPolygonOutward(
+  pts: { x: number; y: number }[], d: number,
 ): { x: number; y: number }[] {
-  const o = kerfHalf;
-  // Kerf expands hole outward for ALL directions
-  const outer = 3.375 + o, inner = 1.65 - o, top = -2.3 - o, bot = 6.77 + o;
-  const pts = [
-    { x: offset - outer, y: top },
-    { x: offset - outer, y: -5.53 - o },
-    { x: offset - inner, y: -5.53 - o },
-    { x: offset - inner, y: -6.45 - o },
-    { x: offset + inner, y: -6.45 - o },
-    { x: offset + inner, y: -5.53 - o },
-    { x: offset + outer, y: -5.53 - o },
-    { x: offset + outer, y: top },
-    { x: offset + 4.2 - o, y: top },
-    { x: offset + 4.2 - o, y: 0.5 - o },
-    { x: offset + outer, y: 0.5 - o },
-    { x: offset + outer, y: bot },
-    { x: offset + inner, y: bot },
-    { x: offset + inner, y: 7.75 - o },
-    { x: offset - inner, y: 7.75 - o },
-    { x: offset - inner, y: bot },
-    { x: offset - outer, y: bot },
-    { x: offset - outer, y: 2.3 - o },
-    { x: -offset + outer, y: 2.3 - o },
-    { x: -offset + outer, y: bot },
-    { x: -offset + inner, y: bot },
-    { x: -offset + inner, y: 7.75 - o },
-    { x: -offset - inner, y: 7.75 - o },
-    { x: -offset - inner, y: bot },
-    { x: -offset - outer, y: bot },
-    { x: -offset - outer, y: 0.5 - o },
-    { x: -offset - 4.2 + o, y: 0.5 - o },
-    { x: -offset - 4.2 + o, y: top },
-    { x: -offset - outer, y: top },
-    { x: -offset - outer, y: -5.53 - o },
-    { x: -offset - inner, y: -5.53 - o },
-    { x: -offset - inner, y: -6.45 - o },
-    { x: -offset + inner, y: -6.45 - o },
-    { x: -offset + inner, y: -5.53 - o },
-    { x: -offset + outer, y: -5.53 - o },
-    { x: -offset + outer, y: top },
-  ];
-  if (isTall) rotatePoints(pts, 90, { x: 0, y: 0 });
+  if (d === 0 || pts.length < 3) return pts;
+  const n = pts.length;
+  const orient = signedArea(pts) >= 0 ? 1 : -1; // CCW → 外法线在边右侧
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n]!;
+    const cur = pts[i]!;
+    const next = pts[(i + 1) % n]!;
+    let e1x = cur.x - prev.x, e1y = cur.y - prev.y;
+    let e2x = next.x - cur.x, e2y = next.y - cur.y;
+    const l1 = Math.hypot(e1x, e1y), l2 = Math.hypot(e2x, e2y);
+    if (l1 < 1e-9 || l2 < 1e-9) { out.push({ x: cur.x, y: cur.y }); continue; }
+    e1x /= l1; e1y /= l1; e2x /= l2; e2y /= l2;
+    const n1x = e1y * orient, n1y = -e1x * orient;
+    const n2x = e2y * orient, n2y = -e2x * orient;
+    let bx = n1x + n2x, by = n1y + n2y;
+    const bl = Math.hypot(bx, by);
+    if (bl < 1e-9) { out.push({ x: cur.x + n1x * d, y: cur.y + n1y * d }); continue; }
+    bx /= bl; by /= bl;
+    const cosHalf = Math.max(0.2, n1x * bx + n1y * by); // 限制极端 miter
+    const m = d / cosHalf;
+    out.push({ x: cur.x + bx * m, y: cur.y + by * m });
+  }
+  return out;
+}
+
+/** 轴对齐圆角矩形顶点（cx,cy 为中心，w×h，圆角 r）；r≤0 退化为直角矩形 */
+function roundedRectPoints(
+  cx: number, cy: number, w: number, h: number, r: number, seg = 6,
+): { x: number; y: number }[] {
+  const hw = w / 2, hh = h / 2;
+  const rr = Math.min(r, hw, hh);
+  if (rr <= 1e-9) {
+    return [
+      { x: cx + hw, y: cy - hh }, { x: cx + hw, y: cy + hh },
+      { x: cx - hw, y: cy + hh }, { x: cx - hw, y: cy - hh },
+    ];
+  }
+  const pts: { x: number; y: number }[] = [];
+  const arc = (ox: number, oy: number, a0: number, a1: number) => {
+    for (let s = 0; s <= seg; s++) {
+      const a = a0 + (a1 - a0) * (s / seg);
+      pts.push({ x: ox + Math.cos(a) * rr, y: oy + Math.sin(a) * rr });
+    }
+  };
+  arc(cx + hw - rr, cy + hh - rr, 0, Math.PI / 2);              // 右下
+  arc(cx - hw + rr, cy + hh - rr, Math.PI / 2, Math.PI);        // 左下
+  arc(cx - hw + rr, cy - hh + rr, Math.PI, Math.PI * 1.5);      // 左上
+  arc(cx + hw - rr, cy - hh + rr, Math.PI * 1.5, Math.PI * 2);  // 右上
   return pts;
 }
 
@@ -245,41 +269,68 @@ function getStabPolygonCherry(
   return pts;
 }
 
-// ─── Fuling (腹灵) stabilizer polygon ───────────────────
-function getFulingStabPolygon(
+// ─── PCB stab（板载卫星轴）开孔 ─────────────────────────
+// 尺寸：7.75(X 宽) × 15(Y 长) mm、R1 圆角；两孔相对轴心左右对称，
+//       相对轴体方框沿 Y 下错 1.5mm；2u 高度键帽整体以轴心顺时针转 90°。
+const PCB_STAB_W = 7.75;
+const PCB_STAB_H = 15;
+const PCB_STAB_R = 1;
+const PCB_STAB_DY = 1.5;
+
+function getPCBStabPolygons(
   offset: number, kerfHalf: number, isTall: boolean,
 ): { x: number; y: number }[][] {
-  const k = kerfHalf;
-  // Y-direction kerf signs corrected (expand hole outward)
-  const rPath = [
-    { x: offset - 3.35 + k, y: +6.75 + k }, { x: offset + 3.35 - k, y: +6.75 + k },
-    { x: offset + 3.35 - k, y: +4.00 + k }, { x: offset + 4.55 - k, y: +4.00 + k },
-    { x: offset + 4.55 - k, y: +0.50 + k }, { x: offset + 3.35 - k, y: +0.50 + k },
-    { x: offset + 3.35 - k, y: -5.55 - k }, { x: offset + 1.55 - k, y: -5.55 - k },
-    { x: offset + 1.55 - k, y: -6.75 - k }, { x: offset - 1.55 + k, y: -6.75 - k },
-    { x: offset - 1.55 + k, y: -5.55 - k }, { x: offset - 3.35 + k, y: -5.55 - k },
-    { x: offset - 3.35 + k, y: +6.75 + k },
+  const polys = [
+    roundedRectPoints(offset, PCB_STAB_DY, PCB_STAB_W, PCB_STAB_H, PCB_STAB_R),
+    roundedRectPoints(-offset, PCB_STAB_DY, PCB_STAB_W, PCB_STAB_H, PCB_STAB_R),
+  ].map((p) => offsetPolygonOutward(p, kerfHalf));
+  if (isTall) for (const p of polys) rotatePoints(p, 90, { x: 0, y: 0 });
+  return polys;
+}
+
+// ─── Fuling (腹灵) stabilizer cutout ────────────────────
+// 依据 L:\k星工作室\标准文件\定位板腹灵开孔.dxf 反推：
+//  · 2u/2.75u：2u 画法（stab 上下边缘开槽与轴孔相连）
+//  · ≥3u：大键画法（stab 体 + 中间横槽连到轴孔）
+//  · 孔位（中心距）沿用 Cherry 标准 getStabOffset；顶点相对轴心（已含 offset）。
+
+/** 大键 FL 轮廓（≥3u）：右半 + 镜像左半 + 连接横槽 */
+function flLargeShape(offset: number): { x: number; y: number }[][] {
+  const right: [number, number][] = [
+    [offset - 3.95, -5.50], [offset - 3.95, 6.80], [offset - 2.15, 6.80],
+    [offset - 2.15, 8.00], [offset + 0.95, 8.00], [offset + 0.95, 6.80],
+    [offset + 2.75, 6.80], [offset + 2.75, 0.75], [offset + 3.95, 0.75],
+    [offset + 3.95, -2.75], [offset + 2.75, -2.75], [offset + 2.75, -5.50],
   ];
-  const lPath = [
-    { x: -offset + 3.35 - k, y: +6.75 + k }, { x: -offset - 3.35 + k, y: +6.75 + k },
-    { x: -offset - 3.35 + k, y: +4.00 + k }, { x: -offset - 4.55 + k, y: +4.00 + k },
-    { x: -offset - 4.55 + k, y: +0.50 + k }, { x: -offset - 3.35 + k, y: +0.50 + k },
-    { x: -offset - 3.35 + k, y: -5.55 - k }, { x: -offset - 1.55 + k, y: -5.55 - k },
-    { x: -offset - 1.55 + k, y: -6.75 - k }, { x: -offset + 1.55 - k, y: -6.75 - k },
-    { x: -offset + 1.55 - k, y: -5.55 - k }, { x: -offset + 3.35 - k, y: -5.55 - k },
-    { x: -offset + 3.35 - k, y: +6.75 + k },
+  const chanR: [number, number][] = [
+    [7, -2.50], [offset - 2.0, -2.50], [offset - 2.0, 2.00], [7, 2.00],
   ];
-  const rChan = [
-    { x: 7.0 + k, y: 0.5 + k }, { x: offset - 2.5 - k, y: 0.5 + k },
-    { x: offset - 2.5 - k, y: 4.0 + k }, { x: 7.0 + k, y: 4.0 + k },
+  const mirror = (p: [number, number][]): [number, number][] => p.map(([x, y]) => [-x, y]);
+  const toPts = (p: [number, number][]) => p.map(([x, y]) => ({ x, y }));
+  return [toPts(right), toPts(mirror(right)), toPts(chanR), toPts(mirror(chanR))];
+}
+
+/** 2u FL 轮廓：右半 + 镜像左半（连接台阶在 stab 上下边缘） */
+function fl2uShape(offset: number): { x: number; y: number }[][] {
+  const sw = 6; // 略伸入轴孔（轴孔边缘 x=7），确保布尔合并
+  const right: [number, number][] = [
+    [sw, 5.30], [offset - 3.95, 5.30], [offset - 3.95, 6.80], [offset - 2.15, 6.80],
+    [offset - 2.15, 8.00], [offset + 0.95, 8.00], [offset + 0.95, 6.80], [offset + 2.75, 6.80],
+    [offset + 2.75, 0.75], [offset + 3.95, 0.75], [offset + 3.95, -2.75], [offset + 2.75, -2.75],
+    [offset + 2.75, -5.50], [offset - 3.95, -5.50], [offset - 3.95, -4.00], [sw, -4.00],
   ];
-  const lChan = [
-    { x: -offset + 2.5 + k, y: 0.5 + k }, { x: -7.0 - k, y: 0.5 + k },
-    { x: -7.0 - k, y: 4.0 + k }, { x: -offset + 2.5 + k, y: 4.0 + k },
-  ];
-  const result = [rPath, lPath, rChan, lChan];
-  for (const poly of result) { if (isTall) rotatePoints(poly, 90, { x: 0, y: 0 }); }
-  return result;
+  const mirror = (p: [number, number][]): [number, number][] => p.map(([x, y]) => [-x, y]);
+  const toPts = (p: [number, number][]) => p.map(([x, y]) => ({ x, y }));
+  return [toPts(right), toPts(mirror(right))];
+}
+
+function getFulingStabPolygon(
+  offset: number, kerfHalf: number, isTall: boolean, stabSize: number,
+): { x: number; y: number }[][] {
+  const raw = stabSize < 3 ? fl2uShape(offset) : flLargeShape(offset);
+  const polys = raw.map((p) => offsetPolygonOutward(p, kerfHalf));
+  if (isTall) for (const p of polys) rotatePoints(p, 90, { x: 0, y: 0 });
+  return polys;
 }
 
 // ─── 轴间棉（foam）卫星轴孔：矩形 + 顶部连接横槽 ─────────
@@ -505,6 +556,7 @@ export function generatePlate(
   // Collect all cutouts — boolean union (switch + stab merged into one ring per key)
   const allSwitchHoles: { x: number; y: number }[][] = [];
   const rawHoles: { x: number; y: number }[][] = [];
+  const compatRawHoles: { x: number; y: number }[][] = [];
   let totalCutLen = 0;
 
   // Regions accumulator: keyinfo-index → bounding polygon coords
@@ -535,45 +587,30 @@ export function generatePlate(
 
     // Stabilizer cutout
     const stabSize = ki.isTall ? ki.kh : ki.kw;
-    const needStab = stabSize >= 2 && cfg.stabType > 0 && cfg.stabType <= 5;
+    const needStab = stabSize >= 2 && cfg.stabType > 0 && cfg.stabType <= 3;
 
     if (needStab) {
       const stabOffset = getStabOffset(stabSize);
       if (stabOffset !== null) {
+        const place = (path: { x: number; y: number }[]) => {
+          translatePoints(path, ki.cx, ki.cy);
+          if (ki.rot !== 0) {
+            const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
+            rotatePoints(path, ki.rot, ro);
+          }
+          keyPolys.push(path);
+        };
         if (options?.foamStab) {
-          for (const path of getFoamStabPolygons(stabOffset, kerfHalf, ki.isTall)) {
-            translatePoints(path, ki.cx, ki.cy);
-            if (ki.rot !== 0) {
-              const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-              rotatePoints(path, ki.rot, ro);
-            }
-            keyPolys.push(path);
-          }
-        } else if (cfg.stabType === 5) {
-          for (const path of getFulingStabPolygon(stabOffset, kerfHalf, ki.isTall)) {
-            translatePoints(path, ki.cx, ki.cy);
-            if (ki.rot !== 0) {
-              const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-              rotatePoints(path, ki.rot, ro);
-            }
-            keyPolys.push(path);
-          }
+          for (const path of getFoamStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
+        } else if (cfg.stabType === 3) {
+          // FL 腹灵
+          for (const path of getFulingStabPolygon(stabOffset, kerfHalf, ki.isTall, stabSize)) place(path);
         } else if (cfg.stabType === 2) {
-          const stabPts = getStabPolygonCherry(stabOffset, kerfHalf, ki.isTall);
-          translatePoints(stabPts, ki.cx, ki.cy);
-          if (ki.rot !== 0) {
-            const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-            rotatePoints(stabPts, ki.rot, ro);
-          }
-          keyPolys.push(stabPts);
+          // PCB stab
+          for (const path of getPCBStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
         } else {
-          const stabPts = getStabPolygonCherryCostar(stabOffset, kerfHalf, ki.isTall);
-          translatePoints(stabPts, ki.cx, ki.cy);
-          if (ki.rot !== 0) {
-            const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-            rotatePoints(stabPts, ki.rot, ro);
-          }
-          keyPolys.push(stabPts);
+          // Cherry only
+          place(getStabPolygonCherry(stabOffset, kerfHalf, ki.isTall));
         }
       }
     }
@@ -603,6 +640,9 @@ export function generatePlate(
     for (const poly of merged) {
       rawHoles.push(poly);
       totalCutLen += polygonPerimeter(poly);
+    }
+    if (options?.compatKeyIndices?.has(keyIndex)) {
+      for (const poly of merged) compatRawHoles.push(poly);
     }
 
     // Accumulate region bounding boxes — post-override AABB for hit-testing, plus pre-override for selection indicator
@@ -650,6 +690,12 @@ export function generatePlate(
     ? allMergedHoles.map((poly) => filletPolygon(poly, options.cornerFillet!, 4))
     : allMergedHoles;
 
+  // 兼容层：兼容键的挖孔合并后以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
+  const compatMerged = compatRawHoles.length > 0 ? unionAll(compatRawHoles) : [];
+  const compatFinal = (options?.cornerFillet && options.cornerFillet > 0)
+    ? compatMerged.map((poly) => filletPolygon(poly, options.cornerFillet!, 4))
+    : compatMerged;
+
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path{vector-effect:non-scaling-stroke}</style>
@@ -659,8 +705,18 @@ export function generatePlate(
   for (const hole of holesFinal) {
     svg += `<path d="${ptsToPath(hole)}"/>`;
   }
+  svg += `</g>`;
 
-  svg += `</g>
+  if (compatFinal.length > 0) {
+    svg += `
+  <g fill="lightgray" stroke="#888" stroke-width="0.3">`;
+    for (const hole of compatFinal) {
+      svg += `<path d="${ptsToPath(hole)}"/>`;
+    }
+    svg += `</g>`;
+  }
+
+  svg += `
 </svg>`;
 
   // ── DXF generation ──

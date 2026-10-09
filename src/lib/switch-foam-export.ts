@@ -43,10 +43,12 @@ export function generateSwitchFoam(
   layout: KLELayout,
   config?: Partial<SwitchFoamConfig>,
   rotationOverrides?: PlateRotationOverrides,
+  compatKeyIndices?: Set<number>,
 ): PlateResult {
   const cfg: SwitchFoamConfig = { ...DEFAULT_SWITCH_FOAM_CONFIG, ...config };
   return generatePlate(layout, cfg, rotationOverrides, {
     foamStab: true,
     cornerFillet: cfg.fillet,
+    compatKeyIndices,
   });
 }

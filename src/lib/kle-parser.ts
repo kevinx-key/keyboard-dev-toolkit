@@ -10,7 +10,7 @@
  */
 
 import type { KeyProps, KLELayout, KLEMeta, ComputedKey } from "./kle-types";
-import { DEFAULT_PROPS, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions, reorderLabelsFromPositions } from "./kle-types";
+import { DEFAULT_PROPS, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions, reorderLabelsFromPositions, parseViaCompatTag, VIA_OPTION_LABEL_SLOT } from "./kle-types";
 import { stringify as urlonStringify, parse as urlonParse } from "./kle-urlon";
 
 /* ===== Constants ===== */
@@ -254,6 +254,19 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
 
       // Build the label string in serialized format
       const serialLabels = reorderLabelsFromPositions(key.labels, key.align || DEFAULT_PROPS.align);
+      // 兼容层写回键标签："<option>,<value>"。保留原 option；无 origin option 时用 0。
+      // 槽位若被普通图例占用则跳过（避免破坏图例）；从兼容键重置回常规键时清空占用槽。
+      const isViaTag = (s: string | undefined) => !s || /^\d+\s*,\s*[01]$/.test(s.trim());
+      if (key.compat !== undefined) {
+        while (serialLabels.length <= VIA_OPTION_LABEL_SLOT) serialLabels.push("");
+        if (key.compatOption !== undefined) {
+          serialLabels[VIA_OPTION_LABEL_SLOT] = `${key.compatOption},${key.compat}`;
+        } else if (isViaTag(serialLabels[VIA_OPTION_LABEL_SLOT])) {
+          serialLabels[VIA_OPTION_LABEL_SLOT] = `0,${key.compat}`;
+        }
+      } else if (key.compatOption !== undefined && serialLabels.length > VIA_OPTION_LABEL_SLOT) {
+        if (isViaTag(serialLabels[VIA_OPTION_LABEL_SLOT])) serialLabels[VIA_OPTION_LABEL_SLOT] = "";
+      }
       let labelStr = serialLabels.join("\n");
 
       // Emit props object if non-empty
@@ -376,6 +389,13 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         const mappedLabels = reorderLabelsToPositions(serialLabels, align);
         key.labels = mappedLabels;
         key.align = align;
+
+        // VIA 兼容标记（"<matrix>\n\n\n<option>,<value>"）→ compat / compatOption
+        const via = parseViaCompatTag(serialLabels);
+        if (via) {
+          key.compat = via.value;
+          key.compatOption = via.option;
+        }
 
         // Colors
         key.c = (current.c as string) || DEFAULT_PROPS.c;

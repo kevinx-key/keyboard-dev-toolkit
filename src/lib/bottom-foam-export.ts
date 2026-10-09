@@ -96,8 +96,9 @@ export function generateBottomFoam(
   layout: KLELayout,
   config: BottomFoamConfig,
   switchRotations?: PCBSwitchRotations,
+  compatKeyIndices?: Set<number>,
 ): BottomFoamResult {
-  const geo = computeBottomFoamGeometry(layout, config, switchRotations);
+  const geo = computeBottomFoamGeometry(layout, config, switchRotations, compatKeyIndices);
   const width = geo.maxX - geo.minX;
   const height = geo.maxY - geo.minY;
   if (geo.polys.length === 0 || width <= 0 || height <= 0) {
@@ -127,7 +128,25 @@ export function generateBottomFoam(
     const d = poly.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z";
     svg += `<path d="${d}"/>`;
   }
-  svg += `</g>
+  svg += `</g>`;
+
+  // 兼容层：兼容键的挖孔以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
+  const compatRaw = geo.compatPolys ?? [];
+  if (compatRaw.length > 0) {
+    const compatMerged = anyOverlap(compatRaw) ? unionPolys(compatRaw) : compatRaw;
+    const compatHoles = config.fillet > 0
+      ? compatMerged.map((p) => filletPolygon(p.map(([x, y]) => ({ x, y })), config.fillet, 4).map((q) => [q.x, q.y] as Pt2))
+      : compatMerged;
+    svg += `
+  <g fill="lightgray" stroke="#888" stroke-width="0.3">`;
+    for (const poly of compatHoles) {
+      const d = poly.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z";
+      svg += `<path d="${d}"/>`;
+    }
+    svg += `</g>`;
+  }
+
+  svg += `
 </svg>`;
 
   // ── DXF ──

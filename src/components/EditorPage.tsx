@@ -34,6 +34,7 @@ import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb
 import { computePCBBounds } from "../lib/pcb-export";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import { useStpExport } from "../hooks/useStpExport";
+import { CompatLayerProvider } from "../lib/compat-layer";
 import { serializeProjectFile } from "../lib/project-serial";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
 
@@ -289,7 +290,7 @@ export default function EditorPage() {
   }, [theme]);
 
   return (
-    <>
+    <CompatLayerProvider>
       {/* ═══ TopBar — 品牌名 + 语言/主题（右对齐） ═══ */}
       <TopBar />
       {/* 内部滚动容器（block 流：子区块保持自然高度，不被 flex 压缩） */}
@@ -520,7 +521,7 @@ export default function EditorPage() {
       />
 
       <AiFloatingPanel layout={state.layout} onAiCommit={editor.commitLayout} />
-    </>
+    </CompatLayerProvider>
   );
 }
 

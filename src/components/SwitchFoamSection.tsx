@@ -7,6 +7,7 @@ import type { SwitchFoamConfig } from "../lib/switch-foam-export";
 import type { PlateResult, PlateRotationOverrides } from "../lib/plate-export";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
@@ -26,6 +27,7 @@ export default function SwitchFoamSection({
   onStpExportingChange, onStpProgress, onClearCanvasSelection,
 }: SwitchFoamSectionProps) {
   const { t } = useI18n();
+  const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [fillet, setFillet] = useState(1);
   const [thickness, setThickness] = useState(DEFAULT_FOAM_THICKNESS);
   const [drawn, setDrawn] = useState(false);
@@ -40,8 +42,8 @@ export default function SwitchFoamSection({
 
   const foamResult = useMemo((): PlateResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
-    return generateSwitchFoam(layout, effectiveConfig, rotationOverrides);
-  }, [drawn, effectiveConfig, layout, rotationOverrides]);
+    return generateSwitchFoam(layout, effectiveConfig, rotationOverrides, compatDimIndices);
+  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices]);
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);

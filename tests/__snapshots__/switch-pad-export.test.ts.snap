@@ -825,6 +825,9 @@ ENDSEC
 0
 EOF",
   "height": 44.1,
+  "minX": -3,
+  "minY": -3,
+  "pad": 5,
   "stpData": {
     "boundary": [
       [
