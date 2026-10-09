@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useMemo, useEffect, useId } from "react";
 import { KEY_UNIT } from "../lib";
 import type { KeyProps } from "../lib";
+import type { DecalConfig } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
 import { computeLayoutBBoxInUnits } from "../lib/coordinate-system";
 import KeyRenderer from "./canvas/KeyRenderer";
@@ -18,6 +19,7 @@ interface KeyboardCanvasProps {
   backgroundColor?: string; texture?: string; radii?: string;
   css?: string; categoryFilter?: string; preview?: boolean;
   unhideDecals?: boolean; readOnly?: boolean; keycapTopEffect?: string;
+  decal?: DecalConfig | null;
   onDelete?: () => void; onCopy?: () => void; onCut?: () => void;
   onPaste?: () => void; onDuplicate?: () => void;
   onSetProp?: (ids: string[], prop: keyof KeyProps, value: unknown) => void;
@@ -31,7 +33,7 @@ const INFO_BAR_HEIGHT = 24;
 export default function KeyboardCanvas({
   keys, selectedIds, onSelectKey, onSelectArea, onClearSelection, onMoveKeys,
   backgroundColor, texture, radii, css, categoryFilter = "All", preview = false,
-  unhideDecals: _unhideDecals, readOnly, keycapTopEffect, onDelete, onCopy,
+  unhideDecals: _unhideDecals, readOnly, keycapTopEffect, decal, onDelete, onCopy,
   onCut, onPaste, onDuplicate: _onDuplicate, onAddKeys, infoHint,
 }: KeyboardCanvasProps) {
   const { t } = useI18n();
@@ -299,7 +301,7 @@ export default function KeyboardCanvas({
           {keys.map((key, i) => {
             const id = String(i);
             const matchesFilter = !isFilterActive || getKeyCategory(key) === categoryFilter;
-            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} matchesFilter={matchesFilter} onContextMenu={handleContextMenu} />;
+            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} decal={decal} matchesFilter={matchesFilter} onContextMenu={handleContextMenu} />;
           })}
 
           {/* Selection rectangle */}

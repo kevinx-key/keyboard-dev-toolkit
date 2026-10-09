@@ -79,7 +79,7 @@ export default function ToolBelt(props: ToolBeltProps) {
           <LabelsTab keys={props.keys} selectedIds={props.selectedIds} onSetProp={props.onSetProp} />
         )}
         {activeTab === "colors" && (
-          <ColorsTab keys={props.keys} selectedIds={props.selectedIds} onSetProp={props.onSetProp} />
+          <ColorsTab keys={props.keys} selectedIds={props.selectedIds} onSetProp={props.onSetProp} meta={props.meta} onSetMeta={props.onSetMeta} />
         )}
         {activeTab === "keyboard" && (
           <KeyboardTab meta={props.meta} layout={props.layout} onSetMeta={props.onSetMeta} onLoadLayout={props.onLoadLayout} />

@@ -52,6 +52,10 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
 
         key.c = (current.c as string) ?? DEFAULT_PROPS.c;
         key.t = (current.t as string) ?? DEFAULT_PROPS.t;
+        if (current.c2) {
+          key.c2 = current.c2 as string;
+          key.cang = (current.cang as number) ?? 135;
+        }
         key.align = align;
         key.labelSize = (current.f as number) ?? DEFAULT_PROPS.labelSize;
         key.f2 = (current.f2 as number) ?? 0;
@@ -109,6 +113,8 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         if (props.fa !== undefined) { current.fa = props.fa as number[]; }
         if (props.p !== undefined) current.p = String(props.p);
         if (props.c !== undefined) current.c = String(props.c);
+        if (props.c2 !== undefined) current.c2 = String(props.c2);
+        if (props.cang !== undefined) current.cang = props.cang as number;
         if (props.t !== undefined) {
           const split = String(props.t).split("\n");
           if (split[0]) current.t = split[0];
@@ -177,6 +183,16 @@ export function parseKLEJSON(data: unknown): KLELayout | null {
                          "switchMount", "switchBrand", "switchType"] as const) {
         if (metaObj[key] !== undefined) meta[key] = String(metaObj[key]);
       }
+      // Decal image (base64) — numeric fields must keep their type
+      const dm = metaObj as Partial<KLEMeta>;
+      if (typeof dm.decalImage === "string" && dm.decalImage) meta.decalImage = dm.decalImage;
+      if (typeof dm.decalScale === "number") meta.decalScale = dm.decalScale;
+      if (typeof dm.decalX === "number") meta.decalX = dm.decalX;
+      if (typeof dm.decalY === "number") meta.decalY = dm.decalY;
+      if (typeof dm.decalDim === "number") meta.decalDim = dm.decalDim;
+      if (typeof dm.decalOpacity === "number") meta.decalOpacity = dm.decalOpacity;
+      if (typeof dm.decalNatW === "number") meta.decalNatW = dm.decalNatW;
+      if (typeof dm.decalNatH === "number") meta.decalNatH = dm.decalNatH;
       keyData = data.slice(1);
     } else {
       // It's a key-level props object at the start (edge case: single-element layout)

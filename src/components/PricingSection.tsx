@@ -210,6 +210,8 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
       case "KEYCOUNT_MISMATCH": return t("pricing.checkout.keycountMismatch");
       case "RATE_LIMITED": return t("pricing.checkout.rateLimited");
       case "DISCOUNT_INVALID": return t("pricing.checkout.discountInvalid");
+      case "DISCOUNT_EXHAUSTED": return t("pricing.checkout.discountExhausted");
+      case "DISCOUNT_EXPIRED": return t("pricing.checkout.discountExpired");
       default: return t("pricing.checkout.failed").replace("{message}", resp.message ?? resp.reason ?? resp.code);
     }
   };

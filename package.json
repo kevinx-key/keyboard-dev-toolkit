@@ -1,6 +1,6 @@
 {
   "name": "custom-key-pcb-tool",
-  "version": "1.0.58",
+  "version": "1.0.61",
   "private": true,
   "description": "Keyboard Dev Toolkit — 键盘配列编辑器 + PCB/定位板自动生成工具 (KLE 兼容)",
   "author": "K Star Lab",
@@ -67,6 +67,7 @@
     "next": "16.2.1",
     "polygon-clipping": "^0.15.7",
     "react": "19.2.4",
+    "react-colorful": "^5.8.1",
     "react-dom": "19.2.4"
   },
   "devDependencies": {

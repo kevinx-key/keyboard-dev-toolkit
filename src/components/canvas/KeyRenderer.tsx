@@ -1,11 +1,13 @@
 "use client";
 
-import { Fragment } from "react";
-import type { KeyProps } from "../../lib/kle-types";
+import { Fragment, useId } from "react";
+import type { KeyProps, DecalConfig } from "../../lib/kle-types";
 import { KEY_UNIT, KEY_GAP } from "../../lib";
 import { KEY_TOP_LEFT, KEY_TOP_TOP, KEY_RX, STEPPED_NOTCH_RATIO, getKeyStrokeColor, getKeyFaceColor } from "../../lib/key-renderer";
 import { computeLShapeSvgPath } from "../../lib/lshape-path";
 import { rotatedBbox } from "../../lib/geometry-utils";
+import { lighten } from "../../lib/color-utils";
+import { isValidHexColor } from "../../lib/sanitize";
 import LabelRenderer from "./LabelRenderer";
 
 interface KeyRendererProps {
@@ -17,6 +19,13 @@ interface KeyRendererProps {
   keycapTopEffect?: string;
   matchesFilter: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
+  /** Global image decal (base64). Rendered as per-key background, clipped to the keycap. */
+  decal?: DecalConfig | null;
+}
+
+/** Build a linear-gradient CSS string for a two-color key. */
+function keyGradient(angle: number, from: string, to: string): string {
+  return `linear-gradient(${angle}deg, ${from}, ${to})`;
 }
 
 /**
@@ -32,6 +41,7 @@ export default function KeyRenderer({
   keycapTopEffect,
   matchesFilter,
   onContextMenu,
+  decal,
 }: KeyRendererProps) {
   // ── Dimension extraction ──
   const x2 = keyData.x2 || 0;
@@ -126,6 +136,38 @@ export default function KeyRenderer({
   // Issue 2: Default keycap color #cccccc → top face should be white, not lightened gray
   const lightBg = keyData.c && keyData.c !== "#cccccc" ? getKeyFaceColor(keyData.c) : "#ffffff";
 
+  // ── Two-color gradient (per key) ──
+  const hasGradient = !!(keyData.c2 && isValidHexColor(keyData.c2));
+  const gradAngle = typeof keyData.cang === "number" ? keyData.cang : 135;
+  const baseC = keyData.c || "#cccccc";
+  const bodyGradient = hasGradient ? keyGradient(gradAngle, baseC, keyData.c2!) : undefined;
+  const faceGradient = hasGradient
+    ? keyGradient(gradAngle, lighten(baseC, 18), lighten(keyData.c2!, 18))
+    : undefined;
+
+  // ── Image decal: per-key background sampling (content-space coordinates) ──
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const bodyImgX = keyData.x * KEY_UNIT + KEY_GAP;
+  const bodyImgY = keyData.y * KEY_UNIT + KEY_GAP;
+  const faceImgX = bodyImgX + KEY_TOP_LEFT;
+  const faceImgY = bodyImgY + KTOP_TOP;
+  const decalSize = decal ? `${(decal.natW || 512) * decal.scale}px ${(decal.natH || 512) * decal.scale}px` : "";
+  const decalOpacity = decal && decal.opacity < 1 ? decal.opacity : undefined;
+  const bodyDecalStyle: React.CSSProperties = decal ? {
+    backgroundImage: `linear-gradient(rgba(0,0,0,${decal.dim}), rgba(0,0,0,${decal.dim})), url(${decal.image})`,
+    backgroundSize: `100% 100%, ${decalSize}`,
+    backgroundPosition: `0 0, ${decal.x - bodyImgX}px ${decal.y - bodyImgY}px`,
+    backgroundRepeat: "no-repeat, no-repeat",
+    opacity: decalOpacity,
+  } : {};
+  const faceDecalStyle: React.CSSProperties = decal ? {
+    backgroundImage: `url(${decal.image})`,
+    backgroundSize: decalSize,
+    backgroundPosition: `${decal.x - faceImgX}px ${decal.y - faceImgY}px`,
+    backgroundRepeat: "no-repeat",
+    opacity: decalOpacity,
+  } : {};
+
   // ── L-shaped SVG path ──
   const lShapePath = hasExt
     ? computeLShapeSvgPath(
@@ -134,6 +176,48 @@ export default function KeyRenderer({
         bboxW, bboxH, KEY_RX,
       )
     : "";
+
+  // ── L-shape fill + defs (gradient / decal pattern) ──
+  const gradVec = (a: number) => {
+    const rad = (a * Math.PI) / 180;
+    const vx = Math.sin(rad), vy = -Math.cos(rad);
+    return { x1: 0.5 - vx / 2, y1: 0.5 - vy / 2, x2: 0.5 + vx / 2, y2: 0.5 + vy / 2 };
+  };
+  const lShapeFill = decal
+    ? `url(#kkdecal-${uid})`
+    : hasGradient
+      ? `url(#kkgrad-${uid})`
+      : baseC;
+  const lShapeDefs = (
+    <defs>
+      {hasGradient && (
+        <linearGradient id={`kkgrad-${uid}`} {...gradVec(gradAngle)}>
+          <stop offset="0%" stopColor={baseC} />
+          <stop offset="100%" stopColor={keyData.c2!} />
+        </linearGradient>
+      )}
+      {decal && (
+        <pattern
+          id={`kkdecal-${uid}`}
+          patternUnits="userSpaceOnUse"
+          x={decal.x - bboxL}
+          y={decal.y - bboxT}
+          width={(decal.natW || 512) * decal.scale}
+          height={(decal.natH || 512) * decal.scale}
+        >
+          <image
+            href={decal.image}
+            x={decal.x - bboxL}
+            y={decal.y - bboxT}
+            width={(decal.natW || 512) * decal.scale}
+            height={(decal.natH || 512) * decal.scale}
+            preserveAspectRatio="none"
+            opacity={decal.opacity}
+          />
+        </pattern>
+      )}
+    </defs>
+  );
 
   // ── Wrapper style (position, rotation, clip-path) ──
   const wrapperStyle: React.CSSProperties = {
@@ -225,13 +309,15 @@ export default function KeyRenderer({
                     zIndex: 1, pointerEvents: "none", overflow: "visible",
                   }}
                 >
+                  {lShapeDefs}
                   <path
                     d={lShapePath}
-                    fill={keyData.c || "#cccccc"}
-                    stroke={getKeyStrokeColor(keyData.c || "#cccccc")}
+                    fill={lShapeFill}
+                    stroke={getKeyStrokeColor(baseC)}
                     strokeWidth={1.5}
                     strokeLinejoin="round"
                   />
+                  {decal && <path d={lShapePath} fill={`rgba(0,0,0,${decal.dim})`} opacity={decal.opacity} />}
                 </svg>
                 {/* Main face */}
                 <div
@@ -242,6 +328,7 @@ export default function KeyRenderer({
                     width: kbWidth - KEY_TOP_LEFT * 2,
                     height: kbHeight - 12,
                     backgroundColor: lightBg,
+                    ...(decal ? faceDecalStyle : hasGradient ? { backgroundImage: faceGradient } : {}),
                     borderRadius: ktopRadius,
                     zIndex: 2,
                     pointerEvents: "none",
@@ -256,6 +343,7 @@ export default function KeyRenderer({
                     width: Math.max(0, extWidth - KEY_TOP_LEFT * 2),
                     height: Math.max(0, extHeight - KEY_TOP_LEFT * 2),
                     backgroundColor: lightBg,
+                    ...(decal ? faceDecalStyle : hasGradient ? { backgroundImage: faceGradient } : {}),
                     borderRadius: ktopRadius,
                     zIndex: 3,
                     pointerEvents: "none",
@@ -272,13 +360,15 @@ export default function KeyRenderer({
                     zIndex: 1, pointerEvents: "none", overflow: "visible",
                   }}
                 >
+                  {lShapeDefs}
                   <path
                     d={lShapePath}
-                    fill={keyData.c || "#cccccc"}
-                    stroke={getKeyStrokeColor(keyData.c || "#cccccc")}
+                    fill={lShapeFill}
+                    stroke={getKeyStrokeColor(baseC)}
                     strokeWidth={1.5}
                     strokeLinejoin="round"
                   />
+                  {decal && <path d={lShapePath} fill={`rgba(0,0,0,${decal.dim})`} opacity={decal.opacity} />}
                 </svg>
                 {/* Stepped main face */}
                 <div
@@ -289,6 +379,7 @@ export default function KeyRenderer({
                     width: kbWidth - KEY_TOP_LEFT * 2,
                     height: kbHeight - 12,
                     backgroundColor: lightBg,
+                    ...(decal ? faceDecalStyle : hasGradient ? { backgroundImage: faceGradient } : {}),
                     borderRadius: ktopRadius,
                     zIndex: 2,
                     pointerEvents: "none",
@@ -306,9 +397,10 @@ export default function KeyRenderer({
                     top: bodyOffY,
                     width: kbWidth,
                     height: kbHeight,
-                    backgroundColor: keyData.c || "#cccccc",
+                    backgroundColor: baseC,
+                    ...(decal ? bodyDecalStyle : hasGradient ? { backgroundImage: bodyGradient } : {}),
                     borderRadius: KEY_RX,
-                    border: `1px solid ${getKeyStrokeColor(keyData.c || "#cccccc")}`,
+                    border: `1px solid ${getKeyStrokeColor(baseC)}`,
                     boxSizing: "border-box",
                     boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
                     pointerEvents: "none",
@@ -323,14 +415,20 @@ export default function KeyRenderer({
                     width: faceWidth,
                     height: faceHeight,
                     backgroundColor: lightBg,
-                    backgroundImage: hasTopEffect
-                      ? isLinearEffect
-                        ? `linear-gradient(90deg, ${gradColor} 0%, transparent 30%, transparent 70%, ${gradColor} 100%)`
-                        : keyData.n
-                          ? `radial-gradient(${gradColor} 50%, transparent 60%)`
-                          : `radial-gradient(${gradColor} 30%, transparent 90%)`
-                      : undefined,
-                    opacity: hasTopEffect ? 0.2 : undefined,
+                    ...(decal
+                      ? faceDecalStyle
+                      : hasGradient
+                        ? { backgroundImage: faceGradient }
+                        : hasTopEffect
+                          ? {
+                              backgroundImage: isLinearEffect
+                                ? `linear-gradient(90deg, ${gradColor} 0%, transparent 30%, transparent 70%, ${gradColor} 100%)`
+                                : keyData.n
+                                  ? `radial-gradient(${gradColor} 50%, transparent 60%)`
+                                  : `radial-gradient(${gradColor} 30%, transparent 90%)`,
+                              opacity: 0.2,
+                            }
+                          : {}),
                     borderRadius: ktopRadius,
                     zIndex: 2,
                     pointerEvents: "none",

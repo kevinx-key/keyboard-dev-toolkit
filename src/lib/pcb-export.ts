@@ -17,6 +17,71 @@ import type { KLELayout } from "./kle-types";
 import type { StpExtrudeData, ModelPlacement } from "./stp-export";
 import { getStabOffset } from "./stab-offsets";
 import { rotatePoint, computeLayoutBBoxInUnits } from "./coordinate-system";
+import polygonClipping from "polygon-clipping";
+
+// ─── Hole boolean-union helpers (跨键合并重叠钻孔) ────────
+
+type Pt2 = [number, number];
+type ClipRing = Pt2[];
+type ClipPoly = ClipRing[];
+
+/** 一个钻孔圆（cx/cy 为 SVG 视口坐标；sX/sY 为 STP 绝对 mm 坐标） */
+interface HoleCircle { cx: number; cy: number; r: number; sX: number; sY: number }
+
+function pathToMP(pts: Pt2[]): ClipPoly[] {
+  if (pts.length < 2) return [];
+  return [[pts.map((p) => [p[0], p[1]] as Pt2)]];
+}
+function mpToPaths(mp: ClipPoly[]): Pt2[][] {
+  const out: Pt2[][] = [];
+  for (const poly of mp) {
+    for (const ring of poly) {
+      const path = ring.map(([x, y]) => [x, y] as Pt2);
+      if (path.length > 2) out.push(path);
+    }
+  }
+  return out;
+}
+/** 多个多边形单次布尔并集 */
+function unionPolys(polys: Pt2[][]): Pt2[][] {
+  if (polys.length === 0) return [];
+  if (polys.length === 1) return [polys[0]!];
+  const [first, ...rest] = polys;
+  const res = polygonClipping.union(pathToMP(first!), ...rest.map((p) => pathToMP(p)));
+  return mpToPaths(res);
+}
+/** 圆 → 多边形（N 边形近似） */
+function circleToPoly(cx: number, cy: number, r: number, seg = 32): Pt2[] {
+  const pts: Pt2[] = [];
+  for (let i = 0; i < seg; i++) {
+    const a = (i / seg) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+  }
+  return pts;
+}
+/** 若环是一个正圆（所有顶点到圆心等距）则还原为圆，否则返回 null */
+function circleFromRing(ring: Pt2[]): { cx: number; cy: number; r: number } | null {
+  // 去掉重复/首尾闭合点，否则质心偏移会误判为非圆
+  const v: Pt2[] = [];
+  for (const p of ring) {
+    const q = v[v.length - 1];
+    if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6) v.push(p);
+  }
+  while (v.length > 1 && Math.hypot(v[0]![0] - v[v.length - 1]![0], v[0]![1] - v[v.length - 1]![1]) <= 1e-6) v.pop();
+  if (v.length < 8) return null;
+  let sx = 0, sy = 0;
+  for (const [x, y] of v) { sx += x; sy += y; }
+  const cx = sx / v.length, cy = sy / v.length;
+  let r = 0;
+  for (const [x, y] of v) r += Math.hypot(x - cx, y - cy);
+  r /= v.length;
+  if (r < 1e-6) return null;
+  for (const [x, y] of v) if (Math.abs(Math.hypot(x - cx, y - cy) - r) > 1e-3) return null;
+  return { cx, cy, r };
+}
+function ringPathD(pts: Pt2[]): string {
+  return pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(3)},${y.toFixed(3)}`).join("") + "Z";
+}
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -330,6 +395,98 @@ export function computePCBBounds(
   return computePCBBoundsFromExtents(keys, config, config.edgeDistance, holeMinX, holeMinY, holeMaxX, holeMaxY);
 }
 
+// ─── 轴下垫几何（从 PCB 配置派生，绝对 mm，Y 向下） ─────────
+
+export interface SwitchPadGeometry {
+  /** 开关孔 + 卫星轴孔（绝对 mm，Y 向下） */
+  circles: { x: number; y: number; r: number }[];
+  /** LED 方孔等多边形（绝对 mm，Y 向下） */
+  polys: [number, number][][];
+  /** 片材包围盒（含 Edge Distance），绝对 mm */
+  minX: number; minY: number; maxX: number; maxY: number;
+}
+
+/**
+ * 轴下垫孔位：按 PCB 配置派生开关孔/卫星轴孔/LED 方孔。
+ *  - socket（热插拔）轴体上方两个 3mm 大圆 → 1mm 直径
+ *  - 不含 4P/TypeC/MCU
+ *  - 片材边界 = 键位包围盒 + Edge Distance
+ */
+export function computeSwitchPadGeometry(
+  layout: KLELayout,
+  opts: { solderType: SolderType; needStab: boolean; needLed: boolean; edgeDistance: number },
+  switchRotations?: PCBSwitchRotations,
+  stabRotations?: PCBStabRotations,
+): SwitchPadGeometry {
+  const circles: { x: number; y: number; r: number }[] = [];
+  const polys: [number, number][][] = [];
+  const { keys } = layout;
+  if (keys.length === 0) return { circles, polys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+  const posConfig: PCBConfig = {
+    solderType: opts.solderType, needStab: opts.needStab, needLed: opts.needLed,
+    edgeDistance: opts.edgeDistance,
+    needTypeC: false, need4P: false, needMCU: false,
+    typeCX: 0, typeCY: 0, fourPX: 0, fourPY: 0, mcuX: 0, mcuY: 0,
+    typeCRot: 0, fourPRot: 0, mcuRot: 0,
+  };
+  const { keyInfos, holeMinX, holeMinY, holeMaxX, holeMaxY } = computePCBKeyPositions(keys, posConfig, U);
+
+  // 轴孔半径：socket 的两个上方大孔 (3mm→1mm) 用 0.5
+  const switchRadii = opts.solderType === "socket"
+    ? [MX_CENTER_R, MX_OFFSET_R, MX_OFFSET_R, 0.5, 0.5]
+    : opts.solderType === "stepped" ? MAGNETIC_RADII : THT_RADII;
+  const switchOffsets = opts.solderType === "stepped" ? MAGNETIC_HOLES : THT_HOLES;
+
+  for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
+    const ki = keyInfos[keyIndex]!;
+    const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
+    const stRot = stabRotations?.[`stab-${keyIndex}`] || 0;
+
+    for (let i = 0; i < switchOffsets.length; i++) {
+      let ox = switchOffsets[i]!.x, oy = switchOffsets[i]!.y;
+      if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
+      if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      circles.push({ x: ki.visualCx + ox, y: ki.visualCy + oy, r: switchRadii[i]! });
+    }
+
+    if (opts.needLed) {
+      const ledW = 3.9, ledH = 3.5;
+      let ox = 0, oy = 3.35 + ledH / 2;
+      if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
+      if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      const ledAngle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
+      const cx = ki.visualCx + ox, cy = ki.visualCy + oy;
+      const local: [number, number][] = [[-ledW / 2, -ledH / 2], [ledW / 2, -ledH / 2], [ledW / 2, ledH / 2], [-ledW / 2, ledH / 2]];
+      polys.push(local.map(([dx, dy]) => {
+        const r = ledAngle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, ledAngle, { x: 0, y: 0 }) : { x: dx, y: dy };
+        return [cx + r.x, cy + r.y] as [number, number];
+      }));
+    }
+
+    if (ki.hasStab) {
+      const size = ki.isTall ? ki.kh : ki.kw;
+      const stabOff = getStabOffset(size);
+      if (stabOff !== null) {
+        const offsets: [number, number, number][] = [
+          [-stabOff, -7.1, 1.5], [-stabOff, 8.3, 2], [stabOff, -7.1, 1.5], [stabOff, 8.3, 2],
+        ];
+        for (const [bx, by, r0] of offsets) {
+          let ox = bx, oy = by;
+          if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
+          if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+          if (stRot) { const r = rotatePoint({ x: ox, y: oy }, stRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+          circles.push({ x: ki.visualCx + ox, y: ki.visualCy + oy, r: r0 });
+        }
+      }
+    }
+  }
+
+  return { circles, polys, minX: holeMinX, minY: holeMinY, maxX: holeMaxX, maxY: holeMaxY };
+}
+
 /** M3 抽取：扩展 PCB 边界以包含组件（Type-C/4P/MCU） */
 function expandPCBComponentBoundary(
   config: PCBConfig, edge: number,
@@ -442,7 +599,7 @@ export function generatePCB(
 
   // DXF builder
   const dxfLines: string[] = [];
-  let dxf = (s: string | number) => { dxfLines.push(s.toString()); };
+  const dxf = (s: string | number) => { dxfLines.push(s.toString()); };
 
   dxf(0); dxf("SECTION"); dxf(2); dxf("HEADER");
   dxf(9); dxf("$ACADVER"); dxf(1); dxf("AC1009");
@@ -492,6 +649,8 @@ export function generatePCB(
   // ── STP 3D 数据收集器 (绝对 mm，用于 cadrum 挤出) ──
   const stpCircleHoles: [number, number, number][] = [];
   const stpPolyHoles: [number, number][][] = [];
+  // 本次所有轴的开关/卫星轴钻孔（延后统一输出，便于跨键布尔合并）
+  const holeShapes: HoleCircle[] = [];
 
   // ── Region accumulators (viewport coords: p.x - minX + pad) ──
   type RegionAcc = { minX: number; minY: number; maxX: number; maxY: number };
@@ -543,7 +702,7 @@ export function generatePCB(
     }
 
     // Switch region accumulator
-    let swAcc = switchRegionAccums.get(keyIndex) || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const swAcc = switchRegionAccums.get(keyIndex) || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
 
     for (const h of holes) {
       let ox = h.ox, oy = h.oy;
@@ -555,14 +714,8 @@ export function generatePCB(
       const absX = ki.visualCx + ox - holeOffX + pad;
       const absY = ki.visualCy + oy - holeOffY + pad;
 
-      // SVG
-      svg += `<circle cx="${absX.toFixed(3)}" cy="${absY.toFixed(3)}" r="${h.r}"/>`;
-      // DXF
-      dxf(0); dxf("CIRCLE"); dxf(8); dxf("0");
-      dxf(10); dxf(absX.toFixed(4)); dxf(20); dxf((-absY).toFixed(4)); dxf(30); dxf("0.0");
-      dxf(40); dxf(h.r.toFixed(4));
-      // STP
-      stpCircleHoles.push([ki.visualCx + ox, -(ki.visualCy + oy), h.r]);
+      // 收集（延后统一布尔输出）
+      holeShapes.push({ cx: absX, cy: absY, r: h.r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
 
       // Accumulate bbox (circle extents)
       accPt(swAcc, absX - h.r, absY - h.r);
@@ -647,7 +800,7 @@ export function generatePCB(
       const size = ki.isTall ? ki.kh : ki.kw;
       const stabOff = getStabOffset(size);
       if (stabOff !== null) {
-        let stAcc = stabRegionAccums.get(keyIndex) || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+        const stAcc = stabRegionAccums.get(keyIndex) || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
         const stabOffsets: Offset[] = [
           { x: -stabOff, y: -7.1 }, { x: -stabOff, y: 8.3 },
           { x: stabOff, y: -7.1 }, { x: stabOff, y: 8.3 },
@@ -664,16 +817,51 @@ export function generatePCB(
           const absX = ki.visualCx + ox - holeOffX + pad;
           const absY = ki.visualCy + oy - holeOffY + pad;
           const r = stabRadii[si]!;
-          svg += `<circle cx="${absX.toFixed(3)}" cy="${absY.toFixed(3)}" r="${r}"/>`;
-          dxf(0); dxf("CIRCLE"); dxf(8); dxf("0");
-          dxf(10); dxf(absX.toFixed(4)); dxf(20); dxf((-absY).toFixed(4)); dxf(30); dxf("0.0");
-          dxf(40); dxf(r.toFixed(4));
-          stpCircleHoles.push([ki.visualCx + ox, -(ki.visualCy + oy), r]);
+          holeShapes.push({ cx: absX, cy: absY, r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
 
           accPt(stAcc, absX - r, absY - r);
           accPt(stAcc, absX + r, absY + r);
         }
         stabRegionAccums.set(keyIndex, stAcc);
+      }
+    }
+  }
+
+  // ── 输出开关/卫星轴钻孔（跨键布尔合并：错位重合的孔合并为同一孔） ──
+  if (holeShapes.length > 0) {
+    let overlap = false;
+    for (let i = 0; i < holeShapes.length && !overlap; i++) {
+      const a = holeShapes[i]!;
+      for (let j = i + 1; j < holeShapes.length; j++) {
+        const b = holeShapes[j]!;
+        if (Math.hypot(a.cx - b.cx, a.cy - b.cy) < a.r + b.r - 1e-6) { overlap = true; break; }
+      }
+    }
+    if (!overlap) {
+      // 无重叠：逐个原样输出圆孔
+      for (const s of holeShapes) {
+        svg += `<circle cx="${s.cx.toFixed(3)}" cy="${s.cy.toFixed(3)}" r="${s.r}"/>`;
+        dxf(0); dxf("CIRCLE"); dxf(8); dxf("0");
+        dxf(10); dxf(s.cx.toFixed(4)); dxf(20); dxf((-s.cy).toFixed(4)); dxf(30); dxf("0.0");
+        dxf(40); dxf(s.r.toFixed(4));
+        stpCircleHoles.push([s.sX, s.sY, s.r]);
+      }
+    } else {
+      // 有重叠：布尔合并后输出（孤立圆仍还原为圆，合并后的异形输出多边形）
+      const rings = unionPolys(holeShapes.map((s) => circleToPoly(s.cx, s.cy, s.r)));
+      for (const ring of rings) {
+        const c = circleFromRing(ring);
+        if (c) {
+          svg += `<circle cx="${c.cx.toFixed(3)}" cy="${c.cy.toFixed(3)}" r="${c.r.toFixed(3)}"/>`;
+          dxf(0); dxf("CIRCLE"); dxf(8); dxf("0");
+          dxf(10); dxf(c.cx.toFixed(4)); dxf(20); dxf((-c.cy).toFixed(4)); dxf(30); dxf("0.0");
+          dxf(40); dxf(c.r.toFixed(4));
+          stpCircleHoles.push([c.cx + holeOffX - pad, -(c.cy + holeOffY - pad), c.r]);
+        } else {
+          svg += `<path d="${ringPathD(ring)}"/>`;
+          dxfPolygon(ring);
+          stpPolyHoles.push(ring.map(([x, y]) => [x + holeOffX - pad, -(y + holeOffY - pad)] as Pt2));
+        }
       }
     }
   }

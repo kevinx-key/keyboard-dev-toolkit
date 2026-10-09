@@ -699,3 +699,21 @@ describe("computePCBBounds", () => {
     expect(withMcU.height).toBeGreaterThan(without.height);
   });
 });
+
+// ── 错位重合的轴：钻孔应布尔合并，而非叠加 ──
+
+describe("generatePCB — overlapping keys boolean-merge", () => {
+  it("merges overlapping keys' holes into one region; spaced keys stay as circles", () => {
+    const overlapping = generatePCB(makeLayout([mk({ x: 0, y: 0 }), mk({ x: 0.5, y: 0 })]), defaultConfig);
+    const spaced = generatePCB(makeLayout([mk({ x: 0, y: 0 }), mk({ x: 1, y: 0 })]), defaultConfig);
+
+    const paths = (svg: string) => (svg.match(/<path/g) || []).length;
+    const circles = (svg: string) => (svg.match(/<circle/g) || []).length;
+
+    // 不重合：全部为圆孔，无合并多边形
+    expect(paths(spaced.svg)).toBe(0);
+    // 重合：出现合并后的多边形孔，且圆孔数量减少（不再叠加）
+    expect(paths(overlapping.svg)).toBeGreaterThan(0);
+    expect(circles(overlapping.svg)).toBeLessThan(circles(spaced.svg));
+  });
+});

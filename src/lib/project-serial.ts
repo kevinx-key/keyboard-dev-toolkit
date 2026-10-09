@@ -66,6 +66,26 @@ export interface ProjectFilePCB {
   mcuRot?: number;
 }
 
+/** 图片贴花（base64 彩色图片，裁剪到所有键帽） */
+export interface ProjectFileDecal {
+  /** base64 / data URL image */
+  image: string;
+  /** Scale multiplier */
+  scale: number;
+  /** X offset in canvas px */
+  x: number;
+  /** Y offset in canvas px */
+  y: number;
+  /** Body darkening 0-1 */
+  dim: number;
+  /** Image opacity 0-1 */
+  opacity: number;
+  /** Natural image width in px */
+  natW?: number;
+  /** Natural image height in px */
+  natH?: number;
+}
+
 export interface ProjectFile {
   version: number;
   meta: ProjectFileMeta;
@@ -73,6 +93,8 @@ export interface ProjectFile {
   kLayout: unknown[];
   plate: ProjectFilePlate;
   pcb: ProjectFilePCB;
+  /** Optional image decal */
+  decal?: ProjectFileDecal;
 }
 
 // ─── Current version ────────────────────────────────────
@@ -99,6 +121,8 @@ export interface ProjectFileInput {
   typeCRot?: number;
   fourPRot?: number;
   mcuRot?: number;
+  /** Optional image decal */
+  decal?: ProjectFileDecal | null;
 }
 
 export interface ProjectFileOutput {
@@ -119,6 +143,8 @@ export interface ProjectFileOutput {
   typeCRot: number;
   fourPRot: number;
   mcuRot: number;
+  /** Optional image decal (null when absent) */
+  decal: ProjectFileDecal | null;
 }
 
 export function serializeProjectFile(input: ProjectFileInput): string {
@@ -148,6 +174,7 @@ export function serializeProjectFile(input: ProjectFileInput): string {
       fourPRot: input.fourPRot,
       mcuRot: input.mcuRot,
     },
+    ...(input.decal ? { decal: input.decal } : {}),
   };
 
   return JSON.stringify(project, null, 2);
@@ -229,6 +256,25 @@ export function deserializeProjectFile(json: string): ProjectFileOutput | null {
   const fourPRot = typeof pcbData.fourPRot === "number" ? pcbData.fourPRot : 270;
   const mcuRot = typeof pcbData.mcuRot === "number" ? pcbData.mcuRot : 45;
 
+  // Image decal (optional)
+  let decal: ProjectFileDecal | null = null;
+  const decalRaw = file.decal;
+  if (decalRaw && typeof decalRaw === "object") {
+    const d = decalRaw as Record<string, unknown>;
+    if (typeof d.image === "string" && d.image) {
+      decal = {
+        image: d.image,
+        scale: typeof d.scale === "number" ? d.scale : 1,
+        x: typeof d.x === "number" ? d.x : 0,
+        y: typeof d.y === "number" ? d.y : 0,
+        dim: typeof d.dim === "number" ? d.dim : 0.4,
+        opacity: typeof d.opacity === "number" ? d.opacity : 1,
+        ...(typeof d.natW === "number" ? { natW: d.natW } : {}),
+        ...(typeof d.natH === "number" ? { natH: d.natH } : {}),
+      };
+    }
+  }
+
   return {
     name,
     kLayout,
@@ -247,5 +293,6 @@ export function deserializeProjectFile(json: string): ProjectFileOutput | null {
     typeCRot,
     fourPRot,
     mcuRot,
+    decal,
   };
 }

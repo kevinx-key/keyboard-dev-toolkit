@@ -1,5 +1,5 @@
-import type { KLELayout, KeyProps } from "./kle-types";
-import { parseLabelColor } from "./kle-types";
+import type { KLELayout, KeyProps, KLEMeta } from "./kle-types";
+import { parseLabelColor, getDecalConfig, type DecalConfig } from "./kle-types";
 import { KEY_UNIT } from "./kle-parser";
 import { getRawRows, parseKLEJSON } from "./kle-serial";
 import { isValidHexColor } from "./sanitize";
@@ -7,11 +7,28 @@ import { computeLShapeSvgPath } from "./lshape-path";
 import { lighten, darken } from "./color-utils";
 import { esc, getLabelText } from "./key-renderer";
 
-/** Build SVG defs section — creates gradients for all unique key colors */
-function buildDefs(keys: KeyProps[]): string {
+/** Deterministic gradient id for a two-color key. */
+function keyGradientId(c: string, c2: string, angle: number): string {
+  return `kg_${c.replace("#", "")}_${c2.replace("#", "")}_${Math.round(angle)}`;
+}
+
+/** SVG gradient vector for a CSS-like angle (0 = up, 90 = right). */
+function gradientVector(angle: number): { x1: number; y1: number; x2: number; y2: number } {
+  const rad = (angle * Math.PI) / 180;
+  const vx = Math.sin(rad), vy = -Math.cos(rad);
+  return { x1: 0.5 - vx / 2, y1: 0.5 - vy / 2, x2: 0.5 + vx / 2, y2: 0.5 + vy / 2 };
+}
+
+/** Build SVG defs section — gradients for all unique key colors + optional decal pattern. */
+function buildDefs(keys: KeyProps[], decal: DecalConfig | null): string {
   const colors = new Set<string>();
+  const gradients = new Set<string>();
   for (const k of keys) {
-    if (k.c && isValidHexColor(k.c)) colors.add(k.c);
+    if (k.c2 && isValidHexColor(k.c2) && k.c && isValidHexColor(k.c)) {
+      gradients.add(`${k.c}|${k.c2}|${k.cang ?? 135}`);
+    } else if (k.c && isValidHexColor(k.c)) {
+      colors.add(k.c);
+    }
   }
   let defs = "";
   for (const c of colors) {
@@ -23,12 +40,38 @@ function buildDefs(keys: KeyProps[]): string {
       <stop offset="100%" stop-color="${darken(c, 18)}" />
     </linearGradient>`;
   }
+  for (const key of gradients) {
+    const [c, c2, angRaw] = key.split("|");
+    const angle = Number(angRaw);
+    const v = gradientVector(angle);
+    const id = keyGradientId(c!, c2!, angle);
+    defs += `<linearGradient id="${id}" x1="${v.x1}" y1="${v.y1}" x2="${v.x2}" y2="${v.y2}">
+      <stop offset="0%" stop-color="${c}" />
+      <stop offset="100%" stop-color="${c2}" />
+    </linearGradient>`;
+  }
+  // Decal image pattern (global, canvas-space coordinates)
+  if (decal && decal.image) {
+    const iw = (decal.natW || 512) * decal.scale;
+    const ih = (decal.natH || 512) * decal.scale;
+    defs += `<pattern id="decalPattern" patternUnits="userSpaceOnUse" x="${decal.x}" y="${decal.y}" width="${iw}" height="${ih}">
+      <image href="${decal.image}" x="${decal.x}" y="${decal.y}" width="${iw}" height="${ih}" preserveAspectRatio="none" opacity="${decal.opacity}" />
+    </pattern>`;
+  }
   // Highlight gradient
   defs += `<linearGradient id="key-highlight" x1="0%" y1="0%" x2="0%" y2="100%">
     <stop offset="0%" stop-color="rgba(255,255,255,0.35)" />
     <stop offset="50%" stop-color="rgba(255,255,255,0)" />
   </linearGradient>`;
   return defs;
+}
+
+/** Resolve the SVG fill reference for a key (decal pattern > gradient > solid). */
+function keyFillRef(k: KeyProps, decal: DecalConfig | null): string {
+  if (decal && decal.image) return "url(#decalPattern)";
+  const c = k.c && isValidHexColor(k.c) ? k.c : "#cccccc";
+  if (k.c2 && isValidHexColor(k.c2)) return `url(#${keyGradientId(c, k.c2, k.cang ?? 135)})`;
+  return `url(#grad_${c.replace("#", "")})`;
 }
 
 // ── M6 修复：renderKey 拆分为子函数 ──
@@ -100,6 +143,7 @@ function renderKeyLabels(
 function renderKeyLShape(
   k: KeyProps, x: number, y: number, w: number, h: number,
   fillRef: string, c: string, t: string, gap: number, rotAttr: string, labels: string[],
+  decal: DecalConfig | null,
 ): string {
   if (!(k.w2 > 0 || k.h2 > 0)) return "";
   const aw = w * KEY_UNIT, ah = h * KEY_UNIT;
@@ -113,6 +157,9 @@ function renderKeyLShape(
   const lPath = computeLShapeSvgPath(ax, ay, aw, ah, bx, by, bw, bh, extW, extH, 4);
   let html = `<g${rotAttr}><path d="${lPath}" transform="translate(0,1)" fill="rgba(0,0,0,0.15)" />`;
   html += `<path d="${lPath}" fill="${fillRef}" stroke="${darken(c, 20)}" stroke-width="0.8" />`;
+  if (decal) {
+    html += `<path d="${lPath}" fill="rgba(0,0,0,${decal.dim})" opacity="${decal.opacity}" />`;
+  }
   const c2x = bx + bw / 2, c2y = by + bh / 2;
   const primaryText = getLabelText(labels);
   if (primaryText) {
@@ -133,11 +180,12 @@ function renderKey(
   isDecal: boolean,
   isGhosted: boolean,
   _i: number,
+  decal: DecalConfig | null,
 ): string {
   const c = k.c && isValidHexColor(k.c) ? k.c : "#cccccc";
   const t = k.t && isValidHexColor(k.t) ? k.t : "#000000";
   const r = k.r || 0;
-  const fillRef = `grad_${c.replace("#", "")}`;
+  const fillRef = keyFillRef(k, decal);
   const gap = 2;
   const rx = 4;
 
@@ -152,11 +200,19 @@ function renderKey(
   let group = `<g${rotAttr}${isGhosted ? ' opacity="0.4"' : ""}${isDecal ? ' stroke-dasharray="3,2"' : ""}>`;
 
   group += renderKeyShadow(px, py, pw, ph, rx);
-  group += renderKeyBody(k, px, py, pw, ph, rx, cx, c, `url(#${fillRef})`);
+  group += renderKeyBody(k, px, py, pw, ph, rx, cx, c, fillRef);
+  if (decal) {
+    // Body: dim the decal image (bottom face darker)…
+    group += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="${rx}" fill="rgba(0,0,0,${decal.dim})" opacity="${decal.opacity}" />`;
+    // …top face: same image at full brightness (inset), then re-apply highlight.
+    const ix = 6, iy = 4;
+    group += `<rect x="${px + ix}" y="${py + iy}" width="${Math.max(0, pw - ix * 2)}" height="${Math.max(0, ph - iy * 2)}" rx="${rx}" fill="url(#decalPattern)" opacity="${decal.opacity}" />`;
+    group += `<rect x="${px}" y="${py}" width="${pw}" height="${Math.min(ph * 0.45, 10)}" rx="${rx}" fill="url(#key-highlight)" />`;
+  }
   group += renderKeyLabels(labels, px, py, pw, ph, cx, cy, t);
   group += "</g>";
 
-  group += renderKeyLShape(k, x, y, w, h, `url(#${fillRef})`, c, t, gap, rotAttr, labels);
+  group += renderKeyLShape(k, x, y, w, h, fillRef, c, t, gap, rotAttr, labels, decal);
 
   return group;
 }
@@ -175,8 +231,27 @@ function renderKey(
  * Example output:
  *   ["Esc",{"x":1},"F1","F2"],[{"y":0.5},"~\n`","!\n1"]
  */
+/** Inject decal meta into a raw KLE rows array (prepends/merges a bare meta object). */
+function injectDecalMeta(rows: unknown[], meta: KLEMeta): unknown[] {
+  const decalFields: Record<string, unknown> = {
+    decalImage: meta.decalImage,
+    decalScale: meta.decalScale ?? 1,
+    decalX: meta.decalX ?? 0,
+    decalY: meta.decalY ?? 0,
+    decalDim: meta.decalDim ?? 0.4,
+    decalOpacity: meta.decalOpacity ?? 1,
+  };
+  if (meta.decalNatW != null) decalFields.decalNatW = meta.decalNatW;
+  if (meta.decalNatH != null) decalFields.decalNatH = meta.decalNatH;
+  if (rows.length > 0 && typeof rows[0] === "object" && !Array.isArray(rows[0]) && rows[0] !== null) {
+    return [{ ...(rows[0] as Record<string, unknown>), ...decalFields }, ...rows.slice(1)];
+  }
+  return [decalFields, ...rows];
+}
+
 export function exportJSON(layout: KLELayout): string {
-  const data = getRawRows(layout);
+  let data = getRawRows(layout);
+  if (getDecalConfig(layout.meta)) data = injectDecalMeta(data, layout.meta);
   if (data.length === 0) return "[]";
   const items = data.map((item: unknown) => JSON.stringify(item));
   return "[" + items.join(",") + "]";
@@ -278,13 +353,14 @@ export function exportSVG(layout: KLELayout, scale: number = 1): string {
   }
 
   // Defs
-  const defs = buildDefs(keys);
+  const decal = getDecalConfig(meta);
+  const defs = buildDefs(keys, decal);
 
   // Render keys
   let keyElements = "";
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i]!;
-    keyElements += renderKey(k, k.x * U, k.y * U, k.w, k.h, k.labels || [], !!k.d, !!k.g, i);
+    keyElements += renderKey(k, k.x * U, k.y * U, k.w, k.h, k.labels || [], !!k.d, !!k.g, i, decal);
   }
 
   const label = meta.name ? esc(meta.name) : "Keyboard Layout";
