@@ -27,7 +27,6 @@ export default function SwitchPadSection({
   layout, pcbConfig, switchRotations, stabRotations, onStpExportingChange, onStpProgress,
 }: SwitchPadSectionProps) {
   const { t } = useI18n();
-  const [edgeDistance, setEdgeDistance] = useState(pcbConfig.edgeDistance);
 
   const padResult = useMemo(() => {
     if (layout.keys.length === 0) return null;
@@ -35,12 +34,12 @@ export default function SwitchPadSection({
       solderType: pcbConfig.solderType,
       needStab: pcbConfig.needStab,
       needLed: pcbConfig.needLed,
-      edgeDistance,
+      edgeDistance: pcbConfig.edgeDistance,
       fillet: DEFAULT_PAD_FILLET,
     };
     const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations);
     return r.svg ? r : null;
-  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, edgeDistance, switchRotations, stabRotations]);
+  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations]);
 
   const safeSvg = useMemo(() => (padResult?.svg ? sanitizeSvg(padResult.svg) : ""), [padResult]);
 
@@ -103,17 +102,9 @@ export default function SwitchPadSection({
         {t("pad.editorLabel")}
       </div>
 
-      {/* ── Config bar (only Edge Distance) ── */}
-      <div style={{ padding: "10px 12px 4px 12px" }}>
-        <label style={{ display: "inline-flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--theme-text-muted)" }}>
-          <span>{t("pad.edgeDistance")}</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <input type="number" value={edgeDistance} min={0} max={50} step={0.5} title={t("tip.padEdge")}
-              onChange={(e) => setEdgeDistance(parseFloat(e.target.value) || 0)}
-              style={{ width: 60, padding: "2px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)", backgroundColor: "var(--theme-input-bg)" }} />
-            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
-          </span>
-        </label>
+      {/* Edge Distance 以 PCB 编辑器为基准（只读） */}
+      <div style={{ padding: "10px 12px 4px 12px", fontSize: 11, color: "var(--theme-text-muted)" }}>
+        {t("pad.edgeDistance")}：{pcbConfig.edgeDistance} mm　（{t("pad.followPcb")}）
       </div>
 
       {/* ── Preview + exports ── */}

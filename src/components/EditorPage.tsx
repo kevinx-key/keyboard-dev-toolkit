@@ -12,6 +12,7 @@ import PlateSection from "./PlateSection";
 import SwitchFoamSection from "./SwitchFoamSection";
 import PCBSection from "./PCBSection";
 import SwitchPadSection from "./SwitchPadSection";
+import BottomFoamSection from "./BottomFoamSection";
 import PricingSection from "./PricingSection";
 import HelpDialog from "./HelpDialog";
 import BackupDialog from "./BackupDialog";
@@ -422,6 +423,15 @@ export default function EditorPage() {
           pcbConfig={projectPcbConfig}
           switchRotations={projectSwitchRots}
           stabRotations={projectStabRots}
+          onStpExportingChange={handleStpExportingChange}
+          onStpProgress={handleStpProgress}
+        />
+
+        {/* ═══ Bottom Foam Section（底棉，依托 PCB 配置） ═══ */}
+        <BottomFoamSection
+          layout={state.layout}
+          pcbConfig={projectPcbConfig}
+          switchRotations={projectSwitchRots}
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
         />
