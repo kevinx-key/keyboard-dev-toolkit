@@ -6,6 +6,7 @@ import { generatePlate } from "../lib/plate-export";
 import type { PlateConfig, PlateResult, PlateRotationOverrides } from "../lib/plate-export";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
@@ -16,7 +17,6 @@ import type { PlateOrderInfo } from "../lib/checkout-payload";
 // ─── PlateConfig extended with swillkb controls ──────────
 
 export interface PlateSectionConfig extends PlateConfig {
-  caseType: "" | "poker" | "sandwich";
   fillet: number;
   lineColor: string;
   lineWeight: number;
@@ -31,7 +31,7 @@ export interface PlateSectionConfig extends PlateConfig {
 }
 
 const DEFAULT_PLATE_CONFIG: PlateSectionConfig = {
-  switchType: 1, stabType: 1, caseType: "", u1: 19.05, kerf: 0,
+  switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
   topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
   fillet: 1, lineColor: "#000000", lineWeight: 0.05, dmz: 5,
   padEnabled: false, filletEnabled: false, kerfEnabled: false,
@@ -55,6 +55,7 @@ interface PlateSectionProps {
 
 export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, clearNonCanvasEpoch, onPlateOrderChange }: PlateSectionProps) {
   const { t } = useI18n();
+  const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [config, setConfig] = useState<PlateSectionConfig>({ ...DEFAULT_PLATE_CONFIG });
   const [drawn, setDrawn] = useState(false);
 
@@ -75,8 +76,8 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
 
   const plateResult = useMemo((): PlateResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
-    return generatePlate(layout, effectiveConfig, rotationOverrides);
-  }, [drawn, effectiveConfig, layout, rotationOverrides]);
+    return generatePlate(layout, effectiveConfig, rotationOverrides, { compatKeyIndices: compatDimIndices });
+  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices]);
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -101,6 +102,12 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
       }
     }
   }, [layout.keys.length, drawn, setRotationOverrides]);
+
+  // 重置：刷新定位板（清空旋转覆盖与选中），保持预览打开
+  const handleReset = useCallback(() => {
+    setRotationOverrides({});
+    setSelectedKeyIdx(null);
+  }, [setRotationOverrides]);
 
   const handleStpExport = useCallback(async () => {
     if (!plateResult?.stpData) return;
@@ -196,16 +203,12 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
       <div style={{ padding: "10px 12px 4px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 6, alignItems: "end" }}>
           <ConfigSelect label={t("plate.switchType")} tip={t("tip.plSwitch")} value={config.switchType}
-            options={[{ value: 1, label: "MX" }, { value: 2, label: "MX+Alps" }, { value: 3, label: "MX-H" }, { value: 4, label: "Alps" }]}
-            onChange={v => update("switchType", v as 1 | 2 | 3 | 4)}
+            options={[{ value: 1, label: "MX" }]}
+            onChange={v => update("switchType", v as 1)}
           />
           <ConfigSelect label={t("plate.stabType")} tip={t("tip.plStab")} value={config.stabType}
-            options={[{ value: 0, label: t("plate.stabNone") }, { value: 1, label: "Cherry+Costar" }, { value: 2, label: "Cherry" }, { value: 5, label: t("plate.stabFuling") }]}
-            onChange={v => update("stabType", v as 0 | 1 | 2 | 3 | 4 | 5)}
-          />
-          <ConfigSelect label={t("plate.caseType")} tip={t("tip.plCase")} value={config.caseType}
-            options={[{ value: "", label: t("plate.caseNone") }, { value: "poker", label: "Poker — 60%" }, { value: "sandwich", label: "Sandwich" }]}
-            onChange={v => update("caseType", v as "" | "poker" | "sandwich")}
+            options={[{ value: 0, label: t("plate.stabNone") }, { value: 1, label: "Cherry" }, { value: 2, label: t("plate.stabPCB") }, { value: 3, label: t("plate.stabFuling") }]}
+            onChange={v => update("stabType", v as 0 | 1 | 2 | 3)}
           />
           <ConfigNumber label={t("plate.unit")} tip={t("tip.plUnit")} value={config.u1} enabled={config.u1Enabled} onToggle={v => update("u1Enabled", v)} onChange={v => update("u1", v)} min={10} max={30} />
           <ConfigNumber label={t("plate.kerf")} tip={t("tip.plKerf")} value={config.kerf} enabled={config.kerfEnabled} onToggle={v => update("kerfEnabled", v)} onChange={v => update("kerf", v)} min={0} max={2} step={0.05} />
@@ -237,7 +240,7 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
           {drawn ? t("pcb.close") : t("plate.drawing")}
         </button>
         {drawn && (
-          <button onClick={handleDraw}
+          <button onClick={handleReset}
             title={t("tip.resetPlate")}
             className="kle-btn"
             style={{
@@ -379,7 +382,11 @@ function ConfigSelect({ label, tip, value, options, onChange }: {
   return (
     <label style={{ display: "inline-flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--theme-text-muted)" }}>
       <span>{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value)} title={tip}
+      <select value={value} onChange={e => {
+        const raw = e.target.value;
+        const opt = options.find(o => String(o.value) === raw);
+        onChange(opt ? opt.value : raw);
+      }} title={tip}
         style={{ padding: "3px 6px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)", minWidth: 90 }}>
         {options.map(o => <option key={String(o.value)} value={o.value as string | number}>{o.label}</option>)}
       </select>

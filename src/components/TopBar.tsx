@@ -6,6 +6,7 @@ import { useI18n, type Lang, LANG_LABELS } from "../lib/i18n";
 import { useTheme, THEME_LABELS, THEME_CLASSES, type Theme } from "../lib/theme";
 import { getPlatform, openExternal } from "../lib/platform-bridge";
 import UpdateDialog from "./UpdateDialog";
+import CompatLayerBar from "./CompatLayerBar";
 
 const iconProps = { size: 13, strokeWidth: 2 } as const;
 
@@ -32,6 +33,10 @@ export default function TopBar() {
         <Keyboard size={16} strokeWidth={2} />
         Keyboard Dev Toolkit
       </span>
+
+      {/* 兼容区开关 + 不透明度（随顶栏常驻置顶） */}
+      <span className="kle-sep" />
+      <CompatLayerBar />
 
       {/* 右侧：更新 / 语言 / 主题 */}
       <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 4 }}>

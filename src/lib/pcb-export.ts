@@ -456,6 +456,9 @@ export interface SwitchPadGeometry {
   polys: [number, number][][];
   /** 片材包围盒（含 Edge Distance），绝对 mm */
   minX: number; minY: number; maxX: number; maxY: number;
+  /** 兼容层：兼容键的孔（浅灰重绘用） */
+  compatCircles?: { x: number; y: number; r: number }[];
+  compatPolys?: [number, number][][];
 }
 
 /**
@@ -469,11 +472,14 @@ export function computeSwitchPadGeometry(
   opts: { solderType: SolderType; needStab: boolean; needLed: boolean; edgeDistance: number },
   switchRotations?: PCBSwitchRotations,
   stabRotations?: PCBStabRotations,
+  compatKeyIndices?: Set<number>,
 ): SwitchPadGeometry {
   const circles: { x: number; y: number; r: number }[] = [];
   const polys: [number, number][][] = [];
+  const compatCircles: { x: number; y: number; r: number }[] = [];
+  const compatPolys: [number, number][][] = [];
   const { keys } = layout;
-  if (keys.length === 0) return { circles, polys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  if (keys.length === 0) return { circles, polys, compatCircles, compatPolys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
   const posConfig: PCBConfig = {
     solderType: opts.solderType, needStab: opts.needStab, needLed: opts.needLed,
@@ -494,6 +500,7 @@ export function computeSwitchPadGeometry(
     const ki = keyInfos[keyIndex]!;
     const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
     const stRot = stabRotations?.[`stab-${keyIndex}`] || 0;
+    const cStart = circles.length, pStart = polys.length;
 
     for (let i = 0; i < switchOffsets.length; i++) {
       let ox = switchOffsets[i]!.x, oy = switchOffsets[i]!.y;
@@ -534,9 +541,14 @@ export function computeSwitchPadGeometry(
         }
       }
     }
+
+    if (compatKeyIndices?.has(keyIndex)) {
+      for (let k = cStart; k < circles.length; k++) compatCircles.push(circles[k]!);
+      for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
+    }
   }
 
-  return { circles, polys, minX: holeMinX, minY: holeMinY, maxX: holeMaxX, maxY: holeMaxY };
+  return { circles, polys, compatCircles, compatPolys, minX: holeMinX, minY: holeMinY, maxX: holeMaxX, maxY: holeMaxY };
 }
 
 // ─── 底棉几何（从 PCB 配置派生，绝对 mm，Y 向下） ─────────
@@ -545,6 +557,8 @@ export interface BottomFoamGeometry {
   /** 所有挖孔（绝对 mm，Y 向下） */
   polys: [number, number][][];
   minX: number; minY: number; maxX: number; maxY: number;
+  /** 兼容层：兼容键的挖孔（浅灰重绘用） */
+  compatPolys?: [number, number][][];
 }
 
 /**
@@ -565,8 +579,10 @@ export function computeBottomFoamGeometry(
     customRects?: CustomRect[];
   },
   switchRotations?: PCBSwitchRotations,
+  compatKeyIndices?: Set<number>,
 ): BottomFoamGeometry {
   const polys: [number, number][][] = [];
+  const compatPolys: [number, number][][] = [];
   const { keys } = layout;
 
   // 组件挖孔：以组件中心为心的圆角矩形
@@ -586,6 +602,7 @@ export function computeBottomFoamGeometry(
       const ki = keyInfos[keyIndex]!;
       const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
       const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
+      const pStart = polys.length;
       const tf = (pts: [number, number][]) => pts.map(([dx, dy]) => {
         const r = angle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
         return [ki.visualCx + r.x, ki.visualCy + r.y] as [number, number];
@@ -606,6 +623,10 @@ export function computeBottomFoamGeometry(
         const yB = (loy - ledH / 2) + 0.2;         // 探入 RGB 方孔 (与 RGB 重叠)
         polys.push(tf([[-ledW / 2, yA], [ledW / 2, yA], [ledW / 2, yB], [-ledW / 2, yB]]));
       }
+
+      if (compatKeyIndices?.has(keyIndex)) {
+        for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
+      }
     }
   }
 
@@ -616,7 +637,7 @@ export function computeBottomFoamGeometry(
     polys.push(roundedRectPolygon(cr.cx, cr.cy, cr.w, cr.h, cr.r, cr.rot));
   }
 
-  if (polys.length === 0) return { polys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  if (polys.length === 0) return { polys, compatPolys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const poly of polys) {
@@ -627,7 +648,7 @@ export function computeBottomFoamGeometry(
   }
   minX -= opts.edgeDistance; minY -= opts.edgeDistance;
   maxX += opts.edgeDistance; maxY += opts.edgeDistance;
-  return { polys, minX, minY, maxX, maxY };
+  return { polys, compatPolys, minX, minY, maxX, maxY };
 }
 
 /** M3 抽取：扩展 PCB 边界以包含组件（Type-C/4P/MCU） */
@@ -702,6 +723,7 @@ export function generatePCB(
   config: PCBConfig,
   switchRotations?: PCBSwitchRotations,
   stabRotations?: PCBStabRotations,
+  compatKeyIndices?: Set<number>,
 ): PCBResult {
   const { keys } = layout;
   const edge = config.edgeDistance;
@@ -794,6 +816,9 @@ export function generatePCB(
   const stpPolyHoles: [number, number][][] = [];
   // 本次所有轴的开关/卫星轴钻孔（延后统一输出，便于跨键布尔合并）
   const holeShapes: HoleCircle[] = [];
+  // 兼容层：这些键的孔/元件以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
+  const compatHoleShapes: HoleCircle[] = [];
+  const compatLedRects: { x: number; y: number; w: number; h: number; angle: number }[] = [];
 
   // ── Region accumulators (viewport coords: p.x - minX + pad) ──
   type RegionAcc = { minX: number; minY: number; maxX: number; maxY: number };
@@ -859,6 +884,9 @@ export function generatePCB(
 
       // 收集（延后统一布尔输出）
       holeShapes.push({ cx: absX, cy: absY, r: h.r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
+      if (compatKeyIndices?.has(keyIndex)) {
+        compatHoleShapes.push({ cx: absX, cy: absY, r: h.r, sX: 0, sY: 0 });
+      }
 
       // Accumulate bbox (circle extents)
       accPt(swAcc, absX - h.r, absY - h.r);
@@ -879,6 +907,10 @@ export function generatePCB(
       // Total LED orientation angle (CW, SVG convention)
       const ledAngle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
       const needLedRot = ledAngle && ledAngle % 360 !== 0;
+
+      if (compatKeyIndices?.has(keyIndex)) {
+        compatLedRects.push({ x: absX, y: absY, w: ledW, h: ledH, angle: ledAngle });
+      }
 
       // SVG — rotate rect around its centre
       if (needLedRot) {
@@ -961,6 +993,9 @@ export function generatePCB(
           const absY = ki.visualCy + oy - holeOffY + pad;
           const r = stabRadii[si]!;
           holeShapes.push({ cx: absX, cy: absY, r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
+          if (compatKeyIndices?.has(keyIndex)) {
+            compatHoleShapes.push({ cx: absX, cy: absY, r, sX: 0, sY: 0 });
+          }
 
           accPt(stAcc, absX - r, absY - r);
           accPt(stAcc, absX + r, absY + r);
@@ -1010,6 +1045,30 @@ export function generatePCB(
   }
 
   svg += `</g>`;
+
+  // 兼容层：兼容键的孔/元件以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
+  if (compatHoleShapes.length > 0 || compatLedRects.length > 0) {
+    svg += `
+  <g fill="lightgray" stroke="#aaa" stroke-width="0.15">`;
+    if (compatHoleShapes.length > 0) {
+      const rings = unionPolys(compatHoleShapes.map((s) => circleToPoly(s.cx, s.cy, s.r)));
+      for (const ring of rings) {
+        const c = circleFromRing(ring);
+        if (c) svg += `<circle cx="${c.cx.toFixed(3)}" cy="${c.cy.toFixed(3)}" r="${c.r.toFixed(3)}"/>`;
+        else svg += `<path d="${ringPathD(ring)}"/>`;
+      }
+    }
+    for (const r of compatLedRects) {
+      if (r.angle && r.angle % 360 !== 0) {
+        svg += `<g transform="rotate(${r.angle} ${r.x.toFixed(3)} ${r.y.toFixed(3)})">`;
+        svg += `<rect x="${(r.x - r.w / 2).toFixed(3)}" y="${(r.y - r.h / 2).toFixed(3)}" width="${r.w}" height="${r.h}" rx="0.2"/>`;
+        svg += `</g>`;
+      } else {
+        svg += `<rect x="${(r.x - r.w / 2).toFixed(3)}" y="${(r.y - r.h / 2).toFixed(3)}" width="${r.w}" height="${r.h}" rx="0.2"/>`;
+      }
+    }
+    svg += `</g>`;
+  }
 
   // ── Component outlines: Type-C / 4P ──
   const componentRegions: PCBComponentRegion[] = [];

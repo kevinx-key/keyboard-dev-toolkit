@@ -72,6 +72,15 @@ describe("generateSwitchPad", () => {
     expect(paths(generateSwitchPad(mkLay([0, 0.5]), BASE).svg)).toBeGreaterThan(0);
   });
 
+  it("exposes origin/pad for overlay alignment", () => {
+    const r = generateSwitchPad(layout(KEYS), BASE);
+    expect(r.pad).toBe(5);
+    expect(typeof r.minX).toBe("number");
+    expect(typeof r.minY).toBe("number");
+    // 空布局也保持字段存在
+    expect(generateSwitchPad(layout([]), BASE).pad).toBe(5);
+  });
+
   it("matches snapshot", () => {
     expect(generateSwitchPad(layout(KEYS), { ...BASE, solderType: "socket", needLed: true })).toMatchSnapshot();
   });

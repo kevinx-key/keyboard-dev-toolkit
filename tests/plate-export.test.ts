@@ -205,10 +205,9 @@ describe("generatePlate", () => {
 // getStabOffset boundary value tests (via generatePlate)
 // ═══════════════════════════════════════════════════════════════════
 //
-// getStabOffset uses these thresholds:
+// getStabOffset uses these thresholds (Cherry standard, 2026-10-09):
 //   < 2u  → null  (no stabilizer)
-//   < 3u  → 11.9  (2u: 23.8mm / 2)
-//   < 6u  → 19.05 (3u: 38.1mm / 2)
+//   < 6u  → 11.9  (2u stab: 23.8mm / 2) — used for 2u–5.75u
 //   < 6.25u → 47.5 (6u: 95mm / 2)
 //   < 7u  → 50   (6.25u: 100mm / 2)
 //   >= 7u → 57.15 (7u: 114.3mm / 2)
@@ -236,7 +235,7 @@ describe("getStabOffset boundary values (via generatePlate, stabType=1)", () => 
     expect(r).toMatchSnapshot();
   });
 
-  it("3u key: stabilizer at offset 19.05mm (38.1mm / 2)", () => {
+  it("3u key: 2u stabilizer at offset 11.9mm (23.8mm / 2)", () => {
     const r = generateForWidth(3);
     expect(r.cutPathLength).toBeGreaterThan(PERIMETER_1U_NO_STAB + 5);
     expect(r).toMatchSnapshot();
@@ -281,7 +280,7 @@ describe("getStabOffset boundary values (via generatePlate, stabType=1)", () => 
     expect(r.cutPathLength).toBeGreaterThan(PERIMETER_1U_NO_STAB + 5);
   });
 
-  it("5.75u key (3u-6u range): stabilizer at offset 19.05", () => {
+  it("5.75u key (2u stab range): stabilizer at offset 11.9", () => {
     const r = generateForWidth(5.75);
     expect(r.cutPathLength).toBeGreaterThan(PERIMETER_1U_NO_STAB + 5);
   });

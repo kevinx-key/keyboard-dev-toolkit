@@ -7,6 +7,7 @@ import type { BottomFoamConfig } from "../lib/bottom-foam-export";
 import type { PCBConfig, PCBSwitchRotations, CustomRect } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { sanitizeSvg } from "../lib/sanitize";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
@@ -26,6 +27,7 @@ export default function BottomFoamSection({
   layout, pcbConfig, switchRotations, onStpExportingChange, onStpProgress,
 }: BottomFoamSectionProps) {
   const { t } = useI18n();
+  const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [thickness, setThickness] = useState(DEFAULT_BOTTOM_FOAM_THICKNESS);
   const [customRects, setCustomRects] = useState<CustomRect[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -55,9 +57,9 @@ export default function BottomFoamSection({
       fillet: DEFAULT_BOTTOM_FOAM_FILLET,
       customRects,
     };
-    const r = generateBottomFoam(layout, cfg, switchRotations);
+    const r = generateBottomFoam(layout, cfg, switchRotations, compatDimIndices);
     return r.svg ? r : null;
-  }, [layout, pcbConfig, switchRotations, customRects]);
+  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices]);
 
   const safeSvg = useMemo(() => (foamResult?.svg ? sanitizeSvg(foamResult.svg) : ""), [foamResult]);
 

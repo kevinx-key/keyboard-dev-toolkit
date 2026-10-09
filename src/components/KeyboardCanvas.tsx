@@ -5,6 +5,7 @@ import { KEY_UNIT } from "../lib";
 import type { KeyProps } from "../lib";
 import type { DecalConfig } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatLayer } from "../lib/compat-layer";
 import { computeLayoutBBoxInUnits } from "../lib/coordinate-system";
 import KeyRenderer from "./canvas/KeyRenderer";
 import ContextMenu from "./canvas/ContextMenu";
@@ -37,6 +38,7 @@ export default function KeyboardCanvas({
   onCut, onPaste, onDuplicate: _onDuplicate, onAddKeys, infoHint,
 }: KeyboardCanvasProps) {
   const { t } = useI18n();
+  const compatLayer = useCompatLayer();
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -97,6 +99,12 @@ export default function KeyboardCanvas({
   }, [keys]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // 兼容层：变淡（未激活）的键索引集合 —— 命中/框选时跳过，使其不可选中并让位给下层重叠键
+  const compatDimSet = useMemo(() => {
+    const s = new Set<number>();
+    keys.forEach((k, i) => { if (compatLayer.isDimmed(k)) s.add(i); });
+    return s;
+  }, [keys, compatLayer]);
   const isFilterActive = categoryFilter !== "All";
   const selectedKeyInfo = useMemo(() => {
     if (selectedIds.length !== 1) return null;
@@ -189,7 +197,7 @@ export default function KeyboardCanvas({
     }
     const pos = getCanvasPos(e);
     if (!pos) return;
-    const hitIdx = hitTestKey(pos.x, pos.y, keys);
+    const hitIdx = hitTestKey(pos.x, pos.y, keys, compatDimSet);
     if (hitIdx !== null) {
       e.stopPropagation();
       e.preventDefault();
@@ -210,7 +218,7 @@ export default function KeyboardCanvas({
       && pos.y >= bgBounds.top && pos.y <= bgBounds.top + bgBounds.height;
     if (!inBg) return;
     pendingSelectRef.current = { x: pos.x, y: pos.y };
-  }, [readOnly, preview, selectedIds, panX, panY, keys, onSelectKey, bgBounds]);
+  }, [readOnly, preview, selectedIds, panX, panY, keys, onSelectKey, bgBounds, compatDimSet]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -251,7 +259,7 @@ export default function KeyboardCanvas({
       if (dx < 3 && dy < 3) {
         onClearSelection();
       } else {
-        onSelectArea(getKeysInArea(dragState.startX, dragState.startY, dragState.currentX, dragState.currentY, keys));
+        onSelectArea(getKeysInArea(dragState.startX, dragState.startY, dragState.currentX, dragState.currentY, keys, compatDimSet));
       }
     } else if (dragState.type === "move") {
       const dx = Math.round((dragState.currentX - dragState.startX) / KEY_UNIT * 4) / 4;
@@ -259,7 +267,7 @@ export default function KeyboardCanvas({
       if (dx !== 0 || dy !== 0) onMoveKeys(dx, dy);
     }
     setDragState(null);
-  }, [dragState, keys, onClearSelection, onSelectArea, onMoveKeys, isPanning]);
+  }, [dragState, keys, onClearSelection, onSelectArea, onMoveKeys, isPanning, compatDimSet]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -301,7 +309,7 @@ export default function KeyboardCanvas({
           {keys.map((key, i) => {
             const id = String(i);
             const matchesFilter = !isFilterActive || getKeyCategory(key) === categoryFilter;
-            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} decal={decal} matchesFilter={matchesFilter} onContextMenu={handleContextMenu} />;
+            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} decal={decal} matchesFilter={matchesFilter} compatColor={compatLayer.canvasColor(key)} compatOpacity={compatLayer.opacity} compatSkipped={compatDimSet.has(i)} compatZ={compatLayer.compatZ(key)} onContextMenu={handleContextMenu} />;
           })}
 
           {/* Selection rectangle */}

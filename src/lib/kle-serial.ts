@@ -9,7 +9,7 @@
  */
 
 import type { KeyProps, KLELayout, KLEMeta } from "./kle-types";
-import { DEFAULT_PROPS, DEFAULT_ALIGN, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions } from "./kle-types";
+import { DEFAULT_PROPS, DEFAULT_ALIGN, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions, parseViaCompatTag } from "./kle-types";
 import { keyPropsToIntermediate } from "./kle-parser";
 
 /** Parse a layouts.json format preset into KeyProps[].
@@ -69,6 +69,13 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         key.sb = (current.sb as string) ?? "";
         key.st = (current.st as string) ?? "";
         key.labels = mappedLabels;
+
+        // VIA 兼容标记（"<matrix>\n\n\n<option>,<value>"）→ compat / compatOption
+        const via = parseViaCompatTag(serialLabels);
+        if (via) {
+          key.compat = via.value;
+          key.compatOption = via.option;
+        }
 
         keys.push(key);
 

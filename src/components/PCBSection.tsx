@@ -7,6 +7,7 @@ import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, Solder
 import type { KLELayout } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
@@ -71,6 +72,7 @@ export default function PCBSection({
   clearNonCanvasEpoch,
 }: PCBSectionProps) {
   const { t } = useI18n();
+  const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
 
   // Controlled or internal config
   const isControlled = externalConfig !== undefined && externalSetConfig !== undefined;
@@ -120,8 +122,8 @@ export default function PCBSection({
 
   const pcbResult = useMemo((): PCBResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
-    return generatePCB(layout, config, switchRotations, stabRotations);
-  }, [drawn, config, layout, switchRotations, stabRotations]);
+    return generatePCB(layout, config, switchRotations, stabRotations, compatDimIndices);
+  }, [drawn, config, layout, switchRotations, stabRotations, compatDimIndices]);
 
   // ── Matrix mode state ──
   const [matrixMode, setMatrixMode] = useState(false);

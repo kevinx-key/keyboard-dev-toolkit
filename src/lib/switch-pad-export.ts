@@ -33,6 +33,11 @@ export interface SwitchPadResult {
   dxf: string;
   width: number;
   height: number;
+  /** SVG 用户坐标原点偏移（mm），供叠加层对齐 */
+  minX: number;
+  minY: number;
+  /** SVG 边距（mm） */
+  pad: number;
   stpData: StpExtrudeData | null;
 }
 
@@ -125,12 +130,13 @@ export function generateSwitchPad(
   config: SwitchPadConfig,
   switchRotations?: PCBSwitchRotations,
   stabRotations?: PCBStabRotations,
+  compatKeyIndices?: Set<number>,
 ): SwitchPadResult {
-  const geo = computeSwitchPadGeometry(layout, config, switchRotations, stabRotations);
+  const geo = computeSwitchPadGeometry(layout, config, switchRotations, stabRotations, compatKeyIndices);
   const width = geo.maxX - geo.minX;
   const height = geo.maxY - geo.minY;
   if ((geo.circles.length === 0 && geo.polys.length === 0) || width <= 0 || height <= 0) {
-    return { svg: "", dxf: "", width: 0, height: 0, stpData: null };
+    return { svg: "", dxf: "", width: 0, height: 0, minX: 0, minY: 0, pad: 5, stpData: null };
   }
 
   const shapes: Shape[] = [
@@ -160,7 +166,28 @@ export function generateSwitchPad(
       svg += `<path d="${d}"/>`;
     }
   }
-  svg += `</g>
+  svg += `</g>`;
+
+  // 兼容层：兼容键的孔以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
+  const compatShapes: Shape[] = [
+    ...(geo.compatCircles ?? []).map((c): Shape => ({ kind: "circle", x: c.x, y: c.y, r: c.r })),
+    ...(geo.compatPolys ?? []).map((pts): Shape => ({ kind: "poly", pts })),
+  ];
+  if (compatShapes.length > 0) {
+    const grayShapes = anyOverlap(compatShapes) ? unionShapes(compatShapes) : compatShapes;
+    svg += `
+  <g fill="lightgray" stroke="#888" stroke-width="0.3">`;
+    for (const s of grayShapes) {
+      if (s.kind === "circle") {
+        svg += `<circle cx="${vx(s.x)}" cy="${vy(s.y)}" r="${s.r.toFixed(3)}"/>`;
+      } else {
+        svg += `<path d="${s.pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z"}"/>`;
+      }
+    }
+    svg += `</g>`;
+  }
+
+  svg += `
 </svg>`;
 
   // ── DXF ──
@@ -182,7 +209,7 @@ export function generateSwitchPad(
     circleHoles,
   };
 
-  return { svg, dxf, width, height, stpData };
+  return { svg, dxf, width, height, minX: geo.minX, minY: geo.minY, pad, stpData };
 }
 
 // ─── DXF builder (片材圆角外框 + 圆孔 + 多边形孔) ──────────

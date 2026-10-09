@@ -7,6 +7,7 @@ import type { SwitchPadConfig } from "../lib/switch-pad-export";
 import type { PCBConfig, PCBSwitchRotations, PCBStabRotations } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
+import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { sanitizeSvg } from "../lib/sanitize";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
@@ -27,6 +28,7 @@ export default function SwitchPadSection({
   layout, pcbConfig, switchRotations, stabRotations, onStpExportingChange, onStpProgress,
 }: SwitchPadSectionProps) {
   const { t } = useI18n();
+  const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
 
   const padResult = useMemo(() => {
     if (layout.keys.length === 0) return null;
@@ -37,9 +39,9 @@ export default function SwitchPadSection({
       edgeDistance: pcbConfig.edgeDistance,
       fillet: DEFAULT_PAD_FILLET,
     };
-    const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations);
+    const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations, compatDimIndices);
     return r.svg ? r : null;
-  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations]);
+  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations, compatDimIndices]);
 
   const safeSvg = useMemo(() => (padResult?.svg ? sanitizeSvg(padResult.svg) : ""), [padResult]);
 

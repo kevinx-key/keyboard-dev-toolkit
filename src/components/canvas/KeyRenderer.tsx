@@ -21,6 +21,14 @@ interface KeyRendererProps {
   onContextMenu: (e: React.MouseEvent) => void;
   /** Global image decal (base64). Rendered as per-key background, clipped to the keycap. */
   decal?: DecalConfig | null;
+  /** 兼容层：键帽覆盖色（null = 不上色） */
+  compatColor?: string | null;
+  /** 兼容层：覆盖色不透明度（0..1） */
+  compatOpacity?: number;
+  /** 兼容层：参照键（命中穿透，不拦截指针事件） */
+  compatSkipped?: boolean;
+  /** 兼容层：叠放 z 值（置顶/中性/垫底） */
+  compatZ?: number;
 }
 
 /** Build a linear-gradient CSS string for a two-color key. */
@@ -42,6 +50,10 @@ export default function KeyRenderer({
   matchesFilter,
   onContextMenu,
   decal,
+  compatColor = null,
+  compatOpacity = 1,
+  compatSkipped = false,
+  compatZ = 1,
 }: KeyRendererProps) {
   // ── Dimension extraction ──
   const x2 = keyData.x2 || 0;
@@ -227,7 +239,7 @@ export default function KeyRenderer({
     width: bboxW,
     height: bboxH,
     cursor: readOnly || preview ? "default" : "pointer",
-    zIndex: isSelected ? 5 : 1,
+    zIndex: isSelected ? 5 : compatZ,
     opacity: isDecal
       ? 0.6
       : isGhosted
@@ -241,7 +253,8 @@ export default function KeyRenderer({
     ...(hasExt && !keyData.r ? { transform: "translateZ(0)" } : {}),
     ...(hasExt ? { WebkitBackfaceVisibility: "hidden" as const } : {}),
     overflow: hasRotation ? "visible" : undefined,
-    pointerEvents: "auto",
+    // 兼容层参照键不拦截指针事件（右键/悬停落到下层重叠键）
+    pointerEvents: compatSkipped ? "none" : "auto",
   };
   const originX = keyData.r ? (
     (keyData.rx !== 0 || keyData.ry !== 0)
@@ -470,6 +483,24 @@ export default function KeyRenderer({
             )}
           </>
         ) : null}
+
+        {/* ── 兼容层键帽覆盖色（兼容按键浅蓝 / 兼容常规键浅绿） ── */}
+        {compatColor && (
+          <div
+            style={{
+              position: "absolute",
+              left: hasExt ? 0 : bodyOffX,
+              top: hasExt ? 0 : bodyOffY,
+              width: hasExt ? bboxW : kbWidth,
+              height: hasExt ? bboxH : kbHeight,
+              backgroundColor: compatColor,
+              opacity: compatOpacity,
+              borderRadius: hasExt ? 0 : KEY_RX,
+              zIndex: 3,
+              pointerEvents: "none",
+            }}
+          />
+        )}
 
         {/* ── Labels ── */}
         <LabelRenderer
