@@ -420,7 +420,7 @@ exports[`generatePCB > SVG snapshot: basic 2x2 sunken solder layout 1`] = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
   <!-- FR4 base panel -->
-  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="0"/>
   <!-- Copper pour area -->
   <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
   <!-- Holes group: white fill, transparent interior via mask -->
@@ -442,7 +442,7 @@ exports[`generatePCB > needLed snapshot 1`] = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
   <!-- FR4 base panel -->
-  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="0"/>
   <!-- Copper pour area -->
   <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
   <!-- Holes group: white fill, transparent interior via mask -->
@@ -455,7 +455,7 @@ exports[`generatePCB > socket solder type snapshot 1`] = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
   <!-- FR4 base panel -->
-  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="0"/>
   <!-- Copper pour area -->
   <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
   <!-- Holes group: white fill, transparent interior via mask -->
@@ -468,7 +468,7 @@ exports[`generatePCB > stepped solder type snapshot 1`] = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 73.2 54.1" width="73.2mm" height="54.1mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
   <!-- FR4 base panel -->
-  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="3"/>
+  <rect x="5" y="5" width="63.150000000000006" height="44.1" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="0"/>
   <!-- Copper pour area -->
   <rect x="6" y="6" width="61.150000000000006" height="42.1" fill="none" stroke="#6db86a" stroke-width="0.2"/>
   <!-- Holes group: white fill, transparent interior via mask -->

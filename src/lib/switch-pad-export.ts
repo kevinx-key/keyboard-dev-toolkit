@@ -25,8 +25,8 @@ export interface SwitchPadConfig {
   fillet: number;
 }
 
-/** 默认外形圆角 (mm) */
-export const DEFAULT_PAD_FILLET = 1;
+/** 默认外框圆角 (mm) */
+export const DEFAULT_PAD_FILLET = 0;
 
 export interface SwitchPadResult {
   svg: string;

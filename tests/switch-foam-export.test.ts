@@ -67,9 +67,9 @@ describe("generateSwitchFoam", () => {
     expect(foam.cutPathLength).not.toBe(plate.cutPathLength);
   });
 
-  it("applies the default 1mm corner fillet to the outer outline; override honored", () => {
+  it("outer fillet (default 0) applies to the frame; override honored", () => {
     const layout = makeLayout([spacebar(0, 0, 6.25)]);
-    expect(generateSwitchFoam(layout).svg).toContain('rx="1"');
+    expect(generateSwitchFoam(layout).svg).toContain('rx="0"');
     const cfg: Partial<SwitchFoamConfig> = { fillet: 3 };
     expect(generateSwitchFoam(layout, cfg).svg).toContain('rx="3"');
   });

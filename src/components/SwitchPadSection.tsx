@@ -29,6 +29,7 @@ export default function SwitchPadSection({
 }: SwitchPadSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
+  const [outerFillet, setOuterFillet] = useState(DEFAULT_PAD_FILLET);
 
   const padResult = useMemo(() => {
     if (layout.keys.length === 0) return null;
@@ -37,11 +38,11 @@ export default function SwitchPadSection({
       needStab: pcbConfig.needStab,
       needLed: pcbConfig.needLed,
       edgeDistance: pcbConfig.edgeDistance,
-      fillet: DEFAULT_PAD_FILLET,
+      fillet: outerFillet,
     };
     const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations, compatDimIndices);
     return r.svg ? r : null;
-  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations, compatDimIndices]);
+  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations, compatDimIndices, outerFillet]);
 
   const safeSvg = useMemo(() => (padResult?.svg ? sanitizeSvg(padResult.svg) : ""), [padResult]);
 
@@ -104,9 +105,20 @@ export default function SwitchPadSection({
         {t("pad.editorLabel")}
       </div>
 
-      {/* Edge Distance 以 PCB 编辑器为基准（只读） */}
-      <div style={{ padding: "10px 12px 4px 12px", fontSize: 11, color: "var(--theme-text-muted)" }}>
-        {t("pad.edgeDistance")}：{pcbConfig.edgeDistance} mm　（{t("pad.followPcb")}）
+      {/* Edge Distance 以 PCB 编辑器为基准（只读）+ 外框圆角 */}
+      <div style={{ padding: "10px 12px 4px 12px", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <span style={{ fontSize: 11, color: "var(--theme-text-muted)", paddingBottom: 4 }}>
+          {t("pad.edgeDistance")}：{pcbConfig.edgeDistance} mm　（{t("pad.followPcb")}）
+        </span>
+        <label style={{ display: "inline-flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--theme-text-muted)" }}>
+          <span>{t("fillet.outer")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={outerFillet} min={0} max={20} step={0.5} title={t("tip.filletOuter")}
+              onChange={(e) => setOuterFillet(parseFloat(e.target.value) || 0)}
+              style={{ width: 60, padding: "2px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)", backgroundColor: "var(--theme-input-bg)" }} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
       </div>
 
       {/* ── Preview + exports ── */}

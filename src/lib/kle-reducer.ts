@@ -4,7 +4,7 @@
  */
 
 import type { EditorState, EditorAction, KeyProps, KLEMeta, UndoSnapshot } from "./kle-types";
-import { DEFAULT_PROPS, DEFAULT_META } from "./kle-types";
+import { DEFAULT_PROPS, DEFAULT_META, applyCompatToLabels } from "./kle-types";
 import { PRESET_NAMES } from "../data/presets";
 
 const MAX_HISTORY = 100;
@@ -82,6 +82,15 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       if (ids.length === 0) return state; // Empty selection is a no-op
       const newKeys = state.layout.keys.map((k, i) => {
         if (ids.includes(String(i))) {
+          // 兼容层：修改兼容状态/组号时，同步写回标签槽（画布标签实时反映 "<组号>,<值>"）
+          if (prop === "compat") {
+            const nextCompat = value as 0 | 1 | undefined;
+            return { ...k, compat: nextCompat, labels: applyCompatToLabels(k.labels, k.align, nextCompat, k.compatOption) };
+          }
+          if (prop === "compatOption") {
+            const nextOption = value as number | undefined;
+            return { ...k, compatOption: nextOption, labels: applyCompatToLabels(k.labels, k.align, k.compat, nextOption) };
+          }
           if (prop === "d" && value === true) {
             // Decal enabled: clear mutually exclusive states, follow KLE original behavior
             return { ...k, d: true, g: false, l: false, n: false, x2: 0, y2: 0, w2: 0, h2: 0 };

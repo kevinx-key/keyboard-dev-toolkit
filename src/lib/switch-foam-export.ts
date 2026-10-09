@@ -13,6 +13,8 @@ import type { KLELayout } from "./kle-types";
 export interface SwitchFoamConfig extends PlateConfig {
   /** 棉片厚度 (mm) —— 由调用方传给 exportSTP，不参与 2D 几何 */
   thickness: number;
+  /** 「圆角」：所有挖孔（外框以外图形）的圆角半径 (mm)；外框圆角用继承的 fillet */
+  holeFillet: number;
 }
 
 /** 默认棉片厚度 (mm) */
@@ -29,15 +31,16 @@ const DEFAULT_SWITCH_FOAM_CONFIG: SwitchFoamConfig = {
   bottomPad: 0,
   xGrow: 0,
   yGrow: 0,
-  fillet: 1,
+  fillet: 0,
+  holeFillet: 0,
   thickness: DEFAULT_FOAM_THICKNESS,
 };
 
 /**
  * 生成轴间棉几何。返回结构与定位板一致（svg / dxf / stpData / regions）。
- * 与定位板的差异由 foamStab + cornerFillet 控制：
+ * 与定位板的差异由 foamStab + holeFillet 控制：
  *  - 卫星轴孔 = 矩形（顶部与轴孔齐平）+ 顶部连接横槽（4mm）
- *  - 所有元素直角 → cornerFillet（默认 1mm）圆角
+ *  - 所有挖孔直角 → holeFillet 圆角；外框四角圆角用 cfg.fillet
  */
 export function generateSwitchFoam(
   layout: KLELayout,
@@ -48,7 +51,7 @@ export function generateSwitchFoam(
   const cfg: SwitchFoamConfig = { ...DEFAULT_SWITCH_FOAM_CONFIG, ...config };
   return generatePlate(layout, cfg, rotationOverrides, {
     foamStab: true,
-    cornerFillet: cfg.fillet,
+    holeFillet: cfg.holeFillet,
     compatKeyIndices,
   });
 }

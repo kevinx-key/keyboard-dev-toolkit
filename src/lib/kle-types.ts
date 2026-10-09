@@ -215,6 +215,34 @@ export function compatVariantIndices(
   return s;
 }
 
+/** 归一化标签数组中承载 VIA 兼容标记（"<option>,<value>"）的下标；-1 = 该对齐无此槽位。 */
+export function compatLabelSlot(align: number): number {
+  return LABEL_ALIGN_MAP[align]?.[VIA_OPTION_LABEL_SLOT] ?? -1;
+}
+
+/**
+ * 把 compat / compatOption 同步写回标签槽（组号,值）。
+ * compat 有值 → 写 "<option>,<value>"（option 缺省 0）；compat 为 undefined → 清空该槽。
+ * 供 reducer 在修改兼容状态/组号时保持画布标签实时一致。
+ */
+export function applyCompatToLabels(
+  labels: string[],
+  align: number,
+  compat: 0 | 1 | undefined,
+  compatOption: number | undefined,
+): string[] {
+  const slot = compatLabelSlot(align);
+  if (slot < 0) return labels;
+  const next = labels.slice();
+  while (next.length < LABEL_POSITIONS) next.push("");
+  if (compat !== undefined) {
+    next[slot] = `${compatOption ?? 0},${compat}`;
+  } else if (/^\d+\s*,\s*[01]$/.test((next[slot] ?? "").trim())) {
+    next[slot] = "";
+  }
+  return next;
+}
+
 /** Default key properties */
 export const DEFAULT_PROPS: KeyProps = {
   labels: Array(12).fill(""), align: DEFAULT_ALIGN, labelSize: 3,

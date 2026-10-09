@@ -22,6 +22,7 @@ const DEFAULT_PCB_CONFIG: PCBConfig = {
   needStab: true,
   needLed: false,
   edgeDistance: 5,
+  outerFillet: 0,
   needTypeC: false,
   need4P: false,
   needMCU: false,
@@ -401,6 +402,18 @@ export default function PCBSection({
               <input type="number" value={config.edgeDistance} min={0} max={30} step={0.5}
                 title={t("tip.pcbEdge")}
                 onChange={e => update("edgeDistance", parseFloat(e.target.value) || 0)}
+                style={{ width: 55, padding: "3px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)" }} />
+              <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+            </div>
+          </div>
+
+          {/* 外框圆角 */}
+          <div style={{ display: "inline-flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ fontSize: 11, color: "var(--theme-text-muted)", fontWeight: 500 }}>{t("fillet.outer")}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <input type="number" value={config.outerFillet ?? 0} min={0} max={30} step={0.5}
+                title={t("tip.filletOuter")}
+                onChange={e => update("outerFillet", parseFloat(e.target.value) || 0)}
                 style={{ width: 55, padding: "3px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)" }} />
               <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
             </div>

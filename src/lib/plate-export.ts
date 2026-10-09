@@ -90,8 +90,8 @@ export interface PlateResult {
 export interface PlateGenOptions {
   /** 卫星轴孔改用「矩形（按当前复杂多边形的最大外包围盒）+ 顶部连接横槽」 */
   foamStab?: boolean;
-  /** 对所有元素（外轮廓 + 所有挖孔）的直角施加的圆角半径 (mm) */
-  cornerFillet?: number;
+  /** 「圆角」：对所有挖孔（外框以外的图形）的直角施加的圆角半径 (mm) */
+  holeFillet?: number;
   /** 兼容层：这些键（layout.keys 下标）的挖孔额外以浅灰重绘（预览区分用，不影响 DXF/STP） */
   compatKeyIndices?: Set<number>;
 }
@@ -683,23 +683,24 @@ export function generatePlate(
     }).join("") + "Z";
   }
 
-  const filletR = options?.cornerFillet ?? (cfg.fillet > 0 ? cfg.fillet : 0);
+  const outerR = cfg.fillet > 0 ? cfg.fillet : 0;
 
-  // 对所有挖孔施加统一圆角（轴间棉：所有元素直角 → cornerFillet）
-  const holesFinal = (options?.cornerFillet && options.cornerFillet > 0)
-    ? allMergedHoles.map((poly) => filletPolygon(poly, options.cornerFillet!, 4))
+  // 「圆角」：对所有挖孔（外框以外的图形）施加圆角
+  const holeR = options?.holeFillet ?? 0;
+  const holesFinal = holeR > 0
+    ? allMergedHoles.map((poly) => filletPolygon(poly, holeR, 4))
     : allMergedHoles;
 
   // 兼容层：兼容键的挖孔合并后以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
   const compatMerged = compatRawHoles.length > 0 ? unionAll(compatRawHoles) : [];
-  const compatFinal = (options?.cornerFillet && options.cornerFillet > 0)
-    ? compatMerged.map((poly) => filletPolygon(poly, options.cornerFillet!, 4))
+  const compatFinal = holeR > 0
+    ? compatMerged.map((poly) => filletPolygon(poly, holeR, 4))
     : compatMerged;
 
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path{vector-effect:non-scaling-stroke}</style>
-  <rect x="${pad}" y="${pad}" width="${plateW}" height="${plateH}" rx="${filletR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
+  <rect x="${pad}" y="${pad}" width="${plateW}" height="${plateH}" rx="${outerR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
   <g fill="#fff" stroke="#888" stroke-width="0.3">`;
 
   for (const hole of holesFinal) {
@@ -720,7 +721,7 @@ export function generatePlate(
 </svg>`;
 
   // ── DXF generation ──
-  const dxf = buildDXF(holesFinal, plateW, plateH, filletR, minX, minY, pad, keys.length, (meta.name || "").replace(/[<>"']/g, ""));
+  const dxf = buildDXF(holesFinal, plateW, plateH, outerR, minX, minY, pad, keys.length, (meta.name || "").replace(/[<>"']/g, ""));
 
   // ── 构建 STP 3D 挤出几何数据 ──
   // 所有坐标均为绝对 mm，与 DXF/SVG 的 offset 无关

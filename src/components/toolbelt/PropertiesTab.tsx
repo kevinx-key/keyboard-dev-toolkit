@@ -92,6 +92,7 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
   const curRy = key?.ry;
   const curFontSize = key?.labelSize || 9;
   const curCompat = key?.compat;
+  const curCompatOption = key?.compatOption ?? 0;
 
   const psec: React.CSSProperties = {
     flex: 1,
@@ -218,6 +219,20 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
               className={`kle-chip${curCompat === value ? " active" : ""}`}
               style={{ padding: "3px 10px", fontSize: 11, cursor: hasSelection ? "pointer" : "default", borderRadius: "var(--theme-radius-sm)", justifyContent: "flex-start" }}>{t(labelKey)}</span>
           ))}
+          {curCompat !== undefined && (
+            <div style={{ ...prow, marginTop: 6 }}>
+              <label style={plabel}>{t("compat.group")}</label>
+              <input
+                type="number" min={0} step={1} value={curCompatOption} disabled={!hasSelection}
+                title={t("tip.compatGroup")}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  set("compatOption", Number.isFinite(n) && n >= 0 ? n : 0);
+                }}
+                style={{ ...pval, width: 52, minWidth: 52 }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
