@@ -286,6 +286,58 @@ const TYPEC_SCREW_HOLES: [number, number, number][] = [
   [2.854, 3.557, 0.322],
 ];
 
+// ─── Hotswap 轴座挖孔 (据用户 DXF drw0004.dxf) ─────────────
+// 挖孔外形 = 圆角矩形 (键中心相对坐标, SVG Y 向下);
+// DXF 中的 5 个圆 (r2 中心 / 2×r1.5 / 2×r0.85) 是轴孔对位基准, 挖孔时剔除, 不参与切割。
+const HOTSWAP_CUT = { x0: -8.16, y0: -7.043, x1: 6.89, y1: 2.3, r: 1.0 };
+
+/** hotswap 挖孔多边形 (圆角矩形, 键中心相对坐标) */
+function hotswapCutout(seg = 6): [number, number][] {
+  const { x0, y0, x1, y1, r } = HOTSWAP_CUT;
+  const R = Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2);
+  const pts: [number, number][] = [];
+  const arc = (cx: number, cy: number, a0: number, a1: number) => {
+    for (let i = 0; i <= seg; i++) {
+      const a = a0 + (a1 - a0) * (i / seg);
+      pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]);
+    }
+  };
+  arc(x1 - R, y0 + R, -Math.PI / 2, 0);        // 右上
+  arc(x1 - R, y1 - R, 0, Math.PI / 2);         // 右下
+  arc(x0 + R, y1 - R, Math.PI / 2, Math.PI);   // 左下
+  arc(x0 + R, y0 + R, Math.PI, Math.PI * 1.5); // 左上
+  return pts;
+}
+
+// ─── 自定义圆角矩形挖孔 (底棉矩形编辑器) ─────────────────
+
+export interface CustomRect {
+  /** 中心 (绝对 mm, Y 向下) */
+  cx: number; cy: number;
+  w: number; h: number;
+  /** 圆角半径 (mm) */
+  r: number;
+  /** 旋转角度 (度) */
+  rot: number;
+}
+
+/** 生成圆角矩形多边形 (中心 cx,cy; 可旋转; 绝对 mm) */
+export function roundedRectPolygon(cx: number, cy: number, w: number, h: number, r: number, rot = 0, seg = 6): [number, number][] {
+  const hw = w / 2, hh = h / 2, R = Math.min(Math.max(r, 0), hw, hh);
+  const local: [number, number][] = [];
+  const arc = (ax: number, ay: number, a0: number, a1: number) => {
+    for (let i = 0; i <= seg; i++) { const a = a0 + (a1 - a0) * (i / seg); local.push([ax + R * Math.cos(a), ay + R * Math.sin(a)]); }
+  };
+  arc(hw - R, -hh + R, -Math.PI / 2, 0);
+  arc(hw - R, hh - R, 0, Math.PI / 2);
+  arc(-hw + R, hh - R, Math.PI / 2, Math.PI);
+  arc(-hw + R, -hh + R, Math.PI, Math.PI * 1.5);
+  return local.map(([dx, dy]) => {
+    const rr = rot % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, rot, { x: 0, y: 0 }) : { x: dx, y: dy };
+    return [cx + rr.x, cy + rr.y] as [number, number];
+  });
+}
+
 // ─── Main PCB generation ────────────────────────────────
 
 
@@ -485,6 +537,97 @@ export function computeSwitchPadGeometry(
   }
 
   return { circles, polys, minX: holeMinX, minY: holeMinY, maxX: holeMaxX, maxY: holeMaxY };
+}
+
+// ─── 底棉几何（从 PCB 配置派生，绝对 mm，Y 向下） ─────────
+
+export interface BottomFoamGeometry {
+  /** 所有挖孔（绝对 mm，Y 向下） */
+  polys: [number, number][][];
+  minX: number; minY: number; maxX: number; maxY: number;
+}
+
+/**
+ * 底棉挖孔：
+ *  - socket（热插拔）→ 每键一个轴座挖孔（圆角矩形，据 DXF drw0004.dxf；轴孔圆仅对位不切割）
+ *  - RGB 方孔
+ *  - TypeC / 4P / MCU 轮廓孔
+ * 不含开关孔 / 卫星轴孔；片材边界 = 孔位包围盒 + Edge Distance。
+ */
+export function computeBottomFoamGeometry(
+  layout: KLELayout,
+  opts: {
+    solderType: SolderType; needLed: boolean;
+    needTypeC: boolean; typeCX: number; typeCY: number; typeCRot: number;
+    need4P: boolean; fourPX: number; fourPY: number; fourPRot: number;
+    needMCU: boolean; mcuX: number; mcuY: number; mcuRot: number;
+    edgeDistance: number;
+    customRects?: CustomRect[];
+  },
+  switchRotations?: PCBSwitchRotations,
+): BottomFoamGeometry {
+  const polys: [number, number][][] = [];
+  const { keys } = layout;
+
+  // 组件挖孔：以组件中心为心的圆角矩形
+  const compRect = (cx: number, cy: number, w: number, h: number, rot: number, r = 1) => {
+    polys.push(roundedRectPolygon(cx, cy, w, h, r, rot));
+  };
+
+  if (keys.length > 0) {
+    const posConfig: PCBConfig = {
+      solderType: opts.solderType, needStab: false, needLed: opts.needLed, edgeDistance: 0,
+      needTypeC: false, need4P: false, needMCU: false,
+      typeCX: 0, typeCY: 0, fourPX: 0, fourPY: 0, mcuX: 0, mcuY: 0, typeCRot: 0, fourPRot: 0, mcuRot: 0,
+    };
+    const { keyInfos } = computePCBKeyPositions(keys, posConfig, U);
+    const hotswapHole = hotswapCutout();
+    for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
+      const ki = keyInfos[keyIndex]!;
+      const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
+      const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
+      const tf = (pts: [number, number][]) => pts.map(([dx, dy]) => {
+        const r = angle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
+        return [ki.visualCx + r.x, ki.visualCy + r.y] as [number, number];
+      });
+      const ledW = 3.9, ledH = 3.5;
+      const lox = 0, loy = 3.35 + ledH / 2;
+
+      if (opts.solderType === "socket") polys.push(tf(hotswapHole));
+
+      if (opts.needLed) {
+        polys.push(tf(([[-ledW / 2, -ledH / 2], [ledW / 2, -ledH / 2], [ledW / 2, ledH / 2], [-ledW / 2, ledH / 2]] as [number, number][])
+          .map(([dx, dy]) => [lox + dx, loy + dy] as [number, number])));
+      }
+
+      // 只打通 RGB 方孔与轴座孔之间的薄桥 (仅靠轴体一侧, 不越出两者范围)
+      if (opts.solderType === "socket" && opts.needLed) {
+        const yA = HOTSWAP_CUT.y1 - 0.2;          // 探入轴座孔 (与轴座孔重叠)
+        const yB = (loy - ledH / 2) + 0.2;         // 探入 RGB 方孔 (与 RGB 重叠)
+        polys.push(tf([[-ledW / 2, yA], [ledW / 2, yA], [ledW / 2, yB], [-ledW / 2, yB]]));
+      }
+    }
+  }
+
+  if (opts.needTypeC) compRect(opts.typeCX + 9.33 / 2, opts.typeCY + 5.70 / 2, 9, 9, opts.typeCRot);
+  if (opts.need4P) compRect(opts.fourPX + 6.88 / 2, opts.fourPY + 5.64 / 2, 7, 7, opts.fourPRot);
+  if (opts.needMCU) compRect(opts.mcuX + 9.68 / 2, opts.mcuY + 9.68 / 2, 8.5, 8.5, opts.mcuRot);
+  for (const cr of opts.customRects ?? []) {
+    polys.push(roundedRectPolygon(cr.cx, cr.cy, cr.w, cr.h, cr.r, cr.rot));
+  }
+
+  if (polys.length === 0) return { polys, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of polys) {
+    for (const [x, y] of poly) {
+      if (x < minX) minX = x; if (y < minY) minY = y;
+      if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+    }
+  }
+  minX -= opts.edgeDistance; minY -= opts.edgeDistance;
+  maxX += opts.edgeDistance; maxY += opts.edgeDistance;
+  return { polys, minX, minY, maxX, maxY };
 }
 
 /** M3 抽取：扩展 PCB 边界以包含组件（Type-C/4P/MCU） */

@@ -377,7 +377,7 @@ function unionAll(polys: { x: number; y: number }[][]): { x: number; y: number }
 }
 
 /** 把多边形每个顶点替换为半径 r 的圆角（用折线近似圆弧；凸/凹角均适用） */
-function filletPolygon(
+export function filletPolygon(
   pts: { x: number; y: number }[], r: number, segments = 4,
 ): { x: number; y: number }[] {
   if (r <= 0 || pts.length < 3) return pts;
