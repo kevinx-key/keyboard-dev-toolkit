@@ -92,6 +92,8 @@ export interface PlateGenOptions {
   foamStab?: boolean;
   /** 「圆角」：对所有挖孔（外框以外的图形）的直角施加的圆角半径 (mm) */
   holeFillet?: number;
+  /** 最小特征清理 (mm)：消除宽度小于此值的薄肋/碎边（膨胀→收缩，令交错开孔就地连通）。0 = 关闭 */
+  minFeature?: number;
   /** 兼容层：这些键（layout.keys 下标）的挖孔额外以浅灰重绘（预览区分用，不影响 DXF/STP） */
   compatKeyIndices?: Set<number>;
 }
@@ -427,6 +429,36 @@ function unionAll(polys: { x: number; y: number }[][]): { x: number; y: number }
   return mpToPaths(result);
 }
 
+/**
+ * 最小特征清理（形态学闭运算：膨胀→收缩）：消除宽度 < minFeature(mm) 的薄肋与小碎边。
+ * 用「平移并集/交集」近似 Minkowski 和（膨胀=环向平移并集；收缩=环向平移交集），
+ * 全程在 MultiPolygon 上做（保留孔洞嵌套），无需额外依赖。
+ */
+function removeSmallFeatures(
+  holes: { x: number; y: number }[][],
+  minFeature: number,
+): { x: number; y: number }[][] {
+  const r = minFeature / 2;
+  if (r <= 0 || holes.length === 0) return holes;
+  const N = 12;
+  const dirs: ClipPoint[] = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    dirs.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  const shift = (mp: ClipPoly[], dx: number, dy: number): ClipPoly[] =>
+    mp.map((poly) => poly.map((ring) => ring.map(([x, y]) => [x + dx, y + dy] as ClipPoint)));
+
+  const base = polygonClipping.union(pathToMP(holes[0]!), ...holes.slice(1).map((h) => pathToMP(h)));
+  // 膨胀
+  const dilParts = [base, ...dirs.map(([dx, dy]) => shift(base, dx!, dy!))];
+  const dilated = polygonClipping.union(dilParts[0]!, ...dilParts.slice(1));
+  // 收缩
+  const eroParts = dirs.map(([dx, dy]) => shift(dilated, -dx!, -dy!));
+  const closed = polygonClipping.intersection(eroParts[0]!, ...eroParts.slice(1));
+  return mpToPaths(closed);
+}
+
 /** 把多边形每个顶点替换为半径 r 的圆角（用折线近似圆弧；凸/凹角均适用） */
 export function filletPolygon(
   pts: { x: number; y: number }[], r: number, segments = 4,
@@ -668,7 +700,12 @@ export function generatePlate(
   }
 
   // 跨键布尔合并：错位重合的轴孔/卫星轴孔应合并为同一挖孔，而非叠加
-  const allMergedHoles = unionAll(rawHoles);
+  let allMergedHoles = unionAll(rawHoles);
+
+  // 最小特征清理：消除交错产生的 < minFeature 薄肋/碎边（令开孔就地扩大连通）
+  if (options?.minFeature && options.minFeature > 0) {
+    allMergedHoles = removeSmallFeatures(allMergedHoles, options.minFeature);
+  }
 
   // ── SVG generation ──
   const pad = 5;

@@ -52,6 +52,7 @@ export function generateSwitchFoam(
   return generatePlate(layout, cfg, rotationOverrides, {
     foamStab: true,
     holeFillet: cfg.holeFillet,
+    minFeature: 2, // 交错开孔清理：消除 < 2mm 的薄肋/碎边
     compatKeyIndices,
   });
 }
