@@ -98,6 +98,12 @@ describe("generateSwitchFoam", () => {
     expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.5, 0)])).stpData!.polyHoles.length).toBe(1);
   });
 
+  it("最小特征清理：<2mm 的薄肋被消除，>2mm 的保留", () => {
+    // 1u 轴孔 14mm；中心距 14.99mm → 间隙 ~1mm（<2）应连通；16.99mm → 间隙 ~3mm（>2）应保留
+    expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.787, 0)])).stpData!.polyHoles.length).toBe(1);
+    expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.892, 0)])).stpData!.polyHoles.length).toBe(2);
+  });
+
   it("matches snapshot", () => {
     expect(generateSwitchFoam(FIXTURE_LAYOUT)).toMatchSnapshot();
   });
