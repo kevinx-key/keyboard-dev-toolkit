@@ -164,6 +164,10 @@ export interface KeyProps {
   compat?: 0 | 1;
   /** VIA layout option 索引（layouts.labels 下标），用于往返写回键标签 */
   compatOption?: number;
+  /** 矩阵位置覆盖：用户自定义的行（undefined = 按几何自动分配）。不写入 KLE 导出。 */
+  matrixRow?: number;
+  /** 矩阵位置覆盖：用户自定义的列（undefined = 按几何自动分配）。不写入 KLE 导出。 */
+  matrixCol?: number;
 }
 
 /** VIA 键标签中「options 标记」所在的序列化标签槽位：
@@ -258,6 +262,7 @@ export const DEFAULT_PROPS: KeyProps = {
 export const KLE_KEY_PROPS = new Set([
   "r", "rx", "ry", "x", "y", "w", "h", "x2", "y2", "w2", "h2",
   "a", "f", "f2", "fa", "p", "c", "c2", "cang", "t", "d", "g", "l", "n", "sm", "sb", "st", "stab",
+  "matrixRow", "matrixCol",
 ]);
 
 /** A fully computed key with absolute pixel positions */

@@ -467,11 +467,17 @@ function slotShortEdgesOnce(
       if (len <= 1e-6 || len >= minFeature) continue;
       const prev = poly[(i - 1 + n) % n]!;
       const next = poly[(i + 2) % n]!;
-      // 垂边（相邻边）：取较短者作为槽长 → 槽停在最近的垂边处，不越界
-      const adjLen = Math.min(Math.hypot(a.x - prev.x, a.y - prev.y), Math.hypot(next.x - b.x, next.y - b.y));
-      if (adjLen <= 1e-6) continue;
       const ux = (b.x - a.x) / len;
       const uy = (b.y - a.y) / len;
+      // 跳过与相邻边近乎共线的短边（圆弧近似折线），只处理真正的「台阶」短边，
+      // 否则会把圆角/圆弧一刀刀削掉（底棉热插拔轴座的圆角等）。
+      const pdx = a.x - prev.x, pdy = a.y - prev.y;
+      const ndx = next.x - b.x, ndy = next.y - b.y;
+      const pl = Math.hypot(pdx, pdy), nl = Math.hypot(ndx, ndy);
+      if (pl > 1e-9 && Math.abs(ux * pdx + uy * pdy) / pl > 0.906) continue; // cos25°
+      if (nl > 1e-9 && Math.abs(ux * ndx + uy * ndy) / nl > 0.906) continue;
+      const adjLen = Math.min(Math.hypot(a.x - prev.x, a.y - prev.y), Math.hypot(next.x - b.x, next.y - b.y));
+      if (adjLen <= 1e-6) continue;
       // 材料侧法线：CCW 外环外部在右法线；CW 内环外部在左法线
       const ox = ccw ? uy : -uy;
       const oy = ccw ? -ux : ux;
@@ -581,6 +587,52 @@ function cleanMergeComponents(
     results.push(...slotShortEdges(merged, minFeature, { minX: box.minX - PAD, minY: box.minY - PAD, maxX: box.maxX + PAD, maxY: box.maxY + PAD }));
   }
   return unionAll(results);
+}
+
+/** 点是否在多边形环内（射线法） */
+function pointInRing(pt: { x: number; y: number }, ring: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]!, b = ring[j]!;
+    if (((a.y > pt.y) !== (b.y > pt.y)) && (pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x)) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * 丢弃被其它挖孔完全包围的悬空独立块（圆环状挖孔的内环）：
+ * ISO/常规 Enter 等交错开孔的并集可能在被切空区内残留一小块材料（内环），平铺成多条轮廓后
+ * 它会被当成独立闭轮廓、生产中自行掉落却仍增加刀路。这里把**完全落在另一挖孔内**的环删除
+ * （即把该独立块一并切空）。**必须在所有几何计算完成之后、输出之前调用**。
+ */
+function dropNestedHoles(holes: { x: number; y: number }[][]): { x: number; y: number }[][] {
+  if (holes.length <= 1) return holes;
+  const kept: { x: number; y: number }[][] = [];
+  for (let i = 0; i < holes.length; i++) {
+    const ring = holes[i]!;
+    let nested = false;
+    for (let j = 0; j < holes.length && !nested; j++) {
+      if (i === j) continue;
+      if (ring.every((p) => pointInRing(p, holes[j]!))) nested = true;
+    }
+    if (!nested) kept.push(ring);
+  }
+  return kept;
+}
+
+/**
+ * 供其它派生导出（底棉 / 轴下垫等）复用的挖孔清理：
+ *  1. 短边开槽（minFeature>0）：消除交错开孔产生的 <minFeature 短边/薄壁，按相交键组限制范围；
+ *  2. 丢弃被其它挖孔完全包围的悬空独立块（内环）。
+ * 与轴间棉编辑器同款处理。
+ */
+export function cleanupCutoutHoles(
+  polys: { x: number; y: number }[][],
+  minFeature: number,
+): { x: number; y: number }[][] {
+  if (polys.length === 0) return polys;
+  const merged = minFeature > 0 ? cleanMergeComponents(polys.map((p) => [p]), minFeature) : polys;
+  return dropNestedHoles(merged);
 }
 
 /** 把多边形每个顶点替换为半径 r 的圆角（用折线近似圆弧；凸/凹角均适用） */
@@ -847,9 +899,12 @@ export function generatePlate(
 
   // 「圆角」：对所有挖孔（外框以外的图形）施加圆角
   const holeR = options?.holeFillet ?? 0;
-  const holesFinal = holeR > 0
+  let holesFinal = holeR > 0
     ? allMergedHoles.map((poly) => filletPolygon(poly, holeR, 4))
     : allMergedHoles;
+
+  // 最后一步：丢弃被其它挖孔完全包围的悬空独立块（内环）
+  holesFinal = dropNestedHoles(holesFinal);
 
   // 兼容层：兼容键的挖孔合并后以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
   const compatMerged = cleanMergeComponents(compatKeyGroups, options?.minFeature ?? 0);

@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Loader2, Package, FileDown, FileCode2, Plus, Trash2 } from "lucide-react";
-import { generateBottomFoam, DEFAULT_BOTTOM_FOAM_FILLET, DEFAULT_BOTTOM_FOAM_THICKNESS } from "../lib/bottom-foam-export";
+import { generateBottomFoam } from "../lib/bottom-foam-export";
 import type { BottomFoamConfig } from "../lib/bottom-foam-export";
 import type { PCBConfig, PCBSwitchRotations, CustomRect } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
+import type { BottomFoamSettings } from "../lib/editor-settings";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { sanitizeSvg } from "../lib/sanitize";
@@ -19,19 +20,32 @@ interface BottomFoamSectionProps {
   layout: KLELayout;
   pcbConfig: PCBConfig;
   switchRotations: PCBSwitchRotations;
+  /** 底棉设置（受控） */
+  config: BottomFoamSettings;
+  setConfig: React.Dispatch<React.SetStateAction<BottomFoamSettings>>;
   onStpExportingChange?: (exporting: boolean) => void;
   onStpProgress?: (data: StpProgressEvent) => void;
 }
 
 export default function BottomFoamSection({
-  layout, pcbConfig, switchRotations, onStpExportingChange, onStpProgress,
+  layout, pcbConfig, switchRotations, config, setConfig, onStpExportingChange, onStpProgress,
 }: BottomFoamSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
-  const [thickness, setThickness] = useState(DEFAULT_BOTTOM_FOAM_THICKNESS);
-  const [holeFillet, setHoleFillet] = useState(DEFAULT_BOTTOM_FOAM_FILLET);
-  const [outerFillet, setOuterFillet] = useState(DEFAULT_BOTTOM_FOAM_FILLET);
-  const [customRects, setCustomRects] = useState<CustomRect[]>([]);
+  const { thickness, holeFillet, outerFillet, minFeature, thinWall, customRects } = config;
+  const setThickness = useCallback((v: number) => setConfig((c) => ({ ...c, thickness: v })), [setConfig]);
+  const setHoleFillet = useCallback((v: number) => setConfig((c) => ({ ...c, holeFillet: v })), [setConfig]);
+  const setOuterFillet = useCallback((v: number) => setConfig((c) => ({ ...c, outerFillet: v })), [setConfig]);
+  const setMinFeature = useCallback((v: number) => setConfig((c) => ({ ...c, minFeature: v })), [setConfig]);
+  const setThinWall = useCallback((v: number) => setConfig((c) => ({ ...c, thinWall: v })), [setConfig]);
+  const setCustomRects = useCallback((updater: React.SetStateAction<CustomRect[]>) => {
+    setConfig((c) => ({
+      ...c,
+      customRects: typeof updater === "function"
+        ? (updater as (prev: CustomRect[]) => CustomRect[])(c.customRects)
+        : updater,
+    }));
+  }, [setConfig]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   // 新矩形默认落在键盘中心
@@ -58,11 +72,13 @@ export default function BottomFoamSection({
       edgeDistance: pcbConfig.edgeDistance,
       holeFillet,
       outerFillet,
+      minFeature,
+      thinWall,
       customRects,
     };
     const r = generateBottomFoam(layout, cfg, switchRotations, compatDimIndices);
     return r.svg ? r : null;
-  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet]);
+  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet, minFeature, thinWall]);
 
   const safeSvg = useMemo(() => (foamResult?.svg ? sanitizeSvg(foamResult.svg) : ""), [foamResult]);
 
@@ -211,6 +227,22 @@ export default function BottomFoamSection({
           <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <input type="number" value={outerFillet} min={0} max={20} step={0.5} title={t("tip.filletOuter")}
               onChange={(e) => setOuterFillet(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("foam.minFeature")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={minFeature} min={0} max={10} step={0.5} title={t("tip.foamMinFeature")}
+              onChange={(e) => setMinFeature(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("foam.thinWall")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={thinWall} min={0} max={5} step={0.1} title={t("tip.foamThinWall")}
+              onChange={(e) => setThinWall(parseFloat(e.target.value) || 0)} style={numInput} />
             <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
           </span>
         </label>

@@ -10,38 +10,18 @@ import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
+import type { PlateSettings } from "../lib/editor-settings";
 import InteractivePlatePreview from "./InteractivePlatePreview";
 import PlatePricingSection from "./PlatePricingSection";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
 
-// ─── PlateConfig extended with swillkb controls ──────────
-
-export interface PlateSectionConfig extends PlateConfig {
-  fillet: number;
-  lineColor: string;
-  lineWeight: number;
-  dmz: number;
-  padEnabled: boolean;
-  /** 「圆角」：外框以外的所有图形圆角 */
-  holeFillet: number;
-  kerfEnabled: boolean;
-  u1Enabled: boolean;
-  lineColorEnabled: boolean;
-  lineWeightEnabled: boolean;
-  customPolygons: string;
-}
-
-const DEFAULT_PLATE_CONFIG: PlateSectionConfig = {
-  switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
-  topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
-  fillet: 0, holeFillet: 0, lineColor: "#000000", lineWeight: 0.05, dmz: 5,
-  padEnabled: false, kerfEnabled: false,
-  u1Enabled: false, lineColorEnabled: false, lineWeightEnabled: false,
-  customPolygons: "",
-};
+// ─── 定位板设置类型 / 默认值见 lib/editor-settings（PlateSettings） ──
 
 interface PlateSectionProps {
   layout: KLELayout;
+  /** 定位板设置（受控：由 EditorPage 持有，便于保存全部/还原） */
+  config: PlateSettings;
+  setConfig: React.Dispatch<React.SetStateAction<PlateSettings>>;
   rotationOverrides: PlateRotationOverrides;
   setRotationOverrides: React.Dispatch<React.SetStateAction<PlateRotationOverrides>>;
   onStpExportingChange?: (exporting: boolean) => void;
@@ -56,10 +36,9 @@ interface PlateSectionProps {
   onPlateOrderChange?: (info: PlateOrderInfo | null) => void;
 }
 
-export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, activeSelSource, onActivateSelection, onPlateOrderChange }: PlateSectionProps) {
+export default function PlateSection({ layout, config, setConfig, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, activeSelSource, onActivateSelection, onPlateOrderChange }: PlateSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
-  const [config, setConfig] = useState<PlateSectionConfig>({ ...DEFAULT_PLATE_CONFIG });
   const [drawn, setDrawn] = useState(false);
 
   const effectiveConfig = useMemo((): PlateConfig => {
@@ -169,7 +148,7 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
     }));
   }, [setRotationOverrides]);
 
-  const update = <K extends keyof PlateSectionConfig>(key: K, value: PlateSectionConfig[K]) =>
+  const update = <K extends keyof PlateSettings>(key: K, value: PlateSettings[K]) =>
     setConfig(c => ({ ...c, [key]: value }));
 
   const selectedPlateKeyInfo = useMemo(() => {
@@ -211,15 +190,13 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
             options={[{ value: 0, label: t("plate.stabNone") }, { value: 1, label: "Cherry" }, { value: 2, label: t("plate.stabPCB") }, { value: 3, label: t("plate.stabFuling") }]}
             onChange={v => update("stabType", v as 0 | 1 | 2 | 3)}
           />
-          <ConfigNumber label={t("plate.unit")} tip={t("tip.plUnit")} value={config.u1} enabled={config.u1Enabled} onToggle={v => update("u1Enabled", v)} onChange={v => update("u1", v)} min={10} max={30} />
           <ConfigNumber label={t("plate.kerf")} tip={t("tip.plKerf")} value={config.kerf} enabled={config.kerfEnabled} onToggle={v => update("kerfEnabled", v)} onChange={v => update("kerf", v)} min={0} max={2} step={0.05} />
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 6, alignItems: "end" }}>
-          <ConfigNumber label={t("plate.padTop")} tip={t("tip.plPad")} value={config.topPad} enabled={config.padEnabled} onToggle={v => update("padEnabled", v)} onChange={v => update("topPad", v)} min={0} max={30} />
-          <ConfigNumber label={t("plate.padLeft")} tip={t("tip.plPad")} value={config.leftPad} enabled={config.padEnabled} onChange={v => update("leftPad", v)} min={0} max={30} />
-          <ConfigNumber label={t("plate.padRight")} tip={t("tip.plPad")} value={config.rightPad} enabled={config.padEnabled} onChange={v => update("rightPad", v)} min={0} max={30} />
-          <ConfigNumber label={t("plate.padBottom")} tip={t("tip.plPad")} value={config.bottomPad} enabled={config.padEnabled} onChange={v => update("bottomPad", v)} min={0} max={30} />
-          <ConfigColor label={t("plate.lineColor")} tip={t("tip.plLineColor")} value={config.lineColor} enabled={config.lineColorEnabled} onToggle={v => update("lineColorEnabled", v)} onChange={v => update("lineColor", v)} />
+          <ConfigNumber label={t("plate.padTop")} tip={t("tip.plPad")} value={config.topPad} enabled={config.padEnabled} onToggle={v => update("padEnabled", v)} onChange={v => update("topPad", v)} min={0} max={20} />
+          <ConfigNumber label={t("plate.padLeft")} tip={t("tip.plPad")} value={config.leftPad} enabled={config.padEnabled} onChange={v => update("leftPad", v)} min={0} max={20} />
+          <ConfigNumber label={t("plate.padRight")} tip={t("tip.plPad")} value={config.rightPad} enabled={config.padEnabled} onChange={v => update("rightPad", v)} min={0} max={20} />
+          <ConfigNumber label={t("plate.padBottom")} tip={t("tip.plPad")} value={config.bottomPad} enabled={config.padEnabled} onChange={v => update("bottomPad", v)} min={0} max={20} />
           <ConfigNumber label={t("plate.lineWeight")} tip={t("tip.plLineWeight")} value={config.lineWeight} enabled={config.lineWeightEnabled} onToggle={v => update("lineWeightEnabled", v)} onChange={v => update("lineWeight", v)} min={0} max={1} step={0.01} />
           <ConfigNumber label={t("fillet.holes")} tip={t("tip.filletHoles")} value={config.holeFillet} onChange={v => update("holeFillet", v)} min={0} max={20} step={0.5} unit="mm" />
           <ConfigNumber label={t("fillet.outer")} tip={t("tip.filletOuter")} value={config.fillet} onChange={v => update("fillet", v)} min={0} max={20} step={0.5} unit="mm" />
@@ -413,22 +390,6 @@ function ConfigNumber({ label, tip, value, onChange, enabled, onToggle, min, max
           style={{ width: 55, padding: "2px 4px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)", backgroundColor: isActive ? "var(--theme-input-bg)" : "var(--theme-input-bg-disabled)" }} />
         {unit && <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>{unit}</span>}
       </span>
-    </label>
-  );
-}
-
-function ConfigColor({ label, tip, value, onChange, enabled, onToggle }: {
-  label: string; tip?: string; value: string; onChange: (v: string) => void; enabled: boolean; onToggle: (v: boolean) => void;
-}) {
-  return (
-    <label style={{ display: "inline-flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--theme-text-muted)", opacity: enabled ? 1 : 0.5 }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        {label}
-        <input type="checkbox" checked={enabled} title={tip} onChange={e => onToggle(e.target.checked)} style={{ margin: 0, cursor: "pointer" }} />
-      </span>
-      <input type="color" value={value} disabled={!enabled} title={tip}
-        onChange={e => onChange(e.target.value)}
-        style={{ width: 44, height: 24, padding: 0, border: "1px solid var(--theme-border-input)", borderRadius: 4, cursor: enabled ? "pointer" : "not-allowed" }} />
     </label>
   );
 }

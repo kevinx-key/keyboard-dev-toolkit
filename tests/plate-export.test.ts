@@ -309,3 +309,35 @@ describe("stepped switch cutout (KLE l)", () => {
     expect(cn - cs).toBeCloseTo(0.25 * 19.05, 5);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Enclosed material islands (nested holes) are dropped
+// ═══════════════════════════════════════════════════════════════════
+
+describe("enclosed material islands", () => {
+  function pointInRing(pt: number[], ring: number[][]): boolean {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = ring[i]!, b = ring[j]!;
+      if (((a[1]! > pt[1]!) !== (b[1]! > pt[1]!)) && (pt[0]! < (b[0]! - a[0]!) * (pt[1]! - a[1]!) / (b[1]! - a[1]!) + a[0]!)) inside = !inside;
+    }
+    return inside;
+  }
+
+  it("drops holes fully contained in another hole (ISO/regular Enter junction)", () => {
+    // 8 个 1u 键绕成环 → 并集挖孔呈「圆环」，环心是被完全包围的悬空材料块；
+    // 该内环应被丢弃（并入切空），否则会作为独立闭轮廓残留、生产中掉落却增加刀路。
+    const keys = Array.from({ length: 8 }, (_, k) => {
+      const a = (k / 8) * Math.PI * 2;
+      return mkKey({ x: Math.cos(a) * 0.7 - 0.5, y: Math.sin(a) * 0.7 - 0.5, w: 1, h: 1 });
+    });
+    const holes = generatePlate(makeLayout(keys)).stpData!.polyHoles;
+    for (let i = 0; i < holes.length; i++) {
+      for (let j = 0; j < holes.length; j++) {
+        if (i === j) continue;
+        const nested = holes[i]!.every((p) => pointInRing(p, holes[j]!));
+        expect(nested).toBe(false);
+      }
+    }
+  });
+});

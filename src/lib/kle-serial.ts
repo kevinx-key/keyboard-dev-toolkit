@@ -70,6 +70,10 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         key.st = (current.st as string) ?? "";
         key.labels = mappedLabels;
 
+        // 矩阵覆盖（编辑器专属扩展）
+        if (current.matrixRow !== undefined) key.matrixRow = current.matrixRow;
+        if (current.matrixCol !== undefined) key.matrixCol = current.matrixCol;
+
         // VIA 兼容标记（"<matrix>\n\n\n<option>,<value>"）→ compat / compatOption
         const via = parseViaCompatTag(serialLabels);
         if (via) {
@@ -95,6 +99,8 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         current.l = false;
         current.d = false;
         current.g = false;
+        current.matrixRow = undefined;
+        current.matrixCol = undefined;
 
       } else if (typeof item === "object" && item !== null) {
         const props = item as import("./kle-parser").IntermediateLayoutItem;
@@ -141,6 +147,9 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         if (props.sm !== undefined) current.sm = String(props.sm);
         if (props.sb !== undefined) current.sb = String(props.sb);
         if (props.st !== undefined) current.st = String(props.st);
+        // 矩阵覆盖（编辑器专属扩展）
+        if (props.matrixRow !== undefined) current.matrixRow = props.matrixRow as number;
+        if (props.matrixCol !== undefined) current.matrixCol = props.matrixCol as number;
       }
     }
 

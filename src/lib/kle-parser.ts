@@ -73,6 +73,8 @@ export interface IntermediateLayoutItem {
   x2?: number; y2?: number; w2?: number; h2?: number;
   n?: boolean; l?: boolean; d?: boolean; g?: boolean;
   sm?: string; sb?: string; st?: string;
+  // 矩阵覆盖（编辑器专属扩展，KLE 工具会忽略未知字段）
+  matrixRow?: number; matrixCol?: number;
 }
 
 export type RowItem = string | IntermediateLayoutItem;
@@ -249,6 +251,10 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
       emitPropDiffNumber(props, "h2", key.h2, 0);
       emitPropDiffNumber(props, "x2", key.x2, 0);
       emitPropDiffNumber(props, "y2", key.y2, 0);
+
+      // 矩阵覆盖（编辑器专属扩展，仅在有值时写出；KLE 工具忽略未知字段）
+      if (key.matrixRow !== undefined) props["matrixRow"] = key.matrixRow;
+      if (key.matrixCol !== undefined) props["matrixCol"] = key.matrixCol;
 
       // Build the label string in serialized format
 
@@ -428,6 +434,10 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         key.sb = (current.sb as string) || "";
         key.st = (current.st as string) || "";
 
+        // 矩阵覆盖（编辑器专属扩展）
+        if (current.matrixRow !== undefined) key.matrixRow = current.matrixRow;
+        if (current.matrixCol !== undefined) key.matrixCol = current.matrixCol;
+
         keys.push(key);
 
         // Advance X position
@@ -446,6 +456,8 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         current.g = false;
         current.f2 = 0;
         current.fa = [];
+        current.matrixRow = undefined;
+        current.matrixCol = undefined;
 
       } else if (typeof item === "object" && item !== null) {
         // Property override object
@@ -526,6 +538,10 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         if (props.w2 !== undefined) current.w2 = props.w2 as number;
         if (props.h2 !== undefined) current.h2 = props.h2 as number;
 
+        // 矩阵覆盖（编辑器专属扩展）
+        if (props.matrixRow !== undefined) current.matrixRow = props.matrixRow as number;
+        if (props.matrixCol !== undefined) current.matrixCol = props.matrixCol as number;
+
         // Boolean flags
         if (props.n !== undefined) current.n = props.n as boolean;
         if (props.l !== undefined) current.l = props.l as boolean;
@@ -605,6 +621,9 @@ interface StickyState {
   labelSize: number;
   f2: number;
   fa: number[];
+  // 矩阵覆盖（每键生效，随键重置）
+  matrixRow?: number;
+  matrixCol?: number;
 }
 
 function createDefaultSticky(): StickyState {

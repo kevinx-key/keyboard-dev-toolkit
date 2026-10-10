@@ -23,7 +23,7 @@ import { downloadJSON, downloadSVG, downloadPNG, downloadJPG, exportSVG, renderS
 import { installGlobalErrorHandler, addLog, downloadLog } from "../lib/error-logger";
 import { SAMPLES, ALL_PRESETS } from "../data/presets";
 import { getRawRows, parseKLEJSON, parseLayoutJSON } from "../lib/kle-serial";
-import { getPlatform, saveFile, APP_VERSION } from "../lib/platform-bridge";
+import { getPlatform, saveFile, openExternal, APP_VERSION } from "../lib/platform-bridge";
 import { initPluginSystem } from "../plugins";
 import { useTheme } from "../lib/theme";
 import { useI18n } from "../lib/i18n";
@@ -31,6 +31,14 @@ import type { KLEMeta } from "../lib/kle-types";
 import { DEFAULT_META, getDecalConfig } from "../lib/kle-types";
 import type { PlateRotationOverrides } from "../lib/plate-export";
 import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb-export";
+import type { PlateSettings, FoamSettings, PadSettings, BottomFoamSettings } from "../lib/editor-settings";
+import {
+  DEFAULT_PCB_CONFIG,
+  DEFAULT_PLATE_SETTINGS,
+  DEFAULT_FOAM_SETTINGS,
+  DEFAULT_PAD_SETTINGS,
+  DEFAULT_BOTTOM_FOAM_SETTINGS,
+} from "../lib/editor-settings";
 import { computePCBBounds } from "../lib/pcb-export";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import { useStpExport } from "../hooks/useStpExport";
@@ -66,13 +74,12 @@ export default function EditorPage() {
   const [projectRotations, setProjectRotations] = useState<PlateRotationOverrides>({});
   const [projectSwitchRots, setProjectSwitchRots] = useState<PCBSwitchRotations>({});
   const [projectStabRots, setProjectStabRots] = useState<PCBStabRotations>({});
-  const [projectPcbConfig, setProjectPcbConfig] = useState<PCBConfig>({
-    solderType: "socket", needStab: true, needLed: false, edgeDistance: 5,
-    outerFillet: 0,
-    needTypeC: false, need4P: false, needMCU: false,
-    typeCX: -1.5, typeCY: 16, fourPX: 196, fourPY: 17.5, mcuX: 91, mcuY: 62,
-    typeCRot: 270, fourPRot: 270, mcuRot: 45,
-  });
+  const [projectPcbConfig, setProjectPcbConfig] = useState<PCBConfig>({ ...DEFAULT_PCB_CONFIG });
+  // ── 各编辑器设置（受控，便于「保存全部」完整持久化 + 刷新自动恢复） ──
+  const [plateConfig, setPlateConfig] = useState<PlateSettings>({ ...DEFAULT_PLATE_SETTINGS });
+  const [foamConfig, setFoamConfig] = useState<FoamSettings>({ ...DEFAULT_FOAM_SETTINGS });
+  const [padConfig, setPadConfig] = useState<PadSettings>({ ...DEFAULT_PAD_SETTINGS });
+  const [bottomFoamConfig, setBottomFoamConfig] = useState<BottomFoamSettings>({ ...DEFAULT_BOTTOM_FOAM_SETTINGS });
 
   // PCB 成品板框尺寸（mm）——计价「从 PCB 编辑器取尺寸」的唯一数据源
   const pcbBounds = useMemo(
@@ -89,22 +96,16 @@ export default function EditorPage() {
     try {
       const json = serializeProjectFile({
         name: state.layout.meta.name || "Keyboard",
+        layout: state.layout,
         kLayout: getRawRows(state.layout),
         plateRotations: projectRotations,
+        plateConfig,
         switchRotations: projectSwitchRots,
         stabRotations: projectStabRots,
-        needTypeC: projectPcbConfig.needTypeC,
-        need4P: projectPcbConfig.need4P,
-        needMCU: projectPcbConfig.needMCU,
-        typeCX: projectPcbConfig.typeCX,
-        typeCY: projectPcbConfig.typeCY,
-        fourPX: projectPcbConfig.fourPX,
-        fourPY: projectPcbConfig.fourPY,
-        mcuX: projectPcbConfig.mcuX,
-        mcuY: projectPcbConfig.mcuY,
-        typeCRot: projectPcbConfig.typeCRot,
-        fourPRot: projectPcbConfig.fourPRot,
-        mcuRot: projectPcbConfig.mcuRot,
+        pcbConfig: projectPcbConfig,
+        foamConfig,
+        padConfig,
+        bottomFoamConfig,
         decal: (() => {
           const d = getDecalConfig(state.layout.meta);
           return d ? { image: d.image, scale: d.scale, x: d.x, y: d.y, dim: d.dim, opacity: d.opacity, natW: d.natW, natH: d.natH } : null;
@@ -114,7 +115,7 @@ export default function EditorPage() {
     } catch {
       return { kLayout: getRawRows(state.layout) };
     }
-  }, [state.layout, projectRotations, projectSwitchRots, projectStabRots, projectPcbConfig]);
+  }, [state.layout, projectRotations, plateConfig, projectSwitchRots, projectStabRots, projectPcbConfig, foamConfig, padConfig, bottomFoamConfig]);
 
   // 跨区域选中互斥：任意一处（画布/定位板/轴间棉/PCB）选中时，其余区域一律清空，只保留最新一处。
   type SelectionSource = "canvas" | "plate" | "foam" | "pcb";
@@ -167,10 +168,18 @@ export default function EditorPage() {
     switchRotations: projectSwitchRots,
     stabRotations: projectStabRots,
     pcbConfig: projectPcbConfig,
+    plateConfig,
+    foamConfig,
+    padConfig,
+    bottomFoamConfig,
     setPlateRotations: setProjectRotations,
     setSwitchRotations: setProjectSwitchRots,
     setStabRotations: setProjectStabRots,
     setPcbConfig: setProjectPcbConfig,
+    setPlateConfig,
+    setFoamConfig,
+    setPadConfig,
+    setBottomFoamConfig,
   });
 
   // Install global error logger + init plugin system
@@ -286,6 +295,35 @@ export default function EditorPage() {
     document.documentElement.classList.add(`theme-${theme}`);
   }, [theme]);
 
+  // 鸣谢 · 友链（页脚）
+  const linkGroups = useMemo(() => ([
+    {
+      title: t("footer.origin"),
+      items: [
+        { label: "Keyboard Layout Editor", url: "http://www.keyboard-layout-editor.com/", desc: t("footer.descKle") },
+        { label: "builder.swillkb.com", url: "http://builder.swillkb.com/", desc: t("footer.descSwillkb") },
+      ],
+    },
+    {
+      title: t("footer.site"),
+      items: [
+        { label: "kindlestar.online", url: "https://kindlestar.online/", desc: t("footer.descOfficialSite") },
+        { label: t("footer.onlinePreview"), url: "https://kevinx-key.github.io/keyboard-dev-toolkit/", desc: t("footer.descOnlinePreview") },
+        { label: t("footer.github"), url: "https://github.com/kevinx-key/keyboard-dev-toolkit", desc: t("footer.codeOnGitHub") },
+        { label: t("footer.issuesLabel"), url: "https://github.com/kevinx-key/keyboard-dev-toolkit/issues", desc: t("footer.issuesDesc") },
+        { label: "Discord", url: "https://discord.gg/ztQnqW5MTd", desc: t("footer.discordDesc") },
+      ],
+    },
+    {
+      title: t("footer.community"),
+      items: [
+        { label: "zFrontier 装备前线", url: "https://www.zfrontier.com/", desc: t("footer.descCommunityZf") },
+        { label: "Geekhack", url: "https://geekhack.org/index.php", desc: t("footer.descCommunityGh") },
+        { label: "r/mechmarket", url: "https://www.reddit.com/r/mechmarket/", desc: t("footer.descCommunityMechmarket") },
+      ],
+    },
+  ]), [t]);
+
   return (
     <CompatLayerProvider>
       {/* ═══ TopBar — 品牌名 + 语言/主题（右对齐） ═══ */}
@@ -382,6 +420,8 @@ export default function EditorPage() {
         {/* ═══ Plate Section ═══ */}
         <PlateSection
           layout={state.layout}
+          config={plateConfig}
+          setConfig={setPlateConfig}
           rotationOverrides={projectRotations}
           setRotationOverrides={setProjectRotations}
           onStpExportingChange={handleStpExportingChange}
@@ -395,6 +435,8 @@ export default function EditorPage() {
         {/* ═══ Switch Foam Section（轴间棉） ═══ */}
         <SwitchFoamSection
           layout={state.layout}
+          config={foamConfig}
+          setConfig={setFoamConfig}
           rotationOverrides={projectRotations}
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
@@ -422,6 +464,8 @@ export default function EditorPage() {
           pcbConfig={projectPcbConfig}
           switchRotations={projectSwitchRots}
           stabRotations={projectStabRots}
+          config={padConfig}
+          setConfig={setPadConfig}
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
         />
@@ -431,6 +475,8 @@ export default function EditorPage() {
           layout={state.layout}
           pcbConfig={projectPcbConfig}
           switchRotations={projectSwitchRots}
+          config={bottomFoamConfig}
+          setConfig={setBottomFoamConfig}
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
         />
@@ -475,6 +521,46 @@ export default function EditorPage() {
           >
             <FolderOpen size={14} strokeWidth={2} /> {t("backup.openBtn")}
           </button>
+        </div>
+
+        {/* ═══ Acknowledgments & Links（鸣谢 · 友链） ═══ */}
+        <div style={{
+          borderTop: "1px solid var(--theme-border-light)",
+          margin: "8px 12px 0 12px",
+          padding: "18px 12px 6px 12px",
+        }}>
+          <div style={{ textAlign: "center", fontWeight: 600, fontSize: 13, color: "var(--theme-text)" }}>
+            {t("footer.thanksTitle")}
+          </div>
+          <div style={{ textAlign: "center", fontSize: 11, color: "var(--theme-text-dim)", margin: "4px 0 16px 0" }}>
+            {t("footer.thanksLead")}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "18px 48px" }}>
+            {linkGroups.map((group) => (
+              <div key={group.title} style={{ minWidth: 150 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--theme-text-muted)", marginBottom: 8 }}>
+                  {group.title}
+                </div>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {group.items.map((item) => (
+                    <li key={item.url}>
+                      <a
+                        href={item.url}
+                        onClick={(e) => { e.preventDefault(); void openExternal(item.url); }}
+                        title={item.url}
+                        style={{ fontSize: 12, fontWeight: 600, color: "var(--theme-primary)", textDecoration: "none", cursor: "pointer" }}
+                      >
+                        {item.label}
+                      </a>
+                      <div style={{ fontSize: 10, color: "var(--theme-text-dim)", marginTop: 2 }}>
+                        {item.desc}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* ═══ Version Bar ═══ */}

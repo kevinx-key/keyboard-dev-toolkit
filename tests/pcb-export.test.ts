@@ -268,8 +268,8 @@ describe("generatePCB", () => {
       id: "type-c",
       type: "typec",
     });
-    // SVG should mention Type-C
-    expect(result.svg).toContain("Type-C");
+    // SVG should contain the Type-C icon artwork (its 4 racetrack cutouts)
+    expect(result.svg).toContain('rx="46.02"');
   });
 
   it("adds 4P component region when need4P is true", () => {

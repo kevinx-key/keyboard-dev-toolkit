@@ -81,6 +81,35 @@ describe("generateBottomFoam", () => {
     expect(a).not.toBe(b);
   });
 
+  it("清理 ISO/常规回车叠加孔内产生的 <minFeature 碎边（同轴间棉方式）", () => {
+    const keys = [
+      mk({ x: 0.25, y: 0, w: 2.25, h: 1 }),                                  // 常规回车
+      mk({ x: 1, y: 0, w: 1.25, h: 2, x2: -0.25, y2: 0, w2: 1.5, h2: 1 }),   // ISO 回车
+      mk({ x: 2, y: 0 }), mk({ x: 2, y: 1 }),
+    ];
+    const cfg = { ...BASE, needLed: true, holeFillet: 0, outerFillet: 0, minFeature: 2 };
+    const holes = generateBottomFoam(layout(keys), cfg).stpData!.polyHoles;
+    let shortest = Infinity;
+    for (const poly of holes) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+        const l = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+        if (l > 1e-6 && l < shortest) shortest = l;
+      }
+    }
+    expect(shortest).toBeGreaterThanOrEqual(2 - 1e-6);
+  });
+
+  it("消除轴孔与轴孔间 <thinWall 的薄壁（连通两孔）", () => {
+    const cfg = { ...BASE, needLed: false, holeFillet: 0, outerFillet: 0, thinWall: 0.2 };
+    // 1u 键 hotswap 挖孔宽 15.05mm；间距 0.795u(15.14mm) → 两孔间隙 ~0.09mm < 0.2 → 连通
+    const near = generateBottomFoam(layout([mk({ x: 0, y: 0 }), mk({ x: 0.795, y: 0 })]), cfg);
+    expect(near.stpData!.polyHoles.length).toBe(1);
+    // 间距 0.82u(15.62mm) → 间隙 ~0.57mm > 0.2 → 保留两孔
+    const far = generateBottomFoam(layout([mk({ x: 0, y: 0 }), mk({ x: 0.82, y: 0 })]), cfg);
+    expect(far.stpData!.polyHoles.length).toBe(2);
+  });
+
   it("matches snapshot", () => {
     expect(generateBottomFoam(layout(TWO), { ...BASE, needLed: true })).toMatchSnapshot();
   });

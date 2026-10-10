@@ -362,7 +362,7 @@ export function keyPropsToKLEKeys(
     t?: string;
   }>,
 ): KLEKey[] {
-  return keyProps.map((kp) => ({
+  return keyProps.map((kp, i) => ({
     x: kp.x,
     y: kp.y,
     w: kp.w ?? 1,
@@ -375,6 +375,7 @@ export function keyPropsToKLEKeys(
     c: kp.c,
     t: kp.t,
     isDecal: kp.d === true,
+    index: i,
   }));
 }
 

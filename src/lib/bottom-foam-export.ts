@@ -15,6 +15,7 @@ import type { StpExtrudeData } from "./stp-export";
 import type { SolderType, PCBSwitchRotations } from "./pcb-export";
 import { computeBottomFoamGeometry } from "./pcb-export";
 import type { CustomRect } from "./pcb-export";
+import { cleanupCutoutHoles } from "./plate-export";
 
 export interface BottomFoamConfig {
   solderType: SolderType;
@@ -28,6 +29,10 @@ export interface BottomFoamConfig {
   holeFillet: number;
   /** 「外框圆角」：片材外框四角圆角半径 (mm, 0 = 直角) */
   outerFillet: number;
+  /** 短边开槽阈值 (mm)：消除交错开孔产生的 <此值 短边/碎边；0 = 关闭。默认 2 */
+  minFeature?: number;
+  /** 轴孔间薄壁阈值 (mm)：轴孔与轴孔间距 <此值时连通（切掉薄壁）；0 = 关闭。默认 0.4 */
+  thinWall?: number;
   /** 用户自定义圆角矩形挖孔 */
   customRects?: CustomRect[];
 }
@@ -73,6 +78,61 @@ function unionPolys(polys: Pt2[][]): Pt2[][] {
   const res = polygonClipping.union(pathToMP(first!), ...rest.map((p) => pathToMP(p)));
   return mpToPaths(res);
 }
+
+/**
+ * 消除「轴孔与轴孔间」小于 gap(mm) 的薄壁。
+ * 做法：找出分属不同挖孔、**互相平行且投影重叠、间距 ≤ gap** 的两条边，之间并入一个矩形连接块
+ * （沿边方向 = 投影重叠段，垂直方向 = 两边间距）。只增补连接矩形，不改动其余边界 ——
+ * 因此打通后所有转角仍是直角，不会产生圆弧近似折线造成的细小凸起。
+ */
+function closeThinWalls(holes: Pt2[][], gap: number): Pt2[][] {
+  if (gap <= 0 || holes.length < 2) return holes;
+  const M = 0.2; // 向两侧挖孔内延伸的余量，确保布尔并集连通
+  const connectors: Pt2[][] = [];
+  for (let i = 0; i < holes.length; i++) {
+    for (let j = i + 1; j < holes.length; j++) {
+      const A = holes[i]!, B = holes[j]!;
+      const ba = aabb(A), bb = aabb(B);
+      const gx = Math.max(0, Math.max(bb[0] - ba[2], ba[0] - bb[2]));
+      const gy = Math.max(0, Math.max(bb[1] - ba[3], ba[1] - bb[3]));
+      if (Math.hypot(gx, gy) > gap) continue; // 包围盒太远
+      for (let a = 0; a < A.length; a++) {
+        const p1 = A[a]!, p2 = A[(a + 1) % A.length]!;
+        const L = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+        if (L < 1e-9) continue;
+        const dx = (p2[0] - p1[0]) / L, dy = (p2[1] - p1[1]) / L;
+        for (let b = 0; b < B.length; b++) {
+          const q1 = B[b]!, q2 = B[(b + 1) % B.length]!;
+          const L2 = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]);
+          if (L2 < 1e-9) continue;
+          const ex = (q2[0] - q1[0]) / L2, ey = (q2[1] - q1[1]) / L2;
+          if (Math.abs(dx * ex + dy * ey) < 0.996) continue; // 不平行
+          const rx = q1[0] - p1[0], ry = q1[1] - p1[1];
+          const perpSigned = -dy * rx + dx * ry;
+          const perpDist = Math.abs(perpSigned);
+          if (perpDist > gap || perpDist < 1e-6) continue;
+          const tq1 = rx * dx + ry * dy;
+          const tq2 = (q2[0] - p1[0]) * dx + (q2[1] - p1[1]) * dy;
+          const o0 = Math.max(0, Math.min(tq1, tq2));
+          const o1 = Math.min(L, Math.max(tq1, tq2));
+          if (o1 - o0 < 0.05) continue; // 投影无重叠
+          const sgn = perpSigned >= 0 ? 1 : -1;
+          const ux = sgn * -dy, uy = sgn * dx; // 由 A 指向 B 的单位法线
+          const e0x = p1[0] + dx * o0, e0y = p1[1] + dy * o0;
+          const e1x = p1[0] + dx * o1, e1y = p1[1] + dy * o1;
+          connectors.push([
+            [e0x - ux * M, e0y - uy * M],
+            [e1x - ux * M, e1y - uy * M],
+            [e1x + ux * (perpDist + M), e1y + uy * (perpDist + M)],
+            [e0x + ux * (perpDist + M), e0y + uy * (perpDist + M)],
+          ]);
+        }
+      }
+    }
+  }
+  if (connectors.length === 0) return holes;
+  return unionPolys([...holes, ...connectors]);
+}
 function aabb(pts: Pt2[]): [number, number, number, number] {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [x, y] of pts) {
@@ -107,8 +167,18 @@ export function generateBottomFoam(
   }
 
   const merged = anyOverlap(geo.polys) ? unionPolys(geo.polys) : geo.polys;
-  // 「圆角」已在各挖孔自身的半径中体现（hotswap 轴座 / 组件圆角矩形），不再二次圆角
-  const holes = merged;
+  // 1) 短边开槽 + 丢弃被包围的悬空块（作用于**原始**挖孔）。
+  //    圆角模式（holeFillet>0）几何含圆弧折线，开槽会削坏圆角 → 仅直角模式开槽；丢悬空块始终执行。
+  const minFeature = config.minFeature ?? 2;
+  const slotMin = (config.holeFillet ?? 0) > 0 ? 0 : minFeature;
+  const work = cleanupCutoutHoles(
+    merged.map((poly) => poly.map(([x, y]) => ({ x, y }))),
+    slotMin,
+  ).map((poly) => poly.map((p) => [p.x, p.y] as Pt2));
+  // 2) 消除轴孔与轴孔间 <thinWall 的薄壁（定向矩形架桥，仅增补连接块、不改其余边界；
+  //    连接块端部与两条对边对齐，不产生新的短边）。
+  const thinWall = config.thinWall ?? 0.4;
+  const holes = thinWall > 0 ? closeThinWalls(work, thinWall) : work;
 
   const pad = 5;
   const svgW = width + pad * 2;
@@ -134,7 +204,11 @@ export function generateBottomFoam(
   const compatRaw = geo.compatPolys ?? [];
   if (compatRaw.length > 0) {
     const compatMerged = anyOverlap(compatRaw) ? unionPolys(compatRaw) : compatRaw;
-    const compatHoles = compatMerged;
+    const compatClean = cleanupCutoutHoles(
+      compatMerged.map((poly) => poly.map(([x, y]) => ({ x, y }))),
+      slotMin,
+    ).map((poly) => poly.map((p) => [p.x, p.y] as Pt2));
+    const compatHoles = thinWall > 0 ? closeThinWalls(compatClean, thinWall) : compatClean;
     svg += `
   <g fill="lightgray" stroke="#888" stroke-width="0.3">`;
     for (const poly of compatHoles) {
