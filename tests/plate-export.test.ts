@@ -285,3 +285,27 @@ describe("getStabOffset boundary values (via generatePlate, stabType=1)", () => 
     expect(r.cutPathLength).toBeGreaterThan(PERIMETER_1U_NO_STAB + 5);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Stepped key (KLE `l`) — switch hole offset
+// ═══════════════════════════════════════════════════════════════════
+
+describe("stepped switch cutout (KLE l)", () => {
+  function centroidX(poly: number[][]): number {
+    let s = 0, cx = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+      const cross = a[0]! * b[1]! - b[0]! * a[1]!;
+      s += cross; cx += (a[0]! + b[0]!) * cross;
+    }
+    return cx / (3 * s);
+  }
+
+  it("shifts the switch hole 0.25u to the left vs a normal key", () => {
+    const normal = generatePlate(makeLayout([mkKey({ x: 0, y: 0, w: 1.75, h: 1 })]));
+    const stepped = generatePlate(makeLayout([mkKey({ x: 0, y: 0, w: 1.75, h: 1, l: true })]));
+    const cn = centroidX(normal.stpData!.polyHoles[0]!);
+    const cs = centroidX(stepped.stpData!.polyHoles[0]!);
+    expect(cn - cs).toBeCloseTo(0.25 * 19.05, 5);
+  });
+});

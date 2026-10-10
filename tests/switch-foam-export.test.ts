@@ -98,10 +98,60 @@ describe("generateSwitchFoam", () => {
     expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.5, 0)])).stpData!.polyHoles.length).toBe(1);
   });
 
-  it("最小特征清理：<2mm 的薄肋被消除，>2mm 的保留", () => {
-    // 1u 轴孔 14mm；中心距 14.99mm → 间隙 ~1mm（<2）应连通；16.99mm → 间隙 ~3mm（>2）应保留
-    expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.787, 0)])).stpData!.polyHoles.length).toBe(1);
-    expect(generateSwitchFoam(makeLayout([key1u(0, 0), key1u(0.892, 0)])).stpData!.polyHoles.length).toBe(2);
+  it("short-edge slotting runs before fillet and keeps geometry valid", () => {
+    // 交错产生短边时，短边开槽会把它们消除；这里确保生成不崩且 SVG/DXF 非空
+    const r = generateSwitchFoam(makeLayout([key1u(0, 0), key1u(1, 0)]));
+    expect(r.svg).toContain("<svg");
+    expect((r.stpData?.polyHoles.length ?? 0) + (r.stpData?.circleHoles.length ?? 0)).toBeGreaterThan(0);
+  });
+
+  it("removes every sub-2mm short edge (slot stops at the nearest perpendicular edge)", () => {
+    // 回归：ISO Enter 等交错开孔产生的 {0.75,1.525}mm 短边必须被完全消除，
+    // 且短边开槽不得越过垂边继续切削（否则会残留细小的轴间间隔）。
+    const holes = generateSwitchFoam(FIXTURE_LAYOUT).stpData!.polyHoles;
+    let shortest = Infinity;
+    for (const poly of holes) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!;
+        const b = poly[(i + 1) % poly.length]!;
+        const len = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+        if (len > 1e-6 && len < shortest) shortest = len;
+      }
+    }
+    expect(shortest).toBeGreaterThanOrEqual(2 - 1e-6);
+  });
+
+  it("short-edge cleanup never bridges to a non-overlapping neighbor row (syrin65 regression)", () => {
+    // 7u 空格 + 重叠的兼容常规 RAlt 同属一个键组；空格旋转 180° 曾使清理通道贯通到
+    // 上方不相交的另一行按键。修复后：任何挖孔的纵向跨度都不得超过单键高度量级。
+    const layout = makeLayout([
+      mkKey({ x: 0, y: 0, w: 7, h: 1 }),      // 7u 空格
+      mkKey({ x: 6, y: 0, w: 1.25, h: 1 }),   // 重叠的兼容常规 RAlt（同组）
+      key1u(6.25, 2),                          // 两行之上、与之不相交的按键
+    ], "syrin-regression");
+    const r = generateSwitchFoam(layout, { minFeature: 2 }, { 0: 180 });
+    let tallest = 0;
+    for (const poly of r.stpData!.polyHoles) {
+      const ys = poly.map((p) => p[1]);
+      tallest = Math.max(tallest, Math.max(...ys) - Math.min(...ys));
+    }
+    expect(tallest).toBeLessThan(30);
+  });
+
+  it("minFeature config controls short-edge slotting (0 = off)", () => {
+    const shortestEdge = (r: ReturnType<typeof generateSwitchFoam>) => {
+      let m = Infinity;
+      for (const poly of r.stpData!.polyHoles) {
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+          const len = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
+          if (len > 1e-6 && len < m) m = len;
+        }
+      }
+      return m;
+    };
+    expect(shortestEdge(generateSwitchFoam(FIXTURE_LAYOUT, { minFeature: 0 }))).toBeLessThan(2);
+    expect(shortestEdge(generateSwitchFoam(FIXTURE_LAYOUT, { minFeature: 2 }))).toBeGreaterThanOrEqual(2 - 1e-6);
   });
 
   it("matches snapshot", () => {

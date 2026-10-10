@@ -84,4 +84,14 @@ describe("generateSwitchPad", () => {
   it("matches snapshot", () => {
     expect(generateSwitchPad(layout(KEYS), { ...BASE, solderType: "socket", needLed: true })).toMatchSnapshot();
   });
+
+  it("stepped key (KLE l) shifts switch pads 0.25u to the left", () => {
+    const cx = (r: ReturnType<typeof generateSwitchPad>) => {
+      const holes = r.stpData!.circleHoles;
+      return holes.reduce((s, h) => s + h[0], 0) / holes.length;
+    };
+    const normal = generateSwitchPad(layout([mk({ x: 0, y: 0, w: 1.75 })]), BASE);
+    const stepped = generateSwitchPad(layout([mk({ x: 0, y: 0, w: 1.75, l: true })]), BASE);
+    expect(cx(normal) - cx(stepped)).toBeCloseTo(0.25 * 19.05, 4);
+  });
 });

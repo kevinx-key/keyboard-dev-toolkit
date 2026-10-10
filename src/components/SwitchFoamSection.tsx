@@ -15,32 +15,32 @@ import InteractivePlatePreview from "./InteractivePlatePreview";
 
 interface SwitchFoamSectionProps {
   layout: KLELayout;
+  /** 旋转方向来自定位板编辑器（轴间棉依托定位板生成，不接受自定义旋转/选中） */
   rotationOverrides: PlateRotationOverrides;
-  setRotationOverrides: React.Dispatch<React.SetStateAction<PlateRotationOverrides>>;
   onStpExportingChange?: (exporting: boolean) => void;
   onStpProgress?: (data: StpProgressEvent) => void;
-  onClearCanvasSelection?: () => void;
 }
 
 export default function SwitchFoamSection({
-  layout, rotationOverrides, setRotationOverrides,
-  onStpExportingChange, onStpProgress, onClearCanvasSelection,
+  layout, rotationOverrides,
+  onStpExportingChange, onStpProgress,
 }: SwitchFoamSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [fillet, setFillet] = useState(0);
   const [holeFillet, setHoleFillet] = useState(0);
+  const [minFeature, setMinFeature] = useState(2);
   const [thickness, setThickness] = useState(DEFAULT_FOAM_THICKNESS);
   const [drawn, setDrawn] = useState(false);
-  const [selectedKeyIdx, setSelectedKeyIdx] = useState<number | null>(null);
 
   const effectiveConfig = useMemo((): SwitchFoamConfig => ({
     switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
     topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
     fillet,
     holeFillet,
+    minFeature,
     thickness,
-  }), [fillet, holeFillet, thickness]);
+  }), [fillet, holeFillet, minFeature, thickness]);
 
   const foamResult = useMemo((): PlateResult | null => {
     if (!drawn || layout.keys.length === 0) return null;
@@ -55,7 +55,7 @@ export default function SwitchFoamSection({
   const [dxfMsg, setDxfMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleDraw = useCallback(() => {
-    if (layout.keys.length > 0) { setDrawn((d) => !d); setSelectedKeyIdx(null); }
+    if (layout.keys.length > 0) { setDrawn((d) => !d); }
   }, [layout.keys.length]);
 
   const handleStpExport = useCallback(async () => {
@@ -89,14 +89,6 @@ export default function SwitchFoamSection({
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
   }, [foamResult, layout.meta.name, t]);
 
-  const handleSelectKey = useCallback((idx: number | null) => {
-    setSelectedKeyIdx(idx);
-    if (idx !== null) onClearCanvasSelection?.();
-  }, [onClearCanvasSelection]);
-  const handleSpaceRotate = useCallback((idx: number) => {
-    setRotationOverrides((prev) => ({ ...prev, [idx]: ((prev[idx] || 0) + 90) % 360 }));
-  }, [setRotationOverrides]);
-
   const numInput: React.CSSProperties = {
     width: 60, padding: "2px 4px", fontSize: 12, borderRadius: 4,
     border: "1px solid var(--theme-border-input)", backgroundColor: "var(--theme-input-bg)",
@@ -122,6 +114,14 @@ export default function SwitchFoamSection({
           <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <input type="number" value={holeFillet} min={0} max={20} step={0.5} title={t("tip.filletHoles")}
               onChange={(e) => setHoleFillet(parseFloat(e.target.value) || 0)} style={numInput} />
+            <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
+          </span>
+        </label>
+        <label style={fieldLabel}>
+          <span>{t("foam.minFeature")}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input type="number" value={minFeature} min={0} max={10} step={0.5} title={t("tip.foamMinFeature")}
+              onChange={(e) => setMinFeature(parseFloat(e.target.value) || 0)} style={numInput} />
             <span style={{ fontSize: 10, color: "var(--theme-text-muted)" }}>mm</span>
           </span>
         </label>
@@ -168,9 +168,7 @@ export default function SwitchFoamSection({
             <InteractivePlatePreview
               svg={foamResult.svg}
               regions={foamResult.regions}
-              selectedKeyIdx={selectedKeyIdx}
-              onSelectKey={handleSelectKey}
-              onSpaceRotate={handleSpaceRotate}
+              selectedKeyIdx={null}
               rotations={rotationOverrides}
             />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>

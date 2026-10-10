@@ -15,6 +15,8 @@ export interface SwitchFoamConfig extends PlateConfig {
   thickness: number;
   /** 「圆角」：所有挖孔（外框以外图形）的圆角半径 (mm)；外框圆角用继承的 fillet */
   holeFillet: number;
+  /** 短边开槽阈值 (mm)：轮廓上短于此值的短边沿相邻垂边开槽消除；0 = 关闭。默认 2 */
+  minFeature: number;
 }
 
 /** 默认棉片厚度 (mm) */
@@ -33,6 +35,7 @@ const DEFAULT_SWITCH_FOAM_CONFIG: SwitchFoamConfig = {
   yGrow: 0,
   fillet: 0,
   holeFillet: 0,
+  minFeature: 2,
   thickness: DEFAULT_FOAM_THICKNESS,
 };
 
@@ -52,7 +55,7 @@ export function generateSwitchFoam(
   return generatePlate(layout, cfg, rotationOverrides, {
     foamStab: true,
     holeFillet: cfg.holeFillet,
-    minFeature: 2, // 交错开孔清理：消除 < 2mm 的薄肋/碎边
+    minFeature: cfg.minFeature, // 交错开孔清理：消除 < minFeature 的薄肋/碎边
     compatKeyIndices,
   });
 }

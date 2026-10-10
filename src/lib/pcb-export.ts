@@ -351,6 +351,8 @@ interface KeyInfo {
   hasStab: boolean;
   /** Visual center after KLE cluster rotation (mm) */
   visualCx: number; visualCy: number;
+  /** Switch footprint center (mm)：阶梯键 (l) 相对视觉中心左移 0.25u，其余同 visual */
+  swCx: number; swCy: number;
 }
 
 function computePCBKeyPositions(
@@ -404,9 +406,18 @@ function computePCBKeyPositions(
     if (visualCx + halfW + config.edgeDistance > holeMaxX) holeMaxX = visualCx + halfW + config.edgeDistance;
     if (visualCy + halfH + config.edgeDistance > holeMaxY) holeMaxY = visualCy + halfH + config.edgeDistance;
 
+    // 开关焊盘/轴座中心：阶梯键 (KLE `l`) 相对视觉中心左移 0.25u（同 builder.swillkb）
+    let swCx = visualCx, swCy = visualCy;
+    if (k.l) {
+      let sox = -0.25 * U, soy = 0;
+      if (isTall) { const t = sox; sox = -soy; soy = t; }
+      if (rot % 360 !== 0) { const r = rotatePoint({ x: sox, y: soy }, rot, { x: 0, y: 0 }); sox = r.x; soy = r.y; }
+      swCx += sox; swCy += soy;
+    }
+
     keyInfos.push({
       cx, cy, kw: actualW, kh: actualH,
-      rot, rx, ry, isTall, hasStab, visualCx, visualCy,
+      rot, rx, ry, isTall, hasStab, visualCx, visualCy, swCx, swCy,
     });
   }
 
@@ -509,7 +520,7 @@ export function computeSwitchPadGeometry(
       if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
       if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
       if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
-      circles.push({ x: ki.visualCx + ox, y: ki.visualCy + oy, r: switchRadii[i]! });
+      circles.push({ x: ki.swCx + ox, y: ki.swCy + oy, r: switchRadii[i]! });
     }
 
     if (opts.needLed) {
@@ -519,7 +530,7 @@ export function computeSwitchPadGeometry(
       if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
       if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
       const ledAngle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
-      const cx = ki.visualCx + ox, cy = ki.visualCy + oy;
+      const cx = ki.swCx + ox, cy = ki.swCy + oy;
       const local: [number, number][] = [[-ledW / 2, -ledH / 2], [ledW / 2, -ledH / 2], [ledW / 2, ledH / 2], [-ledW / 2, ledH / 2]];
       polys.push(local.map(([dx, dy]) => {
         const r = ledAngle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, ledAngle, { x: 0, y: 0 }) : { x: dx, y: dy };
@@ -609,7 +620,7 @@ export function computeBottomFoamGeometry(
       const pStart = polys.length;
       const tf = (pts: [number, number][]) => pts.map(([dx, dy]) => {
         const r = angle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
-        return [ki.visualCx + r.x, ki.visualCy + r.y] as [number, number];
+        return [ki.swCx + r.x, ki.swCy + r.y] as [number, number];
       });
       const ledW = 3.9, ledH = 3.5;
       const lox = 0, loy = 3.35 + ledH / 2;
@@ -883,11 +894,11 @@ export function generatePCB(
       // Apply user switch rotation override
       if (swRot) { const r = applyRot(ox, oy, swRot); ox = r.x; oy = r.y; }
 
-      const absX = ki.visualCx + ox - holeOffX + pad;
-      const absY = ki.visualCy + oy - holeOffY + pad;
+      const absX = ki.swCx + ox - holeOffX + pad;
+      const absY = ki.swCy + oy - holeOffY + pad;
 
       // 收集（延后统一布尔输出）
-      holeShapes.push({ cx: absX, cy: absY, r: h.r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
+      holeShapes.push({ cx: absX, cy: absY, r: h.r, sX: ki.swCx + ox, sY: -(ki.swCy + oy) });
       if (compatKeyIndices?.has(keyIndex)) {
         compatHoleShapes.push({ cx: absX, cy: absY, r: h.r, sX: 0, sY: 0 });
       }
@@ -905,8 +916,8 @@ export function generatePCB(
       if (ki.rot !== 0) { const r = rotatePoint({ x: ledOx, y: ledOy }, ki.rot, { x: 0, y: 0 }); ledOx = r.x; ledOy = r.y; }
       if (swRot) { const r = applyRot(ledOx, ledOy, swRot); ledOx = r.x; ledOy = r.y; }
 
-      const absX = ki.visualCx + ledOx - holeOffX + pad;
-      const absY = ki.visualCy + ledOy - holeOffY + pad;
+      const absX = ki.swCx + ledOx - holeOffX + pad;
+      const absY = ki.swCy + ledOy - holeOffY + pad;
 
       // Total LED orientation angle (CW, SVG convention)
       const ledAngle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
@@ -945,8 +956,8 @@ export function generatePCB(
       dxf(0); dxf("SEQEND");
 
       // STP 3D LED rect — rotate vertices around LED centre (Y-up coords)
-      const ledAbsX = ki.visualCx + ledOx;
-      const ledAbsY = ki.visualCy + ledOy;
+      const ledAbsX = ki.swCx + ledOx;
+      const ledAbsY = ki.swCy + ledOy;
       stpPolyHoles.push(
         ledLocal.map(([dx, dy]) => {
           const r = needLedRot

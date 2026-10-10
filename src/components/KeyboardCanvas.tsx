@@ -309,7 +309,7 @@ export default function KeyboardCanvas({
           {keys.map((key, i) => {
             const id = String(i);
             const matchesFilter = !isFilterActive || getKeyCategory(key) === categoryFilter;
-            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} decal={decal} matchesFilter={matchesFilter} compatColor={compatLayer.canvasColor(key)} compatOpacity={compatLayer.opacity} compatSkipped={compatDimSet.has(i)} compatZ={compatLayer.compatZ(key)} onContextMenu={handleContextMenu} />;
+            return <KeyRenderer key={id} keyData={key} index={i} isSelected={selectedSet.has(id)} preview={preview} readOnly={readOnly} keycapTopEffect={keycapTopEffect} decal={decal} matchesFilter={matchesFilter} compatColor={compatLayer.canvasColor(key)} compatOpacity={key.compat === 0 ? 1 : compatLayer.opacity} compatSkipped={compatDimSet.has(i)} compatZ={compatLayer.compatZ(key)} onContextMenu={handleContextMenu} />;
           })}
 
           {/* Selection rectangle */}
