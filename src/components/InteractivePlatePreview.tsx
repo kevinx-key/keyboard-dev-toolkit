@@ -12,8 +12,10 @@ interface InteractivePlatePreviewProps {
   svg: string;
   regions: PreviewRegion[];
   selectedKeyIdx: number | null;
-  onSelectKey: (idx: number | null) => void;
-  onSpaceRotate: (idx: number) => void;
+  /** 点击选择回调；缺省 = 只读（不可选中），用于「依托上游生成」的编辑器 */
+  onSelectKey?: (idx: number | null) => void;
+  /** 旋转回调；缺省 = 只读（不响应 Space，不显示旋转提示），用于「依托上游生成」的编辑器 */
+  onSpaceRotate?: (idx: number) => void;
   rotations?: Record<number, number>;
 }
 
@@ -61,8 +63,9 @@ export default function InteractivePlatePreview({
     return () => ro.disconnect();
   }, [svg]);
 
-  // Space key → rotate selected
+  // Space key → rotate selected (只读模式无 onSpaceRotate 时不生效)
   useEffect(() => {
+    if (!onSpaceRotate) return;
     const handler = (e: KeyboardEvent) => {
       if (e.code === "Space" && selectedKeyIdx !== null) {
         e.preventDefault();
@@ -93,7 +96,7 @@ export default function InteractivePlatePreview({
 
         {/* Overlay SVG — positioned exactly over the rendered base SVG */}
         <svg viewBox={viewBox} style={overlayStyle}>
-          {regions.map(r => (
+          {onSelectKey && regions.map(r => (
             <rect
               key={r.id}
               x={r.x} y={r.y} width={r.w} height={r.h}
@@ -131,10 +134,12 @@ export default function InteractivePlatePreview({
         }}>
           <Crosshair size={13} style={{ flexShrink: 0, opacity: 0.8 }} /> {t("plate.selKeyN").replace("{{n}}", String(selectedKeyIdx + 1))}
           {" · "}{t("plate.curRot")}: {rotations?.[selectedKeyIdx] || 0}°
-          {" · "}{t("plate.pressSpacePre")} <kbd className="kle-kbd" style={{
-            padding: "1px 5px", borderRadius: 3,
-            fontSize: 11,
-          }}>Space</kbd> {t("plate.pressSpacePost")}
+          {onSpaceRotate && (
+            <>{" · "}{t("plate.pressSpacePre")} <kbd className="kle-kbd" style={{
+              padding: "1px 5px", borderRadius: 3,
+              fontSize: 11,
+            }}>Space</kbd> {t("plate.pressSpacePost")}</>
+          )}
         </div>
       )}
     </div>

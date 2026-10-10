@@ -116,13 +116,9 @@ export default function EditorPage() {
     }
   }, [state.layout, projectRotations, projectSwitchRots, projectStabRots, projectPcbConfig]);
 
-  // Cross-region selection sync
-  const [clearNonCanvasEpoch, setClearNonCanvasEpoch] = useState(0);
-  useEffect(() => {
-    if (state.selectedIds.length > 0) {
-      setClearNonCanvasEpoch(n => n + 1);
-    }
-  }, [state.selectedIds.length]);
+  // 跨区域选中互斥：任意一处（画布/定位板/轴间棉/PCB）选中时，其余区域一律清空，只保留最新一处。
+  type SelectionSource = "canvas" | "plate" | "foam" | "pcb";
+  const [activeSelSource, setActiveSelSource] = useState<SelectionSource | null>(null);
 
   // STP export state
   const {
@@ -342,10 +338,11 @@ export default function EditorPage() {
               keys={state.layout.keys}
               selectedIds={state.selectedIds}
               onSelectKey={(id, additive) => {
+                setActiveSelSource("canvas");
                 if (additive) { editor.toggleSelection(id); }
                 else { editor.setSelection([id]); }
               }}
-              onSelectArea={(ids) => editor.setSelection(ids)}
+              onSelectArea={(ids) => { setActiveSelSource("canvas"); editor.setSelection(ids); }}
               onClearSelection={editor.clearSelection}
               onMoveKeys={(dx, dy) => moveSelected(dx, dy)}
               backgroundColor={state.layout.meta.backcolor}
@@ -390,7 +387,8 @@ export default function EditorPage() {
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
           onClearCanvasSelection={editor.clearSelection}
-          clearNonCanvasEpoch={clearNonCanvasEpoch}
+          activeSelSource={activeSelSource}
+          onActivateSelection={() => setActiveSelSource("plate")}
           onPlateOrderChange={handlePlateOrderChange}
         />
 
@@ -398,10 +396,8 @@ export default function EditorPage() {
         <SwitchFoamSection
           layout={state.layout}
           rotationOverrides={projectRotations}
-          setRotationOverrides={setProjectRotations}
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
-          onClearCanvasSelection={editor.clearSelection}
         />
 
         {/* ═══ PCB Section ═══ */}
@@ -416,7 +412,8 @@ export default function EditorPage() {
           onStpExportingChange={handleStpExportingChange}
           onStpProgress={handleStpProgress}
           onClearCanvasSelection={editor.clearSelection}
-          clearNonCanvasEpoch={clearNonCanvasEpoch}
+          activeSelSource={activeSelSource}
+          onActivateSelection={() => setActiveSelSource("pcb")}
         />
 
         {/* ═══ Switch Pad Section（轴下垫，依托 PCB 配置） ═══ */}

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePlate } from "../lib/plate-export";
 import type { PlateConfig, PlateResult, PlateRotationOverrides } from "../lib/plate-export";
@@ -48,13 +48,15 @@ interface PlateSectionProps {
   onStpProgress?: (data: StpProgressEvent) => void;
   /** Issue 3: Clear canvas selection when user selects in plate */
   onClearCanvasSelection?: () => void;
-  /** Issue 3: Incremented when canvas selection changes — clears local selection */
-  clearNonCanvasEpoch?: number;
+  /** 全局选中互斥：当前激活的选中来源；非 "plate" 时清空本区选中 */
+  activeSelSource?: string | null;
+  /** 全局选中互斥：本区选中时上报（设为 "plate"） */
+  onActivateSelection?: () => void;
   /** 定位板报价变化上报（供 PCBA 一键下单合并定位板） */
   onPlateOrderChange?: (info: PlateOrderInfo | null) => void;
 }
 
-export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, clearNonCanvasEpoch, onPlateOrderChange }: PlateSectionProps) {
+export default function PlateSection({ layout, rotationOverrides, setRotationOverrides, onStpExportingChange, onStpProgress, onClearCanvasSelection, activeSelSource, onActivateSelection, onPlateOrderChange }: PlateSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
   const [config, setConfig] = useState<PlateSectionConfig>({ ...DEFAULT_PLATE_CONFIG });
@@ -87,10 +89,8 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
   const [dxfSaving, setDxfSaving] = useState(false);
   const [dxfMsg, setDxfMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Issue 3: Clear local selection when canvas selection changes
-  useEffect(() => {
-    setSelectedKeyIdx(null);
-  }, [clearNonCanvasEpoch]);
+  // 全局选中互斥：仅当本区是当前激活来源时展示选中（其他区域选中 → 本区视为未选）
+  const effSelectedKeyIdx = activeSelSource === "plate" ? selectedKeyIdx : null;
 
   const handleDraw = useCallback(() => {
     if (layout.keys.length > 0) {
@@ -159,8 +159,8 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
   // Issue 3: When selecting in plate, clear canvas selection to prevent dual control
   const handleSelectKey = useCallback((idx: number | null) => {
     setSelectedKeyIdx(idx);
-    if (idx !== null) onClearCanvasSelection?.();
-  }, [onClearCanvasSelection]);
+    if (idx !== null) { onActivateSelection?.(); onClearCanvasSelection?.(); }
+  }, [onActivateSelection, onClearCanvasSelection]);
 
   const handleSpaceRotate = useCallback((idx: number) => {
     setRotationOverrides(prev => ({
@@ -173,11 +173,11 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
     setConfig(c => ({ ...c, [key]: value }));
 
   const selectedPlateKeyInfo = useMemo(() => {
-    if (selectedKeyIdx === null || selectedKeyIdx < 0 || selectedKeyIdx >= layout.keys.length) return null;
-    const key = layout.keys[selectedKeyIdx];
+    if (effSelectedKeyIdx === null || effSelectedKeyIdx < 0 || effSelectedKeyIdx >= layout.keys.length) return null;
+    const key = layout.keys[effSelectedKeyIdx];
     if (!key || key.d) return null;
     return `  ${t("canvas.infoPos")} X:${key.x.toFixed(1)} Y:${key.y.toFixed(1)}  ${t("canvas.infoRot")}:${key.r || 0}°`;
-  }, [layout.keys, selectedKeyIdx, t]);
+  }, [layout.keys, effSelectedKeyIdx, t]);
   const keyCount = layout.keys.filter((k) => !k.d).length;
   const stabCount = useMemo(() => layout.keys.filter((k) => {
     if (k.d) return false;
@@ -260,7 +260,7 @@ export default function PlateSection({ layout, rotationOverrides, setRotationOve
             <InteractivePlatePreview
               svg={plateResult.svg}
               regions={plateResult.regions}
-              selectedKeyIdx={selectedKeyIdx}
+              selectedKeyIdx={effSelectedKeyIdx}
               onSelectKey={handleSelectKey}
               onSpaceRotate={handleSpaceRotate}
               rotations={rotationOverrides}

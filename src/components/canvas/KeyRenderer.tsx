@@ -149,10 +149,10 @@ export default function KeyRenderer({
   const rawFace = keyData.c && keyData.c !== "#cccccc" ? getKeyFaceColor(keyData.c) : "#ffffff";
   const rawBase = keyData.c || "#cccccc";
 
-  // ── 兼容层：把标记色混入键帽底色/顶面（保留立体顶面与图例，不覆盖整键） ──
+  // ── 兼容层：整键以标记色着色（满着色）；透明度由 wrapperStyle.opacity 施加，可透出下方参照键 ──
   const compatFace = compatColor ? mixColor(compatColor, "rgb(255,255,255)", 0.5) : null;
-  const baseC = compatColor ? mixColor(rawBase, compatColor, compatOpacity) : rawBase;
-  const lightBg = compatColor && compatFace ? mixColor(rawFace, compatFace, compatOpacity) : rawFace;
+  const baseC = compatColor ?? rawBase;
+  const lightBg = compatColor && compatFace ? compatFace : rawFace;
 
   // ── Two-color gradient (per key；兼容着色时用纯色，避免渐变干扰) ──
   const hasGradient = !compatColor && !!(keyData.c2 && isValidHexColor(keyData.c2));
@@ -245,13 +245,14 @@ export default function KeyRenderer({
     height: bboxH,
     cursor: readOnly || preview ? "default" : "pointer",
     zIndex: isSelected ? 5 : compatZ,
-    opacity: isDecal
-      ? 0.6
-      : isGhosted
-        ? 0.4
-        : matchesFilter
-          ? 1
-          : 0.3,
+    opacity:
+      (isDecal
+        ? 0.6
+        : isGhosted
+          ? 0.4
+          : matchesFilter
+            ? 1
+            : 0.3) * (compatColor ? compatOpacity : 1),
     ...(hasExt ? { clipPath: `path("${lShapePath}")` } : {}),
     // L 形拼接缝补偿：GPU 合成 + 微扩展防止 0.5px 抗锯齿缝隙
     // L 形拼接缝补偿（仅非旋转键）：translateZ 激活 GPU 合成消除 0.5px 抗锯齿缝隙

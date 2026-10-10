@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePCB } from "../lib/pcb-export";
 import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType } from "../lib/pcb-export";
@@ -49,8 +49,10 @@ interface PCBSectionProps {
   onStpProgress?: (data: StpProgressEvent) => void;
   /** Issue 3: Clear canvas selection when user selects in PCB */
   onClearCanvasSelection?: () => void;
-  /** Issue 3: Incremented when canvas selection changes — clears local selection */
-  clearNonCanvasEpoch?: number;
+  /** 全局选中互斥：当前激活的选中来源；非 "pcb" 时清空本区选中 */
+  activeSelSource?: string | null;
+  /** 全局选中互斥：本区选中时上报（设为 "pcb"） */
+  onActivateSelection?: () => void;
 }
 
 const MODEL_LINKS_DEF: { labelKey: string; filename: string | null }[] = [
@@ -70,7 +72,8 @@ export default function PCBSection({
   onStpExportingChange,
   onStpProgress,
   onClearCanvasSelection,
-  clearNonCanvasEpoch,
+  activeSelSource,
+  onActivateSelection,
 }: PCBSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
@@ -91,12 +94,11 @@ export default function PCBSection({
   const [selectedStabId, setSelectedStabId] = useState<string | null>(null);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
 
-  // Issue 3: Clear local selection when canvas selection changes
-  useEffect(() => {
-    setSelectedSwitchId(null);
-    setSelectedStabId(null);
-    setSelectedComponentId(null);
-  }, [clearNonCanvasEpoch]);
+  // 全局选中互斥：仅当 PCB 是当前激活来源时展示选中（其他区域选中 → 本区视为未选）
+  const pcbActive = activeSelSource === "pcb";
+  const effSwitchId = pcbActive ? selectedSwitchId : null;
+  const effStabId = pcbActive ? selectedStabId : null;
+  const effComponentId = pcbActive ? selectedComponentId : null;
 
   const handleDraw = useCallback(() => {
     if (layout.keys.length > 0) {
@@ -262,15 +264,15 @@ export default function PCBSection({
     setSelectedSwitchId(id);
     setSelectedStabId(null);
     setSelectedComponentId(null);
-    if (id !== null) onClearCanvasSelection?.();
-  }, [onClearCanvasSelection]);
+    if (id !== null) { onActivateSelection?.(); onClearCanvasSelection?.(); }
+  }, [onActivateSelection, onClearCanvasSelection]);
 
   const handleSelectStab = useCallback((id: string | null) => {
     setSelectedStabId(id);
     setSelectedSwitchId(null);
     setSelectedComponentId(null);
-    if (id !== null) onClearCanvasSelection?.();
-  }, [onClearCanvasSelection]);
+    if (id !== null) { onActivateSelection?.(); onClearCanvasSelection?.(); }
+  }, [onActivateSelection, onClearCanvasSelection]);
 
   const handleSpaceRotate = useCallback((id: string) => {
     if (id.startsWith("stab-")) {
@@ -296,8 +298,8 @@ export default function PCBSection({
     setSelectedComponentId(id);
     setSelectedSwitchId(null);
     setSelectedStabId(null);
-    if (id !== null) onClearCanvasSelection?.();
-  }, [onClearCanvasSelection]);
+    if (id !== null) { onActivateSelection?.(); onClearCanvasSelection?.(); }
+  }, [onActivateSelection, onClearCanvasSelection]);
 
   const handleMoveComponent = useCallback((id: string, dx: number, dy: number) => {
     setConfig(prev => {
@@ -314,19 +316,19 @@ export default function PCBSection({
 
   const keyCount = layout.keys.filter((k) => !k.d).length;
   const selectedPcbKeyInfo = useMemo(() => {
-    if (!selectedSwitchId || !selectedSwitchId.startsWith("switch-")) return null;
-    const idx = parseInt(selectedSwitchId.replace("switch-", ""), 10);
+    if (!effSwitchId || !effSwitchId.startsWith("switch-")) return null;
+    const idx = parseInt(effSwitchId.replace("switch-", ""), 10);
     if (isNaN(idx) || idx < 0 || idx >= layout.keys.length) return null;
     const key = layout.keys[idx];
     if (!key || key.d) return null;
     return `  ${t("canvas.infoPos")} X:${key.x.toFixed(1)} Y:${key.y.toFixed(1)}  ${t("canvas.infoRot")}:${key.r || 0}°`;
-  }, [layout.keys, selectedSwitchId, t]);
+  }, [layout.keys, effSwitchId, t]);
 
   const selectedComponentInfo = useMemo(() => {
-    if (!selectedComponentId) return null;
+    if (!effComponentId) return null;
     let label = "";
     let x: number, y: number, rot: number;
-    switch (selectedComponentId) {
+    switch (effComponentId) {
       case "type-c":
         label = "Type-C";
         x = config.typeCX;
@@ -349,7 +351,7 @@ export default function PCBSection({
         return null;
     }
     return `  ${label} — ${t("canvas.infoPos")} X:${x.toFixed(1)} Y:${y.toFixed(1)}  ${t("canvas.infoRot")}:${rot}°`;
-  }, [selectedComponentId, config, t]);
+  }, [effComponentId, config, t]);
 
   return (
     <div className="kle-panel" style={{
@@ -638,9 +640,9 @@ export default function PCBSection({
               switchRegions={pcbResult.switchRegions || []}
               stabRegions={pcbResult.stabRegions || []}
               componentRegions={pcbResult.componentRegions || []}
-              selectedSwitchId={selectedSwitchId}
-              selectedStabId={selectedStabId}
-              selectedComponentId={selectedComponentId}
+              selectedSwitchId={effSwitchId}
+              selectedStabId={effStabId}
+              selectedComponentId={effComponentId}
               onSelectSwitch={handleSelectSwitch}
               onSelectStab={handleSelectStab}
               onSelectComponent={handleSelectComponent}

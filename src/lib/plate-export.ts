@@ -92,7 +92,7 @@ export interface PlateGenOptions {
   foamStab?: boolean;
   /** 「圆角」：对所有挖孔（外框以外的图形）的直角施加的圆角半径 (mm) */
   holeFillet?: number;
-  /** 最小特征清理 (mm)：消除宽度小于此值的薄肋/碎边（膨胀→收缩，令交错开孔就地连通）。0 = 关闭 */
+  /** 短边开槽阈值 (mm)：轮廓上长度小于此值的短边，沿相邻垂边（取其较短者）方向开矩形槽消除，反复迭代至收敛（须在圆角之前）。0 = 关闭 */
   minFeature?: number;
   /** 兼容层：这些键（layout.keys 下标）的挖孔额外以浅灰重绘（预览区分用，不影响 DXF/STP） */
   compatKeyIndices?: Set<number>;
@@ -429,34 +429,158 @@ function unionAll(polys: { x: number; y: number }[][]): { x: number; y: number }
   return mpToPaths(result);
 }
 
+/** 有向面积的 2 倍（>0 = CCW）。用于判定轮廓的内/外侧。 */
+function ringArea2(poly: { x: number; y: number }[]): number {
+  let s = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    s += a.x * b.y - b.x * a.y;
+  }
+  return s;
+}
+
 /**
- * 最小特征清理（形态学闭运算：膨胀→收缩）：消除宽度 < minFeature(mm) 的薄肋与小碎边。
- * 用「平移并集/交集」近似 Minkowski 和（膨胀=环向平移并集；收缩=环向平移交集），
- * 全程在 MultiPolygon 上做（保留孔洞嵌套），无需额外依赖。
+ * 短边开槽（须在圆角之前调用）：
+ * 对挖孔轮廓中长度 < minFeature(mm) 的短边 E，沿其法线朝**材料侧**并入一个矩形槽 ——
+ * 槽宽 = 该短边长度；槽长 = 两侧相邻「垂边」中**较短**者。
+ *
+ * 槽长必须取较短者：垂边是槽延伸方向上最先遇到的边界，取较长者会让槽越过近端垂边、
+ * 朝远端多切一大段，事后在近端留下更细的 <minFeature 边（表现为大量细小间隔）。
+ * 一次开槽后可能又生出新的 <minFeature 短边，故反复迭代直至收敛（实测 ≤3 轮）。
  */
-function removeSmallFeatures(
-  holes: { x: number; y: number }[][],
+function slotShortEdgesOnce(
+  polys: { x: number; y: number }[][],
+  minFeature: number,
+  clipMP: ClipPoly[] | null,
+): { polys: { x: number; y: number }[][]; changed: boolean } {
+  const slots: { x: number; y: number }[][] = [];
+  const EPS = 0.02;
+  for (const poly of polys) {
+    const n = poly.length;
+    if (n < 3) continue;
+    const ccw = ringArea2(poly) > 0; // 外环 CCW；内环 CW
+    for (let i = 0; i < n; i++) {
+      const a = poly[i]!;
+      const b = poly[(i + 1) % n]!;
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len <= 1e-6 || len >= minFeature) continue;
+      const prev = poly[(i - 1 + n) % n]!;
+      const next = poly[(i + 2) % n]!;
+      // 垂边（相邻边）：取较短者作为槽长 → 槽停在最近的垂边处，不越界
+      const adjLen = Math.min(Math.hypot(a.x - prev.x, a.y - prev.y), Math.hypot(next.x - b.x, next.y - b.y));
+      if (adjLen <= 1e-6) continue;
+      const ux = (b.x - a.x) / len;
+      const uy = (b.y - a.y) / len;
+      // 材料侧法线：CCW 外环外部在右法线；CW 内环外部在左法线
+      const ox = ccw ? uy : -uy;
+      const oy = ccw ? -ux : ux;
+      const cx = (a.x + b.x) / 2;
+      const cy = (a.y + b.y) / 2;
+      const hw = len / 2;
+      slots.push([
+        { x: cx - ux * hw - ox * EPS, y: cy - uy * hw - oy * EPS },
+        { x: cx + ux * hw - ox * EPS, y: cy + uy * hw - oy * EPS },
+        { x: cx + ux * hw + ox * adjLen, y: cy + uy * hw + oy * adjLen },
+        { x: cx - ux * hw + ox * adjLen, y: cy - uy * hw + oy * adjLen },
+      ]);
+    }
+  }
+  if (slots.length === 0) return { polys, changed: false };
+  // 槽必须保持在 clipMP（本键组包围盒）内，避免开槽贯通到不相交的相邻按键区
+  let use = slots;
+  if (clipMP) {
+    use = [];
+    for (const s of slots) {
+      for (const r of mpToPaths(polygonClipping.intersection(pathToMP(s), clipMP))) {
+        if (r.length >= 3) use.push(r);
+      }
+    }
+    if (use.length === 0) return { polys, changed: false };
+  }
+  return { polys: unionAll([...polys, ...use]), changed: true };
+}
+
+/** 反复短边开槽直至无 <minFeature 短边（或达到迭代上限）。clipBox 限定槽的范围。 */
+function slotShortEdges(
+  polys: { x: number; y: number }[][],
+  minFeature: number,
+  clipBox?: { minX: number; minY: number; maxX: number; maxY: number },
+): { x: number; y: number }[][] {
+  if (minFeature <= 0) return polys;
+  let clipMP: ClipPoly[] | null = null;
+  if (clipBox) {
+    const ring: ClipRing = [
+      [clipBox.minX, clipBox.minY],
+      [clipBox.maxX, clipBox.minY],
+      [clipBox.maxX, clipBox.maxY],
+      [clipBox.minX, clipBox.maxY],
+      [clipBox.minX, clipBox.minY],
+    ];
+    clipMP = [[ring]];
+  }
+  let cur = polys;
+  for (let iter = 0; iter < 8; iter++) {
+    const r = slotShortEdgesOnce(cur, minFeature, clipMP);
+    if (!r.changed) break;
+    cur = r.polys;
+  }
+  return cur;
+}
+
+/** 一组多边形的包围盒 */
+function bboxOf(polys: { x: number; y: number }[][]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of polys) for (const p of poly) {
+    if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** 两组多边形是否有实际重叠（bbox 粗筛 + 精确求交，面积 > 0） */
+function groupsOverlap(a: { x: number; y: number }[][], b: { x: number; y: number }[][]): boolean {
+  const ba = bboxOf(a), bb = bboxOf(b);
+  if (ba.maxX <= bb.minX + 1e-6 || bb.maxX <= ba.minX + 1e-6) return false;
+  if (ba.maxY <= bb.minY + 1e-6 || bb.maxY <= ba.minY + 1e-6) return false;
+  const geoms = [...a.map(pathToMP), ...b.map(pathToMP)];
+  const inter = polygonClipping.intersection(geoms[0]!, ...geoms.slice(1));
+  let area = 0;
+  for (const poly of inter) for (const ring of poly) area += Math.abs(ringArea2(ring.map(([x, y]) => ({ x, y }))));
+  return area > 0.01;
+}
+
+/**
+ * 跨键合并 + 短边开槽清理。
+ * 先把**相互重叠的键**聚成连通分量，分量内合并各键挖孔后开槽；槽体被限制在该分量包围盒内 ——
+ * 因此只会消除「本键与其相交键」之间的 <minFeature 短边，不会贯通到不相交的其他按键区。
+ */
+function cleanMergeComponents(
+  groups: { x: number; y: number }[][][],
   minFeature: number,
 ): { x: number; y: number }[][] {
-  const r = minFeature / 2;
-  if (r <= 0 || holes.length === 0) return holes;
-  const N = 12;
-  const dirs: ClipPoint[] = [];
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2;
-    dirs.push([Math.cos(a) * r, Math.sin(a) * r]);
+  if (groups.length === 0) return [];
+  if (minFeature <= 0) return unionAll(groups.flat());
+  const n = groups.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]!]!; x = parent[x]!; } return x; };
+  const uni = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (groupsOverlap(groups[i]!, groups[j]!)) uni(i, j);
+  const comps = new Map<number, { x: number; y: number }[][]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const c = comps.get(r);
+    if (c) c.push(...groups[i]!); else comps.set(r, [...groups[i]!]);
   }
-  const shift = (mp: ClipPoly[], dx: number, dy: number): ClipPoly[] =>
-    mp.map((poly) => poly.map((ring) => ring.map(([x, y]) => [x + dx, y + dy] as ClipPoint)));
-
-  const base = polygonClipping.union(pathToMP(holes[0]!), ...holes.slice(1).map((h) => pathToMP(h)));
-  // 膨胀
-  const dilParts = [base, ...dirs.map(([dx, dy]) => shift(base, dx!, dy!))];
-  const dilated = polygonClipping.union(dilParts[0]!, ...dilParts.slice(1));
-  // 收缩
-  const eroParts = dirs.map(([dx, dy]) => shift(dilated, -dx!, -dy!));
-  const closed = polygonClipping.intersection(eroParts[0]!, ...eroParts.slice(1));
-  return mpToPaths(closed);
+  const results: { x: number; y: number }[][] = [];
+  const PAD = 0.5;
+  for (const polys of comps.values()) {
+    const merged = unionAll(polys);
+    if (merged.length === 0) continue;
+    const box = bboxOf(merged);
+    results.push(...slotShortEdges(merged, minFeature, { minX: box.minX - PAD, minY: box.minY - PAD, maxX: box.maxX + PAD, maxY: box.maxY + PAD }));
+  }
+  return unionAll(results);
 }
 
 /** 把多边形每个顶点替换为半径 r 的圆角（用折线近似圆弧；凸/凹角均适用） */
@@ -530,6 +654,8 @@ export function generatePlate(
   type KeyInfo = {
     cx: number; cy: number; kw: number; kh: number;
     rx: number; ry: number; rot: number; isTall: boolean;
+    /** 阶梯键 (KLE `l`)，轴孔相对几何中心左移 0.25u */
+    stepped: boolean;
     /** Visual center after KLE layout rotation (mm) */
     visualCx: number; visualCy: number;
   };
@@ -566,7 +692,7 @@ export function generatePlate(
     }
 
     if (!k.d) {
-      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, visualCx, visualCy });
+      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, stepped: !!k.l, visualCx, visualCy });
     }
   }
 
@@ -587,8 +713,9 @@ export function generatePlate(
 
   // Collect all cutouts — boolean union (switch + stab merged into one ring per key)
   const allSwitchHoles: { x: number; y: number }[][] = [];
-  const rawHoles: { x: number; y: number }[][] = [];
-  const compatRawHoles: { x: number; y: number }[][] = [];
+  /** 每个键合并后的挖孔（按键分组，供按「相交键组」清理短边用） */
+  const keyHoleGroups: { x: number; y: number }[][][] = [];
+  const compatKeyGroups: { x: number; y: number }[][][] = [];
   let totalCutLen = 0;
 
   // Regions accumulator: keyinfo-index → bounding polygon coords
@@ -605,6 +732,9 @@ export function generatePlate(
     // Switch cutout
     const swPts = getSwitchPolygon(cfg.switchType, kerfHalf);
     if (swPts.length === 0) continue;
+
+    // 阶梯键 (KLE `l`)：轴孔相对键帽几何中心左移 0.25u（同 builder.swillkb）
+    if (ki.stepped) translatePoints(swPts, -0.25 * U, 0);
 
     if (ki.isTall) rotatePoints(swPts, 90, { x: 0, y: 0 });
     translatePoints(swPts, ki.cx, ki.cy);
@@ -670,12 +800,10 @@ export function generatePlate(
     }
 
     for (const poly of merged) {
-      rawHoles.push(poly);
       totalCutLen += polygonPerimeter(poly);
     }
-    if (options?.compatKeyIndices?.has(keyIndex)) {
-      for (const poly of merged) compatRawHoles.push(poly);
-    }
+    keyHoleGroups.push(merged);
+    if (options?.compatKeyIndices?.has(keyIndex)) compatKeyGroups.push(merged);
 
     // Accumulate region bounding boxes — post-override AABB for hit-testing, plus pre-override for selection indicator
     const acc = regionAccums.get(keyIndex) || {
@@ -699,13 +827,8 @@ export function generatePlate(
     regionAccums.set(keyIndex, acc);
   }
 
-  // 跨键布尔合并：错位重合的轴孔/卫星轴孔应合并为同一挖孔，而非叠加
-  let allMergedHoles = unionAll(rawHoles);
-
-  // 最小特征清理：消除交错产生的 < minFeature 薄肋/碎边（令开孔就地扩大连通）
-  if (options?.minFeature && options.minFeature > 0) {
-    allMergedHoles = removeSmallFeatures(allMergedHoles, options.minFeature);
-  }
+  // 跨键合并 + 短边开槽清理（按「相交键组」进行，槽不越出本键组包围盒）
+  const allMergedHoles = cleanMergeComponents(keyHoleGroups, options?.minFeature ?? 0);
 
   // ── SVG generation ──
   const pad = 5;
@@ -729,7 +852,7 @@ export function generatePlate(
     : allMergedHoles;
 
   // 兼容层：兼容键的挖孔合并后以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
-  const compatMerged = compatRawHoles.length > 0 ? unionAll(compatRawHoles) : [];
+  const compatMerged = cleanMergeComponents(compatKeyGroups, options?.minFeature ?? 0);
   const compatFinal = holeR > 0
     ? compatMerged.map((poly) => filletPolygon(poly, holeR, 4))
     : compatMerged;
