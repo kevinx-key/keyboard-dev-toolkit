@@ -159,7 +159,7 @@ export default function InteractivePCBPreview({
         ? (componentRotations?.mcuRot ?? 0)
         : 0;
 
-  const highlightColor = isStabSelected ? "var(--theme-warning)" : isCompSelected ? "var(--theme-danger)" : "var(--theme-primary)";
+  const highlightColor = isStabSelected ? "var(--theme-warning)" : "var(--theme-primary)";
 
   // ── Matrix overlay: 胶囊徽章尺寸（Tailwind/Flowbite pill-badge 风格）──
   const MATRIX_FONT_SIZE = 2;    // 原 9 → 6 → 再缩 2/3
@@ -324,12 +324,10 @@ export default function InteractivePCBPreview({
         <div style={{
           marginTop: 6, fontSize: 12, color: highlightColor, fontWeight: 500,
           textAlign: "center", padding: "4px 10px",
-          backgroundColor: isCompSelected ? "rgba(var(--theme-danger-rgb), 0.08)"
-            : isStabSelected ? "rgba(var(--theme-warning-rgb), 0.10)"
+          backgroundColor: isStabSelected ? "rgba(var(--theme-warning-rgb), 0.10)"
             : "rgba(var(--theme-primary-rgb), 0.08)",
           borderRadius: "var(--theme-radius-sm)",
-          border: isCompSelected ? "1px solid rgba(var(--theme-danger-rgb), 0.35)"
-            : isStabSelected ? "1px solid rgba(var(--theme-warning-rgb), 0.40)"
+          border: isStabSelected ? "1px solid rgba(var(--theme-warning-rgb), 0.40)"
             : "1px solid rgba(var(--theme-primary-rgb), 0.35)",
         }}>
           <Crosshair size={13} style={{ flexShrink: 0, opacity: 0.8 }} /> {t("pcb.selectedInfo").replace("{{label}}", selectedLabel)}

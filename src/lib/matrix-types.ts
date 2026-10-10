@@ -20,6 +20,8 @@ export interface KLEKey {
   isDecal: boolean;
   /** 物理行序号（从 KLE 数据推断） */
   physicalRow?: number;
+  /** 原始 KeyProps 数组下标（用于把分配结果映射回编辑器键序） */
+  index?: number;
 }
 
 /** 矩阵坐标分配 */

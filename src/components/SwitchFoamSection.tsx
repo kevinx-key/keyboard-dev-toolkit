@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
-import { generateSwitchFoam, DEFAULT_FOAM_THICKNESS } from "../lib/switch-foam-export";
+import { generateSwitchFoam } from "../lib/switch-foam-export";
 import type { SwitchFoamConfig } from "../lib/switch-foam-export";
 import type { PlateResult, PlateRotationOverrides } from "../lib/plate-export";
 import type { KLELayout } from "../lib/kle-types";
@@ -11,10 +11,14 @@ import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
+import type { FoamSettings } from "../lib/editor-settings";
 import InteractivePlatePreview from "./InteractivePlatePreview";
 
 interface SwitchFoamSectionProps {
   layout: KLELayout;
+  /** 轴间棉设置（受控） */
+  config: FoamSettings;
+  setConfig: React.Dispatch<React.SetStateAction<FoamSettings>>;
   /** 旋转方向来自定位板编辑器（轴间棉依托定位板生成，不接受自定义旋转/选中） */
   rotationOverrides: PlateRotationOverrides;
   onStpExportingChange?: (exporting: boolean) => void;
@@ -22,15 +26,16 @@ interface SwitchFoamSectionProps {
 }
 
 export default function SwitchFoamSection({
-  layout, rotationOverrides,
+  layout, config, setConfig, rotationOverrides,
   onStpExportingChange, onStpProgress,
 }: SwitchFoamSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
-  const [fillet, setFillet] = useState(0);
-  const [holeFillet, setHoleFillet] = useState(0);
-  const [minFeature, setMinFeature] = useState(2);
-  const [thickness, setThickness] = useState(DEFAULT_FOAM_THICKNESS);
+  const { fillet, holeFillet, minFeature, thickness } = config;
+  const setFillet = useCallback((v: number) => setConfig((c) => ({ ...c, fillet: v })), [setConfig]);
+  const setHoleFillet = useCallback((v: number) => setConfig((c) => ({ ...c, holeFillet: v })), [setConfig]);
+  const setMinFeature = useCallback((v: number) => setConfig((c) => ({ ...c, minFeature: v })), [setConfig]);
+  const setThickness = useCallback((v: number) => setConfig((c) => ({ ...c, thickness: v })), [setConfig]);
   const [drawn, setDrawn] = useState(false);
 
   const effectiveConfig = useMemo((): SwitchFoamConfig => ({

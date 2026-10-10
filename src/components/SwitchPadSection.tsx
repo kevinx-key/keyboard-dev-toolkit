@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
-import { generateSwitchPad, DEFAULT_PAD_FILLET } from "../lib/switch-pad-export";
+import { generateSwitchPad } from "../lib/switch-pad-export";
 import type { SwitchPadConfig } from "../lib/switch-pad-export";
 import type { PCBConfig, PCBSwitchRotations, PCBStabRotations } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
+import type { PadSettings } from "../lib/editor-settings";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { sanitizeSvg } from "../lib/sanitize";
@@ -20,16 +21,20 @@ interface SwitchPadSectionProps {
   pcbConfig: PCBConfig;
   switchRotations: PCBSwitchRotations;
   stabRotations: PCBStabRotations;
+  /** 轴下垫设置（受控） */
+  config: PadSettings;
+  setConfig: React.Dispatch<React.SetStateAction<PadSettings>>;
   onStpExportingChange?: (exporting: boolean) => void;
   onStpProgress?: (data: StpProgressEvent) => void;
 }
 
 export default function SwitchPadSection({
-  layout, pcbConfig, switchRotations, stabRotations, onStpExportingChange, onStpProgress,
+  layout, pcbConfig, switchRotations, stabRotations, config, setConfig, onStpExportingChange, onStpProgress,
 }: SwitchPadSectionProps) {
   const { t } = useI18n();
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
-  const [outerFillet, setOuterFillet] = useState(DEFAULT_PAD_FILLET);
+  const outerFillet = config.outerFillet;
+  const setOuterFillet = useCallback((v: number) => setConfig((c) => ({ ...c, outerFillet: v })), [setConfig]);
 
   const padResult = useMemo(() => {
     if (layout.keys.length === 0) return null;

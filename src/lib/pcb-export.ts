@@ -17,6 +17,7 @@ import type { KLELayout } from "./kle-types";
 import type { StpExtrudeData, ModelPlacement } from "./stp-export";
 import { getStabOffset } from "./stab-offsets";
 import { rotatePoint, computeLayoutBBoxInUnits } from "./coordinate-system";
+import { TYPEC_ICON, TYPEC_HOLES, MCU_ICON } from "./component-icons";
 import polygonClipping from "polygon-clipping";
 
 // ─── Hole boolean-union helpers (跨键合并重叠钻孔) ────────
@@ -245,48 +246,25 @@ const FOURP_OUTLINE: [number, number][] = [
   [-2.177, -2.520],
 ];
 
-/// MCU 封装外轮廓 (取自 DXF, 9.68×9.68mm, 含四角特征)
-const MCU_OUTLINE: [number, number][] = [
-  [-3.310, 3.440], [-2.063, 3.440], [-0.932, 3.440], [0.069, 3.440],
-  [1.071, 3.440],  [2.072, 4.840],  [3.403, 3.324],  [3.403, 2.069],
-  [3.403, 0.937],  [3.403, -0.064], [3.403, -1.065], [4.840, -2.066],
-  [3.286, -3.415], [2.072, -3.415], [0.940, -3.415], [-0.061, -3.415],
-  [-1.062, -3.415], [-2.063, -4.840], [-3.426, -3.298], [-3.426, -2.066],
-  [-3.426, -0.935], [-3.426, 0.067], [-3.426, 1.068], [-4.840, 2.069],
-  [-3.310, 3.440],
-];
-
-/// TypeC 连接器外轮廓 (取自 DXF 屏蔽壳, 21 点, 含两侧卡扣凹槽)
-const TYPEC_OUTLINE: [number, number][] = [
-  [-4.663, -2.849], [4.663, -2.849], [4.663, -0.940], [4.428, -1.059],
-  [3.931, -1.059],  [3.639, -0.766], [3.639, 0.535],  [3.931, 0.828],
-  [4.428, 0.828],   [4.663, 0.708],  [4.663, 2.849],  [-4.663, 2.849],
-  [-4.663, 0.753],  [-4.470, 0.828], [-4.003, 0.828], [-3.711, 0.535],
-  [-3.711, -0.766], [-4.003, -1.059], [-4.470, -1.059], [-4.663, -0.984],
-  [-4.663, -2.849],
-];
-
-/// TypeC 连接器引脚 (12 个: 4 宽屏蔽/GND + 8 窄信号)
-const TYPEC_PINS: [number, number, number, number][] = [
-  [-3.234, 4.629, 0.673, 1.18],  // 左屏蔽
-  [-2.436, 4.629, 0.673, 1.18],  // 左屏蔽
-  [2.364, 4.629, 0.673, 1.18],   // 右屏蔽
-  [3.162, 4.629, 0.673, 1.18],   // 右屏蔽
-  [1.719, 4.629, 0.390, 1.18],
-  [1.213, 4.629, 0.390, 1.18],
-  [0.714, 4.629, 0.390, 1.18],
-  [0.219, 4.629, 0.390, 1.18],
-  [-0.287, 4.629, 0.390, 1.18],
-  [-0.786, 4.629, 0.390, 1.18],
-  [-1.286, 4.629, 0.390, 1.18],
-  [-1.785, 4.629, 0.390, 1.18],
-];
-
-/// TypeC 螺丝固定孔 (2 个)
-const TYPEC_SCREW_HOLES: [number, number, number][] = [
-  [-2.926, 3.557, 0.322],
-  [2.854, 3.557, 0.322],
-];
+/// 椭圆角圆角矩形 → 多边形 (画稿原始单位, 0.01mm; Y 向下)
+/// 用于 Type-C 4 个「跑道圆」挖孔 (rx/ry 为椭圆角半径)
+function roundedRectPoly(
+  x: number, y: number, w: number, h: number, rx: number, ry: number, seg = 8,
+): [number, number][] {
+  const RX = Math.min(rx, w / 2), RY = Math.min(ry, h / 2);
+  const pts: [number, number][] = [];
+  const arc = (cx: number, cy: number, a0: number, a1: number) => {
+    for (let i = 0; i <= seg; i++) {
+      const a = a0 + (a1 - a0) * (i / seg);
+      pts.push([cx + RX * Math.cos(a), cy + RY * Math.sin(a)]);
+    }
+  };
+  arc(x + w - RX, y + RY, -Math.PI / 2, 0);        // 右上
+  arc(x + w - RX, y + h - RY, 0, Math.PI / 2);     // 右下
+  arc(x + RX, y + h - RY, Math.PI / 2, Math.PI);   // 左下
+  arc(x + RX, y + RY, Math.PI, Math.PI * 1.5);     // 左上
+  return pts;
+}
 
 // ─── Hotswap 轴座挖孔 (据用户 DXF drw0004.dxf) ─────────────
 // 挖孔外形 = 圆角矩形 (键中心相对坐标, SVG Y 向下);
@@ -682,7 +660,7 @@ function expandPCBComponentBoundary(
     if (fpBottom + edge > maxY) maxY = fpBottom + edge;
   }
   if (config.needMCU) {
-    const mcuW = 9.68, mcuH = 9.68;
+    const mcuW = MCU_ICON.viewW * 0.01, mcuH = MCU_ICON.viewH * 0.01;
     const mcuRight = config.mcuX + mcuW;
     const mcuBottom = config.mcuY + mcuH;
     if (config.mcuX - edge < minX) minX = config.mcuX - edge;
@@ -818,12 +796,6 @@ export function generatePCB(
       dxf(10); dxf(px.toFixed(4)); dxf(20); dxf((-py).toFixed(4)); dxf(30); dxf("0.0");
     }
     dxf(0); dxf("SEQEND");
-  }
-  /** Add a line to DXF (viewport coords, Y-down) */
-  function dxfLine(x1: number, y1: number, x2: number, y2: number) {
-    dxf(0); dxf("LINE"); dxf(8); dxf("0");
-    dxf(10); dxf(x1.toFixed(4)); dxf(20); dxf((-y1).toFixed(4)); dxf(30); dxf("0.0");
-    dxf(11); dxf(x2.toFixed(4)); dxf(21); dxf((-y2).toFixed(4)); dxf(31); dxf("0.0");
   }
 
   // ── STP 3D 数据收集器 (绝对 mm，用于 cadrum 挤出) ──
@@ -1116,11 +1088,10 @@ export function generatePCB(
     }
   }
 
-  // Type-C connector outline
+  // Type-C connector (预览图标 + 4 个「跑道圆」真实挖孔)
   if (config.needTypeC) {
-    const tcW = 9.33, tcH = 5.70; // 取自 DXF 全屏蔽壳轮廓
-    const tcTotalH = 8.07; // 含引脚总高
-    const tcCenterW = 8.5; // 位置校准用（保持旧值不偏移模型）
+    const tcW = TYPEC_ICON.viewW * 0.01;   // 9.56 mm
+    const tcH = TYPEC_ICON.viewH * 0.01;   // 7.959 mm
     const tcAbsX = config.typeCX;
     const tcAbsY = config.typeCY;
     const tcVpx = tcAbsX - holeOffX + pad;
@@ -1128,77 +1099,49 @@ export function generatePCB(
     const tcCx = (tcVpx + tcW / 2);
     const tcCy = (tcVpy + tcH / 2);
     const tcRot = config.typeCRot || 0;
+    const SCALE = 0.01; // 画稿单位 → mm
+    const cenX = TYPEC_ICON.viewW / 2;
+    const cenY = TYPEC_ICON.viewH / 2;
+    // 画稿坐标 → 以元件中心为原点的 mm，并绕中心旋转
+    const toCenter = (px: number, py: number) => {
+      const mx = (px - cenX) * SCALE;
+      const my = (py - cenY) * SCALE;
+      return tcRot % 360 !== 0 ? rotatePoint({ x: mx, y: my }, tcRot, { x: 0, y: 0 }) : { x: mx, y: my };
+    };
+    const iconTf = `translate(${tcCx.toFixed(3)} ${tcCy.toFixed(3)}) rotate(${tcRot}) scale(${SCALE}) translate(${(-cenX).toFixed(3)} ${(-cenY).toFixed(3)})`;
 
-    svg += `<g transform="rotate(${tcRot} ${tcCx.toFixed(3)} ${tcCy.toFixed(3)})">`;
-    // 金属屏蔽壳轮廓 (取自 DXF, 21 点含卡扣槽)
-    svg += `<polygon points="${outlinePoints(TYPEC_OUTLINE, tcCx, tcCy)}" fill="#c0c0c0" stroke="#666" stroke-width="0.3"/>`;
-    // 11 根引脚 (2 宽 GND + 9 窄信号)
-    for (const [dx, dy, w, h] of TYPEC_PINS) {
-      const px = tcCx + dx;
-      const py = tcCy + dy;
-      // 引脚在 SVG 中朝向下方 (dy 为正, 在 body 下方)
-      svg += `<rect x="${(px - w/2).toFixed(3)}" y="${(py - h/2).toFixed(3)}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" fill="#888" stroke="#666" stroke-width="0.15"/>`;
+    // 预览：外壳 + 12 引脚 + TYPE-C 文字（仅 SVG，不切割）
+    svg += `<g transform="${iconTf}"><defs>${TYPEC_ICON.defs}</defs>${TYPEC_ICON.markup}</g>`;
+    // 预览：4 个跑道圆画成白孔（压在外壳之上，视觉即挖穿）
+    svg += `<g transform="${iconTf}" fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15">`;
+    for (const [hx, hy, hw, hh, hrx, hry] of TYPEC_HOLES) {
+      svg += `<rect x="${hx}" y="${hy}" width="${hw}" height="${hh}" rx="${hrx}" ry="${hry}"/>`;
     }
-    // 2 个螺丝固定孔
-    for (const [hx, hy, hr] of TYPEC_SCREW_HOLES) {
-      const shCx = tcCx + hx;
-      const shCy = tcCy + hy;
-      svg += `<circle cx="${shCx.toFixed(3)}" cy="${shCy.toFixed(3)}" r="${hr.toFixed(3)}" fill="none" stroke="#666" stroke-width="0.2"/>`;
-    }
-    // Label
-    svg += `<text x="${tcCx.toFixed(3)}" y="${(tcVpy - 0.5).toFixed(3)}" text-anchor="middle" font-size="3" fill="#888" font-family="sans-serif">Type-C</text>`;
     svg += `</g>`;
 
-    // ── DXF: Type-C ──
-    {
-      // Body outline (取自 DXF, 21 点含卡扣槽)
-      const bodyCorners: [number, number][] = TYPEC_OUTLINE.map(([dx, dy]) => [tcCx + dx, tcCy + dy]);
-      const bodyPts = tcRot % 360 !== 0
-        ? bodyCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, tcRot, { x: tcCx, y: tcCy }); return [r.x, r.y] as [number, number]; })
-        : bodyCorners;
-      dxfPolygon(bodyPts);
-      // 11 pins
-      for (const [dx, dy, w, h] of TYPEC_PINS) {
-        const px = tcCx + dx - w/2;
-        const py = tcCy + dy - h/2;
-        const pinCorners: [number, number][] = [
-          [px, py], [px + w, py], [px + w, py + h], [px, py + h],
-        ];
-        const pinPts = tcRot % 360 !== 0
-          ? pinCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, tcRot, { x: tcCx, y: tcCy }); return [r.x, r.y] as [number, number]; })
-          : pinCorners;
-        dxfPolygon(pinPts);
-      }
-      // 2 screw holes as 16-segment polygons
-      for (const [hx, hy, hr] of TYPEC_SCREW_HOLES) {
-        const shCx = tcCx + hx;
-        const shCy = tcCy + hy;
-        const segs = 16;
-        const holeCorners: [number, number][] = [];
-        for (let s = 0; s < segs; s++) {
-          const a = (s / segs) * Math.PI * 2;
-          holeCorners.push([shCx + Math.cos(a) * hr, shCy + Math.sin(a) * hr]);
-        }
-        const holePts = tcRot % 360 !== 0
-          ? holeCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, tcRot, { x: tcCx, y: tcCy }); return [r.x, r.y] as [number, number]; })
-          : holeCorners;
-        dxfPolygon(holePts);
-      }
+    // 4 跑道圆 → DXF 切割 + STP 挖孔（Type-C 唯一的真实制造几何）
+    for (const [hx, hy, hw, hh, hrx, hry] of TYPEC_HOLES) {
+      const poly = roundedRectPoly(hx, hy, hw, hh, hrx, hry).map(([px, py]) => {
+        const r = toCenter(px, py);
+        return [tcCx + r.x, tcCy + r.y] as [number, number]; // viewport 坐标
+      });
+      dxfPolygon(poly);
+      stpPolyHoles.push(poly.map(([x, y]) => [x + holeOffX - pad, -(y + holeOffY - pad)] as [number, number]));
     }
 
     componentRegions.push({
       id: "type-c",
       type: "typec",
-      x: tcVpx, y: tcVpy, w: tcW, h: tcTotalH,
+      x: tcVpx, y: tcVpy, w: tcW, h: tcH,
       absX: tcAbsX, absY: tcAbsY,
     });
 
     modelPlacements.push({
       type: "typec",
-      x: tcAbsX + tcCenterW / 2,
-      y: -tcAbsY - 5.5 / 2, // 保持校准用旧 tcH=5.5
+      x: tcAbsX + 8.5 / 2,     // 保持旧值：3D 摆放不变
+      y: -tcAbsY - 5.5 / 2,    // 保持旧值
       rotation: -tcRot, // 取反: SVG=CW, cadrum 翻转后=CCW
-      zOffset: 0, // TODO: adjust after measuring model height
+      zOffset: 0,
       flip: true, // flipped so pins point up toward PCB
     });
   }
@@ -1217,7 +1160,8 @@ export function generatePCB(
     svg += `<g transform="rotate(${fpRot} ${fpCx.toFixed(3)} ${fpCy.toFixed(3)})">`;
     // D 形外轮廓 (取自 DXF)
     svg += `<polygon points="${outlinePoints(FOURP_OUTLINE, fpCx, fpCy)}" fill="#d4d4d4" stroke="#666" stroke-width="0.3"/>`;
-    svg += `<text x="${fpCx.toFixed(3)}" y="${(fpVpy - 1).toFixed(3)}" text-anchor="middle" font-size="3" fill="#888" font-family="sans-serif">4P</text>`;
+    // 4P 文字：叠印在图标中心，随图标一起旋转（在旋转组内）
+    svg += `<text x="${fpCx.toFixed(3)}" y="${fpCy.toFixed(3)}" text-anchor="middle" dominant-baseline="central" font-size="3" fill="#888" font-family="sans-serif">4P</text>`;
     svg += `</g>`;
 
     // ── DXF: 4P ──
@@ -1246,10 +1190,10 @@ export function generatePCB(
     });
   }
 
-  // MCU outline
+  // MCU (预览图标，不切割)
   if (config.needMCU) {
-    const mcuW = 9.68, mcuH = 9.68; // 取自 DXF
-    const mcuHalfW = mcuW / 2;
+    const mcuW = MCU_ICON.viewW * 0.01;   // 9.33 mm
+    const mcuH = MCU_ICON.viewH * 0.01;   // 9.33 mm
     const mcuAbsX = config.mcuX;
     const mcuAbsY = config.mcuY;
     const mcuVpx = mcuAbsX - holeOffX + pad;
@@ -1257,109 +1201,13 @@ export function generatePCB(
     const mcuCx = (mcuVpx + mcuW / 2);
     const mcuCy = (mcuVpy + mcuH / 2);
     const mcuRot = config.mcuRot || 0;
+    const SCALE = 0.01;
+    const cenX = MCU_ICON.viewW / 2;
+    const cenY = MCU_ICON.viewH / 2;
+    const iconTf = `translate(${mcuCx.toFixed(3)} ${mcuCy.toFixed(3)}) rotate(${mcuRot}) scale(${SCALE}) translate(${(-cenX).toFixed(3)} ${(-cenY).toFixed(3)})`;
 
-    svg += `<g transform="rotate(${mcuRot} ${mcuCx.toFixed(3)} ${mcuCy.toFixed(3)})">`;
-    // 封装外轮廓 (取自 DXF)
-    svg += `<polygon points="${outlinePoints(MCU_OUTLINE, mcuCx, mcuCy)}" fill="#d4e4f5" stroke="#4a7db5" stroke-width="0.3"/>`;
-    // Pin 1 定位标记 (L 形线, 基于 DXF 轮廓)
-    svg += `<line x1="${(mcuCx - mcuHalfW).toFixed(3)}" y1="${(mcuCy - mcuHalfW).toFixed(3)}" x2="${(mcuCx - mcuHalfW + 1).toFixed(3)}" y2="${(mcuCy - mcuHalfW).toFixed(3)}" stroke="#2a5d8f" stroke-width="0.4"/>`;
-    svg += `<line x1="${(mcuCx - mcuHalfW).toFixed(3)}" y1="${(mcuCy - mcuHalfW).toFixed(3)}" x2="${(mcuCx - mcuHalfW).toFixed(3)}" y2="${(mcuCy - mcuHalfW + 1).toFixed(3)}" stroke="#2a5d8f" stroke-width="0.4"/>`;
-    // 引脚焊盘 (每边 6 个)
-    const pinLen = 0.6, pinWid = 0.35;
-    const pinSpan = 8.0, pinPitch = pinSpan / 5;
-    const pinStart = -pinSpan / 2;
-    // 顶部/底部
-    for (let pi = 0; pi < 6; pi++) {
-      const px = mcuCx + pinStart + pi * pinPitch;
-      svg += `<rect x="${(px - pinWid/2).toFixed(3)}" y="${(mcuCy - mcuHalfW - pinLen/2).toFixed(3)}" width="${pinWid.toFixed(3)}" height="${pinLen.toFixed(3)}" fill="#2a5d8f" rx="0.08"/>`;
-      svg += `<rect x="${(px - pinWid/2).toFixed(3)}" y="${(mcuCy + mcuHalfW - pinLen/2).toFixed(3)}" width="${pinWid.toFixed(3)}" height="${pinLen.toFixed(3)}" fill="#2a5d8f" rx="0.08"/>`;
-    }
-    // 左右
-    for (let pi = 0; pi < 6; pi++) {
-      const py = mcuCy + pinStart + pi * pinPitch;
-      svg += `<rect x="${(mcuCx - mcuHalfW - pinLen/2).toFixed(3)}" y="${(py - pinWid/2).toFixed(3)}" width="${pinLen.toFixed(3)}" height="${pinWid.toFixed(3)}" fill="#2a5d8f" rx="0.08"/>`;
-      svg += `<rect x="${(mcuCx + mcuHalfW - pinLen/2).toFixed(3)}" y="${(py - pinWid/2).toFixed(3)}" width="${pinLen.toFixed(3)}" height="${pinWid.toFixed(3)}" fill="#2a5d8f" rx="0.08"/>`;
-    }
-    svg += `<text x="${mcuCx.toFixed(3)}" y="${(mcuCy + 1.0).toFixed(3)}" text-anchor="middle" font-size="2.5" fill="#4a7db5" font-family="sans-serif" font-weight="bold">MCU</text>`;
-    svg += `</g>`;
-
-    // ── DXF: MCU ──
-    {
-      const bodyCorners: [number, number][] = MCU_OUTLINE.map(([dx, dy]) => [mcuCx + dx, mcuCy + dy]);
-      const bodyPts = mcuRot % 360 !== 0
-        ? bodyCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, mcuRot, { x: mcuCx, y: mcuCy }); return [r.x, r.y] as [number, number]; })
-        : bodyCorners;
-      dxfPolygon(bodyPts);
-
-      // Pin1 mark lines
-      {
-        let p1 = { x: mcuCx - mcuHalfW, y: mcuCy - mcuHalfW }, p2 = { x: mcuCx - mcuHalfW + 1, y: mcuCy - mcuHalfW };
-        let q1 = { x: mcuCx - mcuHalfW, y: mcuCy - mcuHalfW }, q2 = { x: mcuCx - mcuHalfW, y: mcuCy - mcuHalfW + 1 };
-        if (mcuRot % 360 !== 0) {
-          p1 = rotatePoint(p1, mcuRot, { x: mcuCx, y: mcuCy });
-          p2 = rotatePoint(p2, mcuRot, { x: mcuCx, y: mcuCy });
-          q1 = rotatePoint(q1, mcuRot, { x: mcuCx, y: mcuCy });
-          q2 = rotatePoint(q2, mcuRot, { x: mcuCx, y: mcuCy });
-        }
-        dxfLine(p1.x, p1.y, p2.x, p2.y);
-        dxfLine(q1.x, q1.y, q2.x, q2.y);
-      }
-
-      // Pin pads: 12 rects (6 top, 6 bottom, 6 left, 6 right — 24 pads)
-      const pinLen = 0.6, pinWid = 0.35;
-      const pinSpan = 8.0, pinPitch = pinSpan / 5;
-      const pinStart = -pinSpan / 2;
-      for (let pi = 0; pi < 6; pi++) {
-        const px = mcuCx + pinStart + pi * pinPitch;
-        // Top edge pad
-        const topCorners: [number, number][] = [
-          [px - pinWid/2, mcuCy - mcuHalfW - pinLen/2],
-          [px + pinWid/2, mcuCy - mcuHalfW - pinLen/2],
-          [px + pinWid/2, mcuCy - mcuHalfW + pinLen/2],
-          [px - pinWid/2, mcuCy - mcuHalfW + pinLen/2],
-        ];
-        const topPts = mcuRot % 360 !== 0
-          ? topCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, mcuRot, { x: mcuCx, y: mcuCy }); return [r.x, r.y] as [number, number]; })
-          : topCorners;
-        dxfPolygon(topPts);
-        // Bottom edge pad
-        const botCorners: [number, number][] = [
-          [px - pinWid/2, mcuCy + mcuHalfW - pinLen/2],
-          [px + pinWid/2, mcuCy + mcuHalfW - pinLen/2],
-          [px + pinWid/2, mcuCy + mcuHalfW + pinLen/2],
-          [px - pinWid/2, mcuCy + mcuHalfW + pinLen/2],
-        ];
-        const botPts = mcuRot % 360 !== 0
-          ? botCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, mcuRot, { x: mcuCx, y: mcuCy }); return [r.x, r.y] as [number, number]; })
-          : botCorners;
-        dxfPolygon(botPts);
-      }
-      for (let pi = 0; pi < 6; pi++) {
-        const py = mcuCy + pinStart + pi * pinPitch;
-        // Left edge pad
-        const leftCorners: [number, number][] = [
-          [mcuCx - mcuHalfW - pinLen/2, py - pinWid/2],
-          [mcuCx - mcuHalfW + pinLen/2, py - pinWid/2],
-          [mcuCx - mcuHalfW + pinLen/2, py + pinWid/2],
-          [mcuCx - mcuHalfW - pinLen/2, py + pinWid/2],
-        ];
-        const leftPts = mcuRot % 360 !== 0
-          ? leftCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, mcuRot, { x: mcuCx, y: mcuCy }); return [r.x, r.y] as [number, number]; })
-          : leftCorners;
-        dxfPolygon(leftPts);
-        // Right edge pad
-        const rightCorners: [number, number][] = [
-          [mcuCx + mcuHalfW - pinLen/2, py - pinWid/2],
-          [mcuCx + mcuHalfW + pinLen/2, py - pinWid/2],
-          [mcuCx + mcuHalfW + pinLen/2, py + pinWid/2],
-          [mcuCx + mcuHalfW - pinLen/2, py + pinWid/2],
-        ];
-        const rightPts = mcuRot % 360 !== 0
-          ? rightCorners.map(([x, y]) => { const r = rotatePoint({ x, y }, mcuRot, { x: mcuCx, y: mcuCy }); return [r.x, r.y] as [number, number]; })
-          : rightCorners;
-        dxfPolygon(rightPts);
-      }
-    }
+    // 预览：芯片体 + 4 边引脚 + Pin1 圆点 + MCU 文字（仅 SVG，不切割）
+    svg += `<g transform="${iconTf}"><defs>${MCU_ICON.defs}</defs>${MCU_ICON.markup}</g>`;
 
     componentRegions.push({
       id: "mcu",
@@ -1370,8 +1218,8 @@ export function generatePCB(
 
     modelPlacements.push({
       type: "mcu",
-      x: mcuAbsX + mcuW / 2,
-      y: -mcuAbsY - mcuH / 2,
+      x: mcuAbsX + 9.68 / 2,   // 保持旧值：3D 摆放不变
+      y: -mcuAbsY - 9.68 / 2,  // 保持旧值
       rotation: -mcuRot, // 取反: SVG=CW, cadrum 翻转后=CCW
       zOffset: 0,
       flip: true, // 顶面底面翻转

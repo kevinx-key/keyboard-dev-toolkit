@@ -23,6 +23,7 @@ import type { ProjectBackupEntry } from "../lib/project-backup-manager";
 import type { KLELayout } from "../lib/kle-types";
 import type { PlateRotationOverrides } from "../lib/plate-export";
 import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb-export";
+import type { PlateSettings, FoamSettings, PadSettings, BottomFoamSettings } from "../lib/editor-settings";
 import { useI18n } from "../lib/i18n";
 
 // ─── Params ───────────────────────────────────────────────
@@ -40,36 +41,29 @@ export interface UseProjectPersistenceParams {
   stabRotations: PCBStabRotations;
   /** PCB component config */
   pcbConfig: PCBConfig;
+  /** 定位板编辑器配置 */
+  plateConfig: PlateSettings;
+  /** 轴间棉配置 */
+  foamConfig: FoamSettings;
+  /** 轴下垫配置 */
+  padConfig: PadSettings;
+  /** 底棉配置 */
+  bottomFoamConfig: BottomFoamSettings;
   /** Setters for restoring from project file */
   setPlateRotations: (value: PlateRotationOverrides) => void;
   setSwitchRotations: (value: PCBSwitchRotations) => void;
   setStabRotations: (value: PCBStabRotations) => void;
   setPcbConfig: React.Dispatch<React.SetStateAction<PCBConfig>>;
+  setPlateConfig: React.Dispatch<React.SetStateAction<PlateSettings>>;
+  setFoamConfig: React.Dispatch<React.SetStateAction<FoamSettings>>;
+  setPadConfig: React.Dispatch<React.SetStateAction<PadSettings>>;
+  setBottomFoamConfig: React.Dispatch<React.SetStateAction<BottomFoamSettings>>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────
 
-/** Restore PCB config fields from a parsed project file output */
-function applyProjectPcbConfig(
-  setPcbConfig: React.Dispatch<React.SetStateAction<PCBConfig>>,
-  parsed: ProjectFileOutput
-) {
-  setPcbConfig((prev) => ({
-    ...prev,
-    needTypeC: parsed.needTypeC,
-    need4P: parsed.need4P,
-    needMCU: parsed.needMCU,
-    typeCX: parsed.typeCX,
-    typeCY: parsed.typeCY,
-    fourPX: parsed.fourPX,
-    fourPY: parsed.fourPY,
-    mcuX: parsed.mcuX,
-    mcuY: parsed.mcuY,
-    typeCRot: parsed.typeCRot,
-    fourPRot: parsed.fourPRot,
-    mcuRot: parsed.mcuRot,
-  }));
-}
+/** localStorage key for the editor sidecar (rotations + all per-editor config) */
+const SIDECAR_LS_KEY = "custom-key-pcb-tool-sidecar-v1";
 
 /** Extract the decal (if any) from a layout's meta as a project-file decal. */
 function decalFromMeta(meta: KLELayout["meta"]): ProjectFileDecal | null {
@@ -119,10 +113,18 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     switchRotations,
     stabRotations,
     pcbConfig,
+    plateConfig,
+    foamConfig,
+    padConfig,
+    bottomFoamConfig,
     setPlateRotations,
     setSwitchRotations,
     setStabRotations,
     setPcbConfig,
+    setPlateConfig,
+    setFoamConfig,
+    setPadConfig,
+    setBottomFoamConfig,
   } = params;
 
   const { t } = useI18n();
@@ -137,8 +139,8 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
-  const configRef = useRef({ plateRotations, switchRotations, stabRotations, pcbConfig });
-  configRef.current = { plateRotations, switchRotations, stabRotations, pcbConfig };
+  const configRef = useRef({ plateRotations, switchRotations, stabRotations, pcbConfig, plateConfig, foamConfig, padConfig, bottomFoamConfig });
+  configRef.current = { plateRotations, switchRotations, stabRotations, pcbConfig, plateConfig, foamConfig, padConfig, bottomFoamConfig };
 
   // ── On mount: remove startup clear — auto-save already prunes to 3 max,
   // and clearing all backups on every startup destroys cross-session data. ─
@@ -151,25 +153,18 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         const curLayout = layoutRef.current;
         const cfg = configRef.current;
         const rows = getRawRows(curLayout);
-        const pc = cfg.pcbConfig;
         const json = serializeProjectFile({
           name: curLayout.meta.name || "Keyboard",
+          layout: curLayout,
           kLayout: rows,
           plateRotations: cfg.plateRotations,
+          plateConfig: cfg.plateConfig,
           switchRotations: cfg.switchRotations,
           stabRotations: cfg.stabRotations,
-          needTypeC: pc.needTypeC,
-          need4P: pc.need4P,
-          needMCU: pc.needMCU,
-          typeCX: pc.typeCX,
-          typeCY: pc.typeCY,
-          fourPX: pc.fourPX,
-          fourPY: pc.fourPY,
-          mcuX: pc.mcuX,
-          mcuY: pc.mcuY,
-          typeCRot: pc.typeCRot,
-          fourPRot: pc.fourPRot,
-          mcuRot: pc.mcuRot,
+          pcbConfig: cfg.pcbConfig,
+          foamConfig: cfg.foamConfig,
+          padConfig: cfg.padConfig,
+          bottomFoamConfig: cfg.bottomFoamConfig,
           decal: decalFromMeta(curLayout.meta),
         });
         saveProjectBackup(json, curLayout.meta.name || "Keyboard").catch((e) => {
@@ -190,6 +185,42 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     return () => clearInterval(interval);
   }, []);
 
+  // ── Sidecar persistence: keep rotations + ALL per-editor config across refresh ──
+  // (layout itself is auto-saved by useKeyboardEditor; this stores everything else)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIDECAR_LS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw) as Record<string, unknown>;
+      if (s.plateRotations && typeof s.plateRotations === "object") setPlateRotations(s.plateRotations as PlateRotationOverrides);
+      if (s.switchRotations && typeof s.switchRotations === "object") setSwitchRotations(s.switchRotations as PCBSwitchRotations);
+      if (s.stabRotations && typeof s.stabRotations === "object") setStabRotations(s.stabRotations as PCBStabRotations);
+      if (s.pcbConfig) setPcbConfig((prev) => ({ ...prev, ...(s.pcbConfig as Partial<PCBConfig>) }));
+      if (s.plateConfig) setPlateConfig((prev) => ({ ...prev, ...(s.plateConfig as Partial<PlateSettings>) }));
+      if (s.foamConfig) setFoamConfig((prev) => ({ ...prev, ...(s.foamConfig as Partial<FoamSettings>) }));
+      if (s.padConfig) setPadConfig((prev) => ({ ...prev, ...(s.padConfig as Partial<PadSettings>) }));
+      if (s.bottomFoamConfig) setBottomFoamConfig((prev) => ({ ...prev, ...(s.bottomFoamConfig as Partial<BottomFoamSettings>) }));
+    } catch (e) {
+      logger.error("useProjectPersistence: load sidecar failed", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(SIDECAR_LS_KEY, JSON.stringify({
+          plateRotations, switchRotations, stabRotations, pcbConfig,
+          plateConfig, foamConfig, padConfig, bottomFoamConfig,
+        }));
+      } catch (e) {
+        logger.error("useProjectPersistence: save sidecar failed", e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [plateRotations, switchRotations, stabRotations, pcbConfig, plateConfig, foamConfig, padConfig, bottomFoamConfig]);
+
   // ── Save All ────────────────────────────────────────
 
   const handleSaveAll = useCallback(async () => {
@@ -197,22 +228,16 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
       const rows = getRawRows(layout);
       const json = serializeProjectFile({
         name: layout.meta.name || "Keyboard",
+        layout,
         kLayout: rows,
         plateRotations,
+        plateConfig,
         switchRotations,
         stabRotations,
-        needTypeC: pcbConfig.needTypeC,
-        need4P: pcbConfig.need4P,
-        needMCU: pcbConfig.needMCU,
-        typeCX: pcbConfig.typeCX,
-        typeCY: pcbConfig.typeCY,
-        fourPX: pcbConfig.fourPX,
-        fourPY: pcbConfig.fourPY,
-        mcuX: pcbConfig.mcuX,
-        mcuY: pcbConfig.mcuY,
-        typeCRot: pcbConfig.typeCRot,
-        fourPRot: pcbConfig.fourPRot,
-        mcuRot: pcbConfig.mcuRot,
+        pcbConfig,
+        foamConfig,
+        padConfig,
+        bottomFoamConfig,
         decal: decalFromMeta(layout.meta),
       });
       const safeName = (layout.meta.name || "keyboard")
@@ -230,7 +255,20 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
     } catch (err) {
       logger.error("handleSaveAll failed", err);
     }
-  }, [layout, plateRotations, switchRotations, stabRotations, pcbConfig, t]);
+  }, [layout, plateRotations, plateConfig, switchRotations, stabRotations, pcbConfig, foamConfig, padConfig, bottomFoamConfig, t]);
+
+  // ── Restore all editor state from a parsed project file ──
+
+  const applyParsedState = useCallback((parsed: ProjectFileOutput) => {
+    setPlateRotations(parsed.plateRotations);
+    setSwitchRotations(parsed.switchRotations);
+    setStabRotations(parsed.stabRotations);
+    setPcbConfig(parsed.pcbConfig);
+    setPlateConfig(parsed.plateConfig);
+    setFoamConfig(parsed.foamConfig);
+    setPadConfig(parsed.padConfig);
+    setBottomFoamConfig(parsed.bottomFoamConfig);
+  }, [setPlateRotations, setSwitchRotations, setStabRotations, setPcbConfig, setPlateConfig, setFoamConfig, setPadConfig, setBottomFoamConfig]);
 
   // ── Upload All ──────────────────────────────────────
 
@@ -245,15 +283,18 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         return;
       }
 
-      // Restore KLE layout
+      // Restore layout: prefer lossless full layout (v3), else parse KLE rows
       try {
-        const layoutData = parseKLEJSON(parsed.kLayout);
+        const layoutData: KLELayout | null = parsed.layout
+          ? parsed.layout
+          : parseKLEJSON(parsed.kLayout);
         if (layoutData) {
-          // Restore keyboard name from project file meta (getRawRows strips it)
+          // Restore keyboard name from project file meta
           if (parsed.name) {
             layoutData.meta.name = parsed.name;
           }
-          applyDecalToLayout(layoutData, parsed.decal);
+          // Full layout already carries decal in meta; only re-inject for legacy kLayout path
+          if (!parsed.layout) applyDecalToLayout(layoutData, parsed.decal);
           loadLayout(layoutData);
         }
       } catch (e) {
@@ -262,17 +303,12 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         return;
       }
 
-      // Restore rotation overrides
-      setPlateRotations(parsed.plateRotations);
-      setSwitchRotations(parsed.switchRotations);
-      setStabRotations(parsed.stabRotations);
-
-      // Restore PCB config
-      applyProjectPcbConfig(setPcbConfig, parsed);
+      // Restore rotation overrides + ALL per-editor config
+      applyParsedState(parsed);
     } catch (err) {
       logger.error("handleUploadAll failed", err);
     }
-  }, [loadLayout, setPlateRotations, setSwitchRotations, setStabRotations, setPcbConfig, t]);
+  }, [loadLayout, applyParsedState, t]);
 
   // ── Project Backup Dialog ───────────────────────────
 
@@ -294,13 +330,15 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         return;
       }
       try {
-        const layoutData = parseKLEJSON(parsed.kLayout);
+        const layoutData: KLELayout | null = parsed.layout
+          ? parsed.layout
+          : parseKLEJSON(parsed.kLayout);
         if (layoutData) {
-          // Restore keyboard name from project file meta (getRawRows strips it)
+          // Restore keyboard name from project file meta
           if (parsed.name) {
             layoutData.meta.name = parsed.name;
           }
-          applyDecalToLayout(layoutData, parsed.decal);
+          if (!parsed.layout) applyDecalToLayout(layoutData, parsed.decal);
           loadLayout(layoutData);
         }
       } catch (e) {
@@ -312,13 +350,10 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
         alert(t("msg.kleParseFail"));
         return;
       }
-      setPlateRotations(parsed.plateRotations);
-      setSwitchRotations(parsed.switchRotations);
-      setStabRotations(parsed.stabRotations);
-      applyProjectPcbConfig(setPcbConfig, parsed);
+      applyParsedState(parsed);
       setProjectBkDialogOpen(false);
     },
-    [loadLayout, setPlateRotations, setSwitchRotations, setStabRotations, setPcbConfig]
+    [loadLayout, applyParsedState]
   );
 
   return {
