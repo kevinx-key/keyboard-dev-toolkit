@@ -1051,10 +1051,10 @@ function buildDXF(
   }
 
   // Generate rounded rectangle plate outline with fillet
-  const x0 = pad;
-  const y0 = pad;
-  const x1 = pad + plateW;
-  const y1 = pad + plateH;
+  const x0 = originX;
+  const y0 = originY;
+  const x1 = originX + plateW;
+  const y1 = originY + plateH;
   const r = Math.min(filletR || 0, plateW / 2, plateH / 2);
   const ARC_SEGMENTS = 4; // 4 segments per 90° arc for smooth approximation
 

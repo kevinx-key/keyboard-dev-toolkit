@@ -113,10 +113,10 @@ export type CloudKind = "pcb" | "plate" | "pad" | "foam" | "switchfoam";
 /** 各 kind 引擎/契约版本（变更即两仓同步升版）。 */
 export const CLOUD_ENGINES: Record<CloudKind, string> = {
   pcb: "pcb@1",
-  plate: "plate@1",
+  plate: "plate@2",
   pad: "pad@1",
   foam: "foam@1",
-  switchfoam: "switchfoam@1",
+  switchfoam: "switchfoam@2",
 };
 
 export type CloudAnalyzeResult = { ok: true; result: unknown } | { ok: false; code: string };
