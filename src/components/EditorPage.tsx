@@ -14,6 +14,7 @@ import PCBSection from "./PCBSection";
 import SwitchPadSection from "./SwitchPadSection";
 import BottomFoamSection from "./BottomFoamSection";
 import PricingSection from "./PricingSection";
+import AssemblySection from "./AssemblySection";
 import HelpDialog from "./HelpDialog";
 import BackupDialog from "./BackupDialog";
 import ProjectBackupDialog from "./ProjectBackupDialog";
@@ -488,6 +489,21 @@ export default function EditorPage() {
           pcbSize={pcbBounds}
           getProjectJson={getProjectJson}
           plateOrder={plateOrder}
+        />
+
+        {/* ═══ STP 装配图 Section ═══ */}
+        <AssemblySection
+          layout={state.layout}
+          plateConfig={plateConfig}
+          rotationOverrides={projectRotations}
+          pcbConfig={projectPcbConfig}
+          switchRotations={projectSwitchRots}
+          stabRotations={projectStabRots}
+          foamConfig={foamConfig}
+          padConfig={padConfig}
+          bottomFoamConfig={bottomFoamConfig}
+          onStpExportingChange={handleStpExportingChange}
+          onStpProgress={handleStpProgress}
         />
 
         {/* ═══ Footer Actions ═══ */}

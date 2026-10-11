@@ -71,6 +71,35 @@ struct StpExtrudeRequest {
     model_placements: Vec<ModelPlacement>,
 }
 
+/// 装配图导出的单个部件：2D 几何 + 挤出厚度 + 装配平移量 (dx, dy, dz)
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+
+struct AssemblyPart {
+    boundary: Vec<[f64; 2]>,
+
+    #[serde(default)]
+    poly_holes: Vec<Vec<[f64; 2]>>,
+
+    #[serde(default)]
+    circle_holes: Vec<[f64; 3]>,
+
+    /// 挤出厚度 (mm)
+    thickness: f64,
+
+    /// 装配平移量 (mm)：X 右 / Y 上 / Z 垂直于板面 (由前端按 esc 轴心对齐算出)
+    dx: f64,
+
+    dy: f64,
+
+    dz: f64,
+
+    /// 额外 3D 模型放置 (仅 PCB 层携带)
+    #[serde(default)]
+    model_placements: Vec<ModelPlacement>,
+}
+
 // ═══════════════════════════════════════════════════════════════════
 
 // 编译时嵌入的 STEP 模型文件
@@ -156,10 +185,13 @@ const HOTSWAP_OFFSET_Y: f64 = 7.884726;
 const HOTSWAP_Z_OFFSET: f64 = 2.454049;
 
 /// Type-C 模型偏移
+///
+/// X/Y 现由前端 pcb-export.ts 按「凸点质心→跑道圆孔质心」精确反解 placement，
+/// 故此处归零（Z 仍保留实测值）。
 
-const TYPEC_OFFSET_X: f64 = -74.782579;
+const TYPEC_OFFSET_X: f64 = 0.0;
 
-const TYPEC_OFFSET_Y: f64 = 59.295036;
+const TYPEC_OFFSET_Y: f64 = 0.0;
 
 const TYPEC_Z_OFFSET: f64 = -4.8;
 
@@ -734,6 +766,99 @@ fn generate_stp(
 
 // ═══════════════════════════════════════════════════════════════════
 
+// Tauri 命令: generate_assembly_stp
+// 多个部件各自挤出→挖孔→装配嵌入模型→按 (dx,dy,dz) 平移，最后合并写入同一个 STEP 文件。
+// ═══════════════════════════════════════════════════════════════════
+
+#[tauri::command]
+
+fn generate_assembly_stp(
+    app_handle: tauri::AppHandle,
+    parts: Vec<AssemblyPart>,
+    output_path: String,
+) -> Result<String, String> {
+    if parts.is_empty() {
+        return Err("错误: 未选择任何部件。".into());
+    }
+
+    emit_progress(&app_handle, 2, 1, "装配图", "开始装配部件...");
+
+    let total = parts.len();
+
+    let mut all_solids: Vec<Solid> = Vec::new();
+
+    for (i, part) in parts.iter().enumerate() {
+        if part.boundary.len() < 3 {
+            return Err(format!("错误: 部件 #{} 的外边界多边形无效。", i + 1));
+        }
+
+        if part.thickness <= 0.0 || part.thickness > 100.0 {
+            return Err(format!(
+                "错误: 部件 #{} 的厚度必须在 0.1–100 mm 之间，收到 {} mm。",
+                i + 1,
+                part.thickness
+            ));
+        }
+
+        let pct = 2 + (i as u32 * 70) / total.max(1) as u32;
+
+        emit_progress(
+            &app_handle,
+            pct,
+            1,
+            "装配图",
+            &format!("挤出部件 {}/{}", i + 1, total),
+        );
+
+        let mut body = extrude_base_plate(&part.boundary, part.thickness)?;
+
+        cut_holes(
+            &mut body,
+            &part.poly_holes,
+            &part.circle_holes,
+            part.thickness,
+            &app_handle,
+        )?;
+
+        let solids = assemble_models(body, &part.model_placements, &app_handle)?;
+
+        let shift = DVec3::new(part.dx, part.dy, part.dz);
+
+        for solid in solids {
+            all_solids.push(solid.translate(shift));
+        }
+    }
+
+    emit_progress(
+        &app_handle,
+        82,
+        4,
+        "导出STEP",
+        "正在生成 STEP AP203 文件...",
+    );
+
+    let mut buffer: Vec<u8> = Vec::new();
+
+    Solid::write_step(&all_solids, &mut buffer).map_err(|e| format!("STEP 导出失败: {e}"))?;
+
+    emit_progress(
+        &app_handle,
+        92,
+        4,
+        "写入文件",
+        "正在写入文件到磁盘...",
+    );
+
+    std::fs::write(&output_path, &buffer)
+        .map_err(|e| format!("文件写入失败 {output_path}: {e}"))?;
+
+    emit_progress(&app_handle, 100, 4, "完成", "STEP 文件已保存到磁盘。");
+
+    Ok(format!("✅ 装配图导出成功！\n文件: {output_path}"))
+}
+
+// ═══════════════════════════════════════════════════════════════════
+
 // Windows 绿色版（portable）自更新
 
 // ═══════════════════════════════════════════════════════════════════
@@ -914,6 +1039,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             generate_stp,
+            generate_assembly_stp,
             is_portable_install,
             check_portable_update,
             install_portable_update

@@ -20,6 +20,14 @@ import { rotatePoint, computeLayoutBBoxInUnits } from "./coordinate-system";
 import { TYPEC_ICON, TYPEC_HOLES, MCU_ICON } from "./component-icons";
 import polygonClipping from "polygon-clipping";
 
+// ─── Type-C 3D 模型装配常量 ───────────────────────────────
+// 模型为内嵌固定文件 src-tauri/models/type-c-connector-3d.stp；
+// 下列数值由 src-tauri/examples/typec_probe.rs 校准工具实测（mm，模型自身坐标系）。
+/** 模型体积质心 = Rust 端 solid.center()（翻转/旋转中心） */
+const TYPEC_MODEL_CENTER: [number, number] = [75.0026, -61.0803];
+/** 底部 4 个定位凸点的质心 */
+const TYPEC_LEG_CENTROID: [number, number] = [75.0029, -61.2318];
+
 // ─── Hole boolean-union helpers (跨键合并重叠钻孔) ────────
 
 type Pt2 = [number, number];
@@ -169,6 +177,34 @@ export interface PCBComponentRegion {
   absY: number;
 }
 
+/** 干涉预警：一个参与干涉的「碰撞体积」（预览中统一淡蓝高亮） */
+export interface InterferenceMark {
+  /** 体积 id（"socket-N" / "stab-N" / "rgb-N" / "mcu" / "4p" / "type-c"） */
+  id: string;
+  /** 圆形碰撞体积（SVG viewport 坐标） */
+  circles: { cx: number; cy: number; r: number }[];
+  /** 多边形碰撞体积（SVG viewport 坐标） */
+  polys: [number, number][][];
+}
+
+/** 干涉预警结果（纯视觉提示，不影响导出） */
+export interface InterferenceReport {
+  /** 互相干涉的体积对（id 无序） */
+  pairs: [string, string][];
+  /** 所有参与干涉的体积（去重；统一淡蓝高亮） */
+  marks: InterferenceMark[];
+}
+
+/** 内部：一个碰撞体积（hitPolys 用于相交判定；mark 用于高亮渲染；owner=同键体积不互检） */
+interface CollisionVolume {
+  id: string;
+  /** 体积类型，用于排除规则（socket / stab4 / stab6 / rgb / mcu / 4p / typec） */
+  kind: "socket" | "stab4" | "stab6" | "rgb" | "mcu" | "4p" | "typec";
+  owner: number | null;
+  hitPolys: [number, number][][];
+  mark: InterferenceMark;
+}
+
 export interface PCBResult {
   svg: string;
   dxf: string;
@@ -191,6 +227,8 @@ export interface PCBResult {
   stabRegions: PCBPreviewRegion[];
   /** Hit-test regions for Type-C / 4P connector outlines */
   componentRegions: PCBComponentRegion[];
+  /** 碰撞体积干涉预警（viewport 坐标；纯视觉） */
+  interference: InterferenceReport;
 }
 
 // ─── Constants ──────────────────────────────────────────
@@ -289,6 +327,222 @@ function hotswapCutout(r = HOTSWAP_CUT.r, seg = 6): [number, number][] {
   return pts;
 }
 
+// ─── 热插拔轴座碰撞面积（据 docs/hotswap.dxf 实测异形边界） ─────
+// 用途：「轴座干涉预警」——两轴座真实碰撞面积重叠即判干涉。
+// 坐标系：SVG（Y 向下）、相对键轴心（swCx/swCy）、未旋转、非 tall 基准。
+// DXF 实测（docs/hotswap.dxf）：
+//   Ø4mm 圆 = 开关轴心（本轮廓的原点基准）；
+//   2×Ø3mm 圆 = 热插拔孔，相对轴心 (2.54,-5.08) / (-3.81,-2.54)（与 MX 焊盘一致）；
+//   异形外边界 = 轴座真实碰撞面积（bbox 16.50×5.89mm；46 控制点三次样条 → 简化 26 顶点）。
+export const HOTSWAP_OUTLINE: [number, number][] = [
+  [7.616, -3.580],
+  [4.816, -3.580],
+  [4.816, -2.303],
+  [-0.063, -2.302],
+  [-0.615, -2.217],
+  [-1.058, -2.039],
+  [-1.501, -1.735],
+  [-1.862, -1.338],
+  [-2.123, -0.865],
+  [-6.084, -0.865],
+  [-6.084, -1.040],
+  [-8.884, -1.040],
+  [-8.884, -4.040],
+  [-6.084, -4.040],
+  [-6.076, -4.581],
+  [-6.015, -4.955],
+  [-5.860, -5.391],
+  [-5.626, -5.784],
+  [-5.323, -6.123],
+  [-4.961, -6.399],
+  [-4.550, -6.603],
+  [-4.099, -6.724],
+  [4.816, -6.755],
+  [4.816, -6.580],
+  [7.616, -6.580],
+  [7.616, -3.580],
+];
+
+/** 判定干涉的相交面积阈值 (mm²)：略高于浮点噪声，避免共边误报 */
+const INTERFERENCE_AREA_EPS = 0.1;
+
+/** 卫星轴孔体积类型（彼此不互检） */
+const isStabKind = (k: string) => k === "stab4" || k === "stab6";
+
+/** 多边形集合的净面积（Shoelace；凸轴座重叠区域无内孔） */
+function polyArea(mp: ClipPoly[]): number {
+  let total = 0;
+  for (const poly of mp) {
+    for (const ring of poly) {
+      let a = 0;
+      for (let i = 0, n = ring.length; i < n; i++) {
+        const p1 = ring[i]!;
+        const p2 = ring[(i + 1) % n]!;
+        a += p1[0] * p2[1] - p2[0] * p1[1];
+      }
+      total += Math.abs(a) / 2;
+    }
+  }
+  return total;
+}
+
+/** 单个键的热插拔轴座碰撞面积（摆放：相对轴心 swCx/swCy，按 key.rot+(tall?90)+switchRot 旋转，再平移到 viewport） */
+function placeHotswapFootprint(
+  ki: KeyInfo, swRot: number, offX: number, offY: number, pad: number,
+): [number, number][] {
+  const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
+  const rotated = angle % 360 !== 0;
+  return HOTSWAP_OUTLINE.map(([dx, dy]) => {
+    const r = rotated ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
+    return [ki.swCx + r.x - offX + pad, ki.swCy + r.y - offY + pad] as [number, number];
+  });
+}
+
+/** 本地矩形（宽 w 沿 X、高 h 沿 Y，绕中心旋转 rot）→ viewport 多边形 */
+function rectPoly(cx: number, cy: number, w: number, h: number, rot: number): [number, number][] {
+  const hw = w / 2, hh = h / 2;
+  return ([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]] as [number, number][]).map(([dx, dy]) => {
+    const r = rot % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, rot, { x: 0, y: 0 }) : { x: dx, y: dy };
+    return [cx + r.x, cy + r.y] as [number, number];
+  });
+}
+
+/** 一组多边形的总包围盒 */
+function polysBBox(polys: [number, number][][]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of polys) for (const [x, y] of poly) {
+    if (x < minX) minX = x; if (y < minY) minY = y;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** 两组多边形是否存在净面积 > 阈值的重叠 */
+function polysOverlap(a: [number, number][][], b: [number, number][][]): boolean {
+  for (const pa of a) for (const pb of b) {
+    let inter: ClipPoly[];
+    try {
+      inter = polygonClipping.intersection(pathToMP(pa), pathToMP(pb));
+    } catch {
+      continue;
+    }
+    if (polyArea(inter) > INTERFERENCE_AREA_EPS) return true;
+  }
+  return false;
+}
+
+/**
+ * 构建全部碰撞体积（viewport 坐标）。
+ * owner = 所属键原始下标（同一键自身的多个体积不互检）；null = 全局元件（MCU/4P/TypeC）。
+ *  - 热插拔轴座：DXF 真实碰撞面积（仅 solderType=socket）
+ *  - 卫星轴孔：2×3mm 孔 → 4mm 同心圆；2×4mm 孔 → 6mm 同心圆
+ *  - RGB 灯珠：6(X)×3(Y) 矩形（needLed）
+ *  - MCU：10×10 正方形；4P：7×7 正方形；Type-C：9.56×7.959 矩形（按各自旋转）
+ */
+function buildCollisionVolumes(
+  keyInfos: KeyInfo[], config: PCBConfig,
+  switchRotations: PCBSwitchRotations | undefined,
+  stabRotations: PCBStabRotations | undefined,
+  offX: number, offY: number, pad: number,
+): CollisionVolume[] {
+  const vols: CollisionVolume[] = [];
+  const vx = (x: number) => x - offX + pad;
+  const vy = (y: number) => y - offY + pad;
+
+  for (const ki of keyInfos) {
+    const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
+    const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
+
+    // 热插拔轴座
+    if (config.solderType === "socket") {
+      const poly = placeHotswapFootprint(ki, swRot, offX, offY, pad);
+      const id = `socket-${ki.srcIndex}`;
+      vols.push({ id, kind: "socket", owner: ki.srcIndex, hitPolys: [poly], mark: { id, circles: [], polys: [poly] } });
+    }
+
+    // 卫星轴孔（同心放大圆）：3mm 孔 → 4mm 圆（stab4）；4mm 孔 → 6mm 圆（stab6）
+    if (ki.hasStab) {
+      const size = ki.isTall ? ki.kh : ki.kw;
+      const stabOff = getStabOffset(size);
+      if (stabOff !== null) {
+        const build = (defs: [number, number, number][], prefix: string, kind: "stab4" | "stab6") => {
+          const circles: { cx: number; cy: number; r: number }[] = [];
+          const polys: [number, number][][] = [];
+          for (const [bx, by, r0] of defs) {
+            let ox = bx, oy = by;
+            if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
+            if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+            if (stRot) { const r = rotatePoint({ x: ox, y: oy }, stRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+            const cx = vx(ki.visualCx + ox), cy = vy(ki.visualCy + oy);
+            circles.push({ cx, cy, r: r0 });
+            polys.push(circleToPoly(cx, cy, r0));
+          }
+          const id = `${prefix}-${ki.srcIndex}`;
+          vols.push({ id, kind, owner: ki.srcIndex, hitPolys: polys, mark: { id, circles, polys: [] } });
+        };
+        build([[-stabOff, -7.1, 2], [stabOff, -7.1, 2]], "stab4", "stab4");
+        build([[-stabOff, 8.3, 3], [stabOff, 8.3, 3]], "stab6", "stab6");
+      }
+    }
+
+    // RGB 灯珠 6×3（6 沿 X、3 沿 Y）
+    if (config.needLed) {
+      const ledH = 3.5;
+      let ox = 0, oy = 3.35 + ledH / 2;
+      if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
+      if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
+      const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
+      const rect = rectPoly(vx(ki.swCx + ox), vy(ki.swCy + oy), 6, 3, angle);
+      const id = `rgb-${ki.srcIndex}`;
+      vols.push({ id, kind: "rgb", owner: ki.srcIndex, hitPolys: [rect], mark: { id, circles: [], polys: [rect] } });
+    }
+  }
+
+  // 全局元件
+  if (config.needMCU) {
+    const mcuW = MCU_ICON.viewW * 0.01, mcuH = MCU_ICON.viewH * 0.01;
+    const rect = rectPoly(vx(config.mcuX + mcuW / 2), vy(config.mcuY + mcuH / 2), 10, 10, config.mcuRot || 0);
+    vols.push({ id: "mcu", kind: "mcu", owner: null, hitPolys: [rect], mark: { id: "mcu", circles: [], polys: [rect] } });
+  }
+  if (config.need4P) {
+    const fpW = 6.88, fpH = 5.64;
+    const rect = rectPoly(vx(config.fourPX + fpW / 2), vy(config.fourPY + fpH / 2), 7, 7, config.fourPRot || 0);
+    vols.push({ id: "4p", kind: "4p", owner: null, hitPolys: [rect], mark: { id: "4p", circles: [], polys: [rect] } });
+  }
+  if (config.needTypeC) {
+    const tcW = TYPEC_ICON.viewW * 0.01, tcH = TYPEC_ICON.viewH * 0.01;
+    const rect = rectPoly(vx(config.typeCX + tcW / 2), vy(config.typeCY + tcH / 2), tcW, tcH, config.typeCRot || 0);
+    vols.push({ id: "type-c", kind: "typec", owner: null, hitPolys: [rect], mark: { id: "type-c", circles: [], polys: [rect] } });
+  }
+
+  return vols;
+}
+
+/** 干涉检测：所有体积两两互检（AABB 粗筛 + 多边形求交，面积 > 阈值）；跳过同一键自身的体积对 */
+function computeInterference(volumes: CollisionVolume[]): InterferenceReport {
+  const bbox = volumes.map((v) => polysBBox(v.hitPolys));
+  const pairs: [string, string][] = [];
+  const hit = new Set<string>();
+  for (let i = 0; i < volumes.length; i++) {
+    const a = volumes[i]!;
+    for (let j = i + 1; j < volumes.length; j++) {
+      const b = volumes[j]!;
+      if (a.owner !== null && a.owner === b.owner) continue;
+      if (isStabKind(a.kind) && isStabKind(b.kind)) continue;                       // 卫星轴 × 卫星轴 不互检（唯一排除项）
+      const ba = bbox[i]!, bb = bbox[j]!;
+      if (ba.maxX <= bb.minX || bb.maxX <= ba.minX || ba.maxY <= bb.minY || bb.maxY <= ba.minY) continue;
+      if (polysOverlap(a.hitPolys, b.hitPolys)) {
+        pairs.push([a.id, b.id]);
+        hit.add(a.id);
+        hit.add(b.id);
+      }
+    }
+  }
+  const marks = volumes.filter((v) => hit.has(v.id)).map((v) => v.mark);
+  return { pairs, marks };
+}
+
 // ─── 自定义圆角矩形挖孔 (底棉矩形编辑器) ─────────────────
 
 export interface CustomRect {
@@ -331,6 +585,8 @@ interface KeyInfo {
   visualCx: number; visualCy: number;
   /** Switch footprint center (mm)：阶梯键 (l) 相对视觉中心左移 0.25u，其余同 visual */
   swCx: number; swCy: number;
+  /** 该键在 layout.keys 中的原始下标（过滤 decal 后仍指向真实键；全链路统一用它，禁再用过滤后下标当原始下标） */
+  srcIndex: number;
 }
 
 function computePCBKeyPositions(
@@ -341,7 +597,8 @@ function computePCBKeyPositions(
   let holeMinX = Infinity, holeMinY = Infinity, holeMaxX = -Infinity, holeMaxY = -Infinity;
   let stabCount = 0;
 
-  for (const k of keys) {
+  for (let srcIndex = 0; srcIndex < keys.length; srcIndex++) {
+    const k = keys[srcIndex]!;
     if (k.d) continue;
     const kw = k.w || 1;
     const kh = k.h || 1;
@@ -395,7 +652,7 @@ function computePCBKeyPositions(
 
     keyInfos.push({
       cx, cy, kw: actualW, kh: actualH,
-      rot, rx, ry, isTall, hasStab, visualCx, visualCy, swCx, swCy,
+      rot, rx, ry, isTall, hasStab, visualCx, visualCy, swCx, swCy, srcIndex,
     });
   }
 
@@ -489,8 +746,8 @@ export function computeSwitchPadGeometry(
 
   for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
     const ki = keyInfos[keyIndex]!;
-    const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
-    const stRot = stabRotations?.[`stab-${keyIndex}`] || 0;
+    const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
+    const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
     const cStart = circles.length, pStart = polys.length;
 
     for (let i = 0; i < switchOffsets.length; i++) {
@@ -533,7 +790,7 @@ export function computeSwitchPadGeometry(
       }
     }
 
-    if (compatKeyIndices?.has(keyIndex)) {
+    if (compatKeyIndices?.has(ki.srcIndex)) {
       for (let k = cStart; k < circles.length; k++) compatCircles.push(circles[k]!);
       for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
     }
@@ -593,7 +850,7 @@ export function computeBottomFoamGeometry(
     const hotswapHole = hotswapCutout(opts.holeFillet);
     for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
       const ki = keyInfos[keyIndex]!;
-      const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
+      const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
       const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
       const pStart = polys.length;
       const tf = (pts: [number, number][]) => pts.map(([dx, dy]) => {
@@ -617,7 +874,7 @@ export function computeBottomFoamGeometry(
         polys.push(tf([[-ledW / 2, yA], [ledW / 2, yA], [ledW / 2, yB], [-ledW / 2, yB]]));
       }
 
-      if (compatKeyIndices?.has(keyIndex)) {
+      if (compatKeyIndices?.has(ki.srcIndex)) {
         for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
       }
     }
@@ -684,8 +941,8 @@ function buildPCBPreviewRegions(
     const ki = keyInfos[keyIndex];
     if (!ki) continue;
     switchRegions.push({
-      id: `switch-${keyIndex}`,
-      keyIndex,
+      id: `switch-${ki.srcIndex}`,
+      keyIndex: ki.srcIndex,
       type: "switch",
       x: acc.minX, y: acc.minY,
       w: acc.maxX - acc.minX, h: acc.maxY - acc.minY,
@@ -699,8 +956,8 @@ function buildPCBPreviewRegions(
     const ki = keyInfos[keyIndex];
     if (!ki) continue;
     stabRegions.push({
-      id: `stab-${keyIndex}`,
-      keyIndex,
+      id: `stab-${ki.srcIndex}`,
+      keyIndex: ki.srcIndex,
       type: "stab",
       x: acc.minX, y: acc.minY,
       w: acc.maxX - acc.minX, h: acc.maxY - acc.minY,
@@ -722,7 +979,7 @@ export function generatePCB(
   const edge = config.edgeDistance;
 
   if (keys.length === 0) {
-    return { svg: "", dxf: "", width: 0, height: 0, keyCount: 0, stabCount: 0, stpData: null, switchRegions: [], stabRegions: [], componentRegions: [] };
+    return { svg: "", dxf: "", width: 0, height: 0, keyCount: 0, stabCount: 0, stpData: null, switchRegions: [], stabRegions: [], componentRegions: [], interference: { pairs: [], marks: [] } };
   }
 
   // M3: Compute key positions via extracted helper
@@ -832,8 +1089,8 @@ export function generatePCB(
   // Draw holes for each key
   for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
     const ki = keyInfos[keyIndex]!;
-    const swRot = switchRotations?.[`switch-${keyIndex}`] || 0;
-    const stRot = stabRotations?.[`stab-${keyIndex}`] || 0;
+    const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
+    const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
 
     // ── Switch holes ──
     const holes: { ox: number; oy: number; r: number }[] = [];
@@ -871,7 +1128,7 @@ export function generatePCB(
 
       // 收集（延后统一布尔输出）
       holeShapes.push({ cx: absX, cy: absY, r: h.r, sX: ki.swCx + ox, sY: -(ki.swCy + oy) });
-      if (compatKeyIndices?.has(keyIndex)) {
+      if (compatKeyIndices?.has(ki.srcIndex)) {
         compatHoleShapes.push({ cx: absX, cy: absY, r: h.r, sX: 0, sY: 0 });
       }
 
@@ -895,7 +1152,7 @@ export function generatePCB(
       const ledAngle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
       const needLedRot = ledAngle && ledAngle % 360 !== 0;
 
-      if (compatKeyIndices?.has(keyIndex)) {
+      if (compatKeyIndices?.has(ki.srcIndex)) {
         compatLedRects.push({ x: absX, y: absY, w: ledW, h: ledH, angle: ledAngle });
       }
 
@@ -980,7 +1237,7 @@ export function generatePCB(
           const absY = ki.visualCy + oy - holeOffY + pad;
           const r = stabRadii[si]!;
           holeShapes.push({ cx: absX, cy: absY, r, sX: ki.visualCx + ox, sY: -(ki.visualCy + oy) });
-          if (compatKeyIndices?.has(keyIndex)) {
+          if (compatKeyIndices?.has(ki.srcIndex)) {
             compatHoleShapes.push({ cx: absX, cy: absY, r, sX: 0, sY: 0 });
           }
 
@@ -1068,7 +1325,7 @@ export function generatePCB(
       type: "t4",
       x: ki.visualCx,
       y: -ki.visualCy,
-      rotation: ki.rot + (ki.isTall ? 90 : 0) + (switchRotations?.[`switch-${keyIndex}`] || 0),
+      rotation: ki.rot + (ki.isTall ? 90 : 0) + (switchRotations?.[`switch-${ki.srcIndex}`] || 0),
       zOffset: 0,
     });
   }
@@ -1082,7 +1339,7 @@ export function generatePCB(
         type: "hotswap",
         x: ki.visualCx,
         y: -ki.visualCy,
-        rotation: ki.rot + (ki.isTall ? 90 : 0) + (switchRotations?.[`switch-${keyIndex}`] || 0),
+        rotation: ki.rot + (ki.isTall ? 90 : 0) + (switchRotations?.[`switch-${ki.srcIndex}`] || 0),
         zOffset: 0, // sits on PCB bottom
       });
     }
@@ -1136,10 +1393,29 @@ export function generatePCB(
       absX: tcAbsX, absY: tcAbsY,
     });
 
+    // ── 3D 模型精确装配 ──
+    // 让模型底部 4 个定位凸点的质心落在 4 个「跑道圆」孔的质心上（对任意 tcRot 成立）。
+    // Rust 端仍按 solid.center() 做「翻转 + 绕中心旋转 θ=-tcRot+180」，故此处反解 placement：
+    //   final(凸点质心) = M_θ·(凸点质心−模型质心) + 模型质心 + placement  ==  孔质心
+    // （TYPEC_OFFSET_X/Y 已置 0；若改回非零需同步在下方公式中减去。）
+    let holeCx = 0, holeCy = 0;
+    for (const [hx, hy, hw, hh] of TYPEC_HOLES) { holeCx += hx + hw / 2; holeCy += hy + hh / 2; }
+    holeCx = (holeCx / TYPEC_HOLES.length - cenX) * SCALE;
+    holeCy = (holeCy / TYPEC_HOLES.length - cenY) * SCALE;
+    const rotRad = (tcRot * Math.PI) / 180;
+    const holeCentroidX = tcAbsX + tcW / 2 + (holeCx * Math.cos(rotRad) - holeCy * Math.sin(rotRad));
+    const holeCentroidY = -(tcAbsY + tcH / 2) - (holeCx * Math.sin(rotRad) + holeCy * Math.cos(rotRad));
+
+    const theta = ((-tcRot + 180) * Math.PI) / 180;
+    const lcDx = TYPEC_LEG_CENTROID[0] - TYPEC_MODEL_CENTER[0];
+    const lcDy = TYPEC_LEG_CENTROID[1] - TYPEC_MODEL_CENTER[1];
+    const legRotX = lcDx * Math.cos(theta) + lcDy * Math.sin(theta);
+    const legRotY = lcDx * Math.sin(theta) - lcDy * Math.cos(theta);
+
     modelPlacements.push({
       type: "typec",
-      x: tcAbsX + 8.5 / 2,     // 保持旧值：3D 摆放不变
-      y: -tcAbsY - 5.5 / 2,    // 保持旧值
+      x: holeCentroidX - legRotX - TYPEC_MODEL_CENTER[0],
+      y: holeCentroidY - legRotY - TYPEC_MODEL_CENTER[1],
       rotation: -tcRot, // 取反: SVG=CW, cadrum 翻转后=CCW
       zOffset: 0,
       flip: true, // flipped so pins point up toward PCB
@@ -1250,6 +1526,12 @@ export function generatePCB(
   const { switchRegions, stabRegions } = buildPCBPreviewRegions(
     keyInfos, switchRegionAccums, stabRegionAccums, holeOffX, holeOffY, pad,
   );
+
+  // ── 碰撞体积干涉预警（所有体积两两互检；viewport 坐标，纯视觉，不影响 DXF/STP） ──
+  const interference: InterferenceReport = computeInterference(
+    buildCollisionVolumes(keyInfos, config, switchRotations, stabRotations, holeOffX, holeOffY, pad),
+  );
+
   return {
     svg,
     dxf: dxfLines.join("\r\n"),
@@ -1261,5 +1543,6 @@ export function generatePCB(
     switchRegions,
     stabRegions,
     componentRegions,
+    interference,
   };
 }

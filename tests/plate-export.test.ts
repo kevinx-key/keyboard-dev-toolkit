@@ -341,3 +341,38 @@ describe("enclosed material islands", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// decal 下标映射（region.keyIndex / 旋转覆盖 / compat 均用 layout.keys 原始下标）
+// ═══════════════════════════════════════════════════════════════════
+
+describe("plate — decal 下标映射回归", () => {
+  it("region.id / region.keyIndex 用原始下标；compat 匹配原始下标", () => {
+    const keys = [
+      mkKey({ x: 0, y: 1, d: true }),            // decal，原始下标 0
+      mkKey({ x: 1, y: 0, compat: 1 }),          // 原始下标 1
+      mkKey({ x: 2, y: 0 }),                     // 原始下标 2
+    ];
+    const layout = makeLayout(keys);
+    const r = generatePlate(layout);
+    expect(r.regions.map((x) => x.keyIndex).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(r.regions.map((x) => x.id).sort()).toEqual(["key-1", "key-2"]);
+    // compat 用原始下标：标 1 → 浅灰；标 0（decal，被过滤）→ 无浅灰
+    expect(generatePlate(layout, {}, undefined, { compatKeyIndices: new Set([1]) }).svg).toContain("lightgray");
+    expect(generatePlate(layout, {}, undefined, { compatKeyIndices: new Set([0]) }).svg).not.toContain("lightgray");
+  });
+
+  it("旋转覆盖按原始下标命中（decal 在前不偏移：标 0 无效果，标 1 生效）", () => {
+    const keys = [
+      mkKey({ x: 0, y: 1, d: true }),   // 原始下标 0（decal）
+      mkKey({ x: 1, y: 0, w: 4, h: 1 }), // 原始下标 1（宽键）
+      mkKey({ x: 6, y: 0 }),             // 原始下标 2
+    ];
+    const layout = makeLayout(keys);
+    const base = generatePlate(layout).svg;
+    // 原始下标 0 = decal（无键）→ 旋转覆盖无效，等于基线
+    expect(generatePlate(layout, {}, { 0: 45 }).svg).toBe(base);
+    // 原始下标 1 = 真键 → 生效
+    expect(generatePlate(layout, {}, { 1: 45 }).svg).not.toBe(base);
+  });
+});

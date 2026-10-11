@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import { Crosshair } from "lucide-react";
-import type { PCBPreviewRegion, PCBComponentRegion } from "../lib/pcb-export";
+import type { PCBPreviewRegion, PCBComponentRegion, InterferenceMark } from "../lib/pcb-export";
 import type { KeyProps } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { U_MM } from "../lib/coordinate-system";
@@ -33,6 +33,8 @@ interface InteractivePCBPreviewProps {
   matrixResult?: MatrixResult;
   /** Layout keys for matrix coordinate calculation (required when showMatrix=true) */
   layoutKeys?: KeyProps[];
+  /** 干涉预警：参与干涉的碰撞体积（viewport 坐标）——统一淡蓝高亮 */
+  interferenceMarks?: InterferenceMark[];
 }
 
 // ─── Component ──────────────────────────────────────────
@@ -56,9 +58,12 @@ export default function InteractivePCBPreview({
   showMatrix = false,
   matrixResult,
   layoutKeys,
+  interferenceMarks = [],
 }: InteractivePCBPreviewProps) {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
+  /** 干涉预警高亮样式：淡蓝半透明（内联，避免 CSS 类未生效退回默认黑） */
+  const INTERFERENCE_STYLE: React.CSSProperties = { fill: "rgba(var(--theme-primary-rgb, 33, 150, 243), 0.35)", pointerEvents: "none" };
   const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({ display: "none" });
 
   // SVG 消毒 — 纵深防御
@@ -285,6 +290,19 @@ export default function InteractivePCBPreview({
               strokeDasharray="6,4" rx={2} style={{ pointerEvents: "none" }}
             />
           )}
+
+          {/* 干涉预警：碰撞体积互相重叠 → 统一淡蓝高亮（解除干涉后自动消失） */}
+          {interferenceMarks.map((m) => (
+            <g key={`interference-${m.id}`}>
+              {m.circles.map((c, i) => (
+                <circle key={`c${i}`} cx={c.cx} cy={c.cy} r={c.r} style={INTERFERENCE_STYLE} />
+              ))}
+              {m.polys.map((poly, i) => (
+                <polygon key={`p${i}`} style={INTERFERENCE_STYLE}
+                  points={poly.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ")} />
+              ))}
+            </g>
+          ))}
 
           {matrixLabels.map((ml, i) => {
             const isOrphan = orphanIdxSet.has(i);

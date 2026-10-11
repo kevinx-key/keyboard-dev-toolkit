@@ -710,11 +710,14 @@ export function generatePlate(
     stepped: boolean;
     /** Visual center after KLE layout rotation (mm) */
     visualCx: number; visualCy: number;
+    /** 该键在 layout.keys 中的原始下标（过滤 decal 后仍指向真实键；统一编号空间） */
+    srcIndex: number;
   };
 
   const keyInfos: KeyInfo[] = [];
 
-  for (const k of keys) {
+  for (let srcIndex = 0; srcIndex < keys.length; srcIndex++) {
+    const k = keys[srcIndex]!;
     const kw = k.w, kh = k.h;
     let actualW = kw, actualH = kh;
     let cx = (k.x + kw / 2) * U;
@@ -744,7 +747,7 @@ export function generatePlate(
     }
 
     if (!k.d) {
-      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, stepped: !!k.l, visualCx, visualCy });
+      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, stepped: !!k.l, visualCx, visualCy, srcIndex });
     }
   }
 
@@ -844,7 +847,7 @@ export function generatePlate(
     }
 
     // 用户覆盖旋转：在 KLE 变换之后，但固定绕 ki.visualCx/ki.visualCy（KLE 旋转后的视觉中心）
-    const rotAngle = rotationOverrides?.[keyIndex];
+    const rotAngle = rotationOverrides?.[ki.srcIndex];
     if (rotAngle && rotAngle % 360 !== 0) {
       for (const poly of merged) {
         rotatePoints(poly, rotAngle, { x: ki.visualCx, y: ki.visualCy });
@@ -855,7 +858,7 @@ export function generatePlate(
       totalCutLen += polygonPerimeter(poly);
     }
     keyHoleGroups.push(merged);
-    if (options?.compatKeyIndices?.has(keyIndex)) compatKeyGroups.push(merged);
+    if (options?.compatKeyIndices?.has(ki.srcIndex)) compatKeyGroups.push(merged);
 
     // Accumulate region bounding boxes — post-override AABB for hit-testing, plus pre-override for selection indicator
     const acc = regionAccums.get(keyIndex) || {
@@ -958,9 +961,10 @@ export function generatePlate(
   const regions: PreviewRegion[] = [];
   for (const [keyIndex, acc] of regionAccums) {
     if (acc.minX === Infinity) continue;
+    const ki = keyInfos[keyIndex]!;
     regions.push({
-      id: `key-${keyIndex}`,
-      keyIndex,
+      id: `key-${ki.srcIndex}`,
+      keyIndex: ki.srcIndex,
       type: "key",
       x: acc.minX - minX + pad,
       y: acc.minY - minY + pad,

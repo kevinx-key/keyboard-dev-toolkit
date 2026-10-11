@@ -8,7 +8,7 @@ import type { KLELayout } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
-import { exportSTP } from "../lib/stp-export";
+import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import InteractivePCBPreview from "./InteractivePCBPreview";
@@ -63,6 +63,11 @@ const MODEL_LINKS_DEF: { labelKey: string; filename: string | null }[] = [
   { labelKey: "model.switch", filename: "switch.step" },
   { labelKey: "model.stab", filename: "PCB-Stabilizer-Model.stp" },
 ];
+
+// 三维零件模型下载已迁云端（防复制计划 §G-A1a 止血 / §G-C2 STP 轻门控）。
+// 本地静态资产 public/models/* 已下线，改由云端鉴权下载提供；
+// 端点由构建期注入 NEXT_PUBLIC_GEOMETRY_API_BASE（私有仓 keyboardstar-geometry §G-B2）。
+const GEOMETRY_API_BASE = process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "";
 
 export default function PCBSection({
   layout,
@@ -166,7 +171,7 @@ export default function PCBSection({
     if (!result.success && result.message === "cancelled") {
       return;
     }
-    const stpText = result.message === "DESKTOP_REQUIRED" ? t("export.requireDesktop") : result.message;
+    const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
   }, [pcbResult, layout.meta.name, onStpExportingChange, t]);
 
@@ -238,7 +243,14 @@ export default function PCBSection({
     setModelDownloading(prev => ({ ...prev, [modelKey]: true }));
     setModelMsg(null);
     try {
-      const response = await fetch(`/models/${filename}`);
+      // 云端几何服务未配置（§G-B2/G-C2 未就绪）——不回落本地静态资产
+      if (!GEOMETRY_API_BASE) {
+        setModelMsg({ modelKey, ok: false, text: t("export.modelCloudOnly") });
+        return;
+      }
+      const response = await fetch(`${GEOMETRY_API_BASE}/api/v1/models/${filename}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error(t("export.downloadFailed").replace("{{status}}", String(response.status)));
       const blob = await response.blob();
       const path = await saveFile(blob, {
@@ -315,6 +327,7 @@ export default function PCBSection({
   }, [setConfig]);
 
   const keyCount = layout.keys.filter((k) => !k.d).length;
+  const interferenceCount = pcbResult?.interference?.pairs.length ?? 0;
   const selectedPcbKeyInfo = useMemo(() => {
     if (!effSwitchId || !effSwitchId.startsWith("switch-")) return null;
     const idx = parseInt(effSwitchId.replace("switch-", ""), 10);
@@ -654,6 +667,7 @@ export default function PCBSection({
               showMatrix={matrixMode}
               matrixResult={matrixResult ?? undefined}
               layoutKeys={layout.keys}
+              interferenceMarks={pcbResult.interference?.marks ?? []}
             />
 
             {/* Stats */}
@@ -666,6 +680,18 @@ export default function PCBSection({
                   <>{"      "}{t("pcb.matrixLabel")}: {matrixResult.matrixRows}×{matrixResult.matrixCols} | {t("pcb.orphanKeys")}: {orphanCount}</>
                 )}
                 {selectedPcbKeyInfo}{selectedComponentInfo}
+              </span>
+              <span
+                title={t("tip.pcbInterference")}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "2px 8px",
+                  borderRadius: "var(--theme-radius-sm)",
+                  backgroundColor: interferenceCount > 0 ? "var(--theme-danger-soft)" : "var(--theme-success-soft)",
+                  color: interferenceCount > 0 ? "var(--theme-danger)" : "var(--theme-success)",
+                  border: interferenceCount > 0 ? "1px solid var(--theme-danger-border)" : "1px solid var(--theme-success-border)",
+                }}
+              >
+                {t("pcb.interference")}: {interferenceCount}
               </span>
               <div style={{ width: 1, height: 20, backgroundColor: "var(--theme-border-light)" }} />
 

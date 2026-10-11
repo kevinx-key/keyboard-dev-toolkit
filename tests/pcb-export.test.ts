@@ -717,3 +717,135 @@ describe("generatePCB — overlapping keys boolean-merge", () => {
     expect(circles(overlapping.svg)).toBeLessThan(circles(spaced.svg));
   });
 });
+
+// ========================================================================
+// Tests: 热插拔轴座干涉预警（solderType=socket）
+// ========================================================================
+
+describe("generatePCB — 碰撞体积干涉预警", () => {
+  const socketCfg: PCBConfig = { ...defaultConfig, solderType: "socket" };
+  const ids = (r: ReturnType<typeof generatePCB>) => new Set(r.interference.marks.map((m) => m.id));
+
+  it("重叠放置的兼容键 → 检出干涉并返回碰撞体积，且不污染导出 svg", () => {
+    // 2u 常规键（compat=0）与两个 1u 兼容键（compat=1）物理重叠（如同组备选装配）
+    const keys = [
+      mk({ x: 1, y: 0, w: 2, h: 1, compat: 0, compatOption: 0 }),
+      mk({ x: 1, y: 0, w: 1, h: 1, compat: 1, compatOption: 0 }),
+      mk({ x: 2, y: 0, w: 1, h: 1, compat: 1, compatOption: 0 }),
+    ];
+    const r = generatePCB(makeLayout(keys), socketCfg);
+    expect(r.interference.pairs.length).toBeGreaterThanOrEqual(2);
+    expect(r.interference.marks.length).toBeGreaterThanOrEqual(3);
+    for (const m of r.interference.marks) {
+      expect(typeof m.id).toBe("string");
+      expect(m.circles.length + m.polys.length).toBeGreaterThanOrEqual(1);
+    }
+    // 纯视觉预警：高亮不得出现在导出 svg
+    expect(r.svg).not.toContain("pcb-interference");
+  });
+
+  it("普通 1u 相邻键（无卫星轴）→ 无干涉（碰撞面积 < 1u 间距）", () => {
+    const cfg: PCBConfig = { ...socketCfg, needStab: false };
+    const keys = [mk({ x: 0, y: 0 }), mk({ x: 1, y: 0 }), mk({ x: 0, y: 1 }), mk({ x: 1, y: 1 })];
+    const r = generatePCB(makeLayout(keys), cfg);
+    expect(r.interference.pairs).toHaveLength(0);
+    expect(r.interference.marks).toHaveLength(0);
+  });
+
+  it("沉板模式 → 无轴座体积（socket-*）", () => {
+    const r = generatePCB(makeLayout([mk({ x: 0, y: 0, w: 2 })]), { ...defaultConfig, needStab: true });
+    expect([...ids(r)].some((id) => id.startsWith("socket-"))).toBe(false);
+  });
+
+  it("切换键旋转覆盖后仍返回合法干涉结构", () => {
+    const keys = [mk({ x: 1, y: 0, w: 2 }), mk({ x: 1, y: 0, w: 1 })];
+    const r = generatePCB(makeLayout(keys), socketCfg, { "switch-1": 90 });
+    expect(r.interference).toHaveProperty("pairs");
+    expect(r.interference).toHaveProperty("marks");
+  });
+
+  it("MCU（10×10）压在轴座上 → 检出 mcu × socket", () => {
+    const r = generatePCB(makeLayout([mk({ x: 0, y: 0 })]), {
+      ...socketCfg, needMCU: true, mcuX: 4, mcuY: 0, mcuRot: 0,
+    });
+    const s = ids(r);
+    expect(s.has("mcu")).toBe(true);
+    expect(s.has("socket-0")).toBe(true);
+  });
+
+  it("卫星轴孔体积参与互检：MCU 压在卫星轴孔上 → 出 stab* × mcu", () => {
+    // 2u 键轴心 x=19.05；stab6 孔在 x=19.05±11.9=30.95，y=9.525+8.3=17.825
+    // MCU 中心对准该孔：mcuX = 30.95-9.33/2 = 26.285，mcuY = 17.825-9.33/2 = 13.16
+    const r = generatePCB(makeLayout([mk({ x: 0, y: 0, w: 2 })]), {
+      ...socketCfg, needMCU: true, mcuX: 26.285, mcuY: 13.16, mcuRot: 0,
+    });
+    const s = ids(r);
+    expect(s.has("mcu")).toBe(true);
+    expect([...s].some((id) => id.startsWith("stab"))).toBe(true);
+  });
+
+  it("排除规则：仅 卫星轴×卫星轴 不计", () => {
+    // 两个 2u 键纵向紧叠（间距 < 轴座高 & 卫星轴圆直径 → 轴座与卫星轴都会重叠）
+    const r = generatePCB(makeLayout([mk({ x: 0, y: 0, w: 2 }), mk({ x: 0, y: 0.15, w: 2 })]), socketCfg);
+    const pairs = r.interference.pairs;
+    const has = (pa: string, pb: string) =>
+      pairs.some(([a, b]) => (a.startsWith(pa) && b.startsWith(pb)) || (b.startsWith(pa) && a.startsWith(pb)));
+    expect(has("socket", "socket")).toBe(true); // 轴座×轴座 计入
+    expect(has("stab", "stab")).toBe(false);     // 卫星轴×卫星轴 不计（唯一排除项）
+  });
+
+  it("轴座 × 卫星轴孔 现在计入（不再排除）", () => {
+    // K2 的卫星轴 4mm 孔落进 K1（2u@x0,y0）轴座碰撞面积内
+    const keys = [mk({ x: 0, y: 0, w: 2 }), mk({ x: 0.46, y: 0.14, w: 2 })];
+    const r = generatePCB(makeLayout(keys), socketCfg);
+    const has = (pa: string, pb: string) =>
+      r.interference.pairs.some(([a, b]) => (a.startsWith(pa) && b.startsWith(pb)) || (b.startsWith(pa) && a.startsWith(pb)));
+    expect(has("socket", "stab")).toBe(true);
+  });
+});
+
+// ========================================================================
+// Tests: decal 夹中间的下标映射（过滤 decal 后 region/keyIndex/compat 仍用原始下标）
+// ========================================================================
+
+describe("generatePCB — decal 下标映射回归", () => {
+  const socketCfg: PCBConfig = { ...defaultConfig, solderType: "socket" };
+
+  it("region.id / region.keyIndex 使用 layout.keys 原始下标（跳过 decal）", () => {
+    const keys = [
+      mk({ x: 0, y: 1, d: true }), // 装饰键（无轴）——原始下标 0
+      mk({ x: 1, y: 0 }),          // 原始下标 1
+      mk({ x: 2, y: 0 }),          // 原始下标 2
+    ];
+    const r = generatePCB(makeLayout(keys), defaultConfig);
+    expect(r.keyCount).toBe(2);
+    expect(r.switchRegions.map((x) => x.keyIndex).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(r.switchRegions.map((x) => x.id).sort()).toEqual(["switch-1", "switch-2"]);
+  });
+
+  it("compatKeyIndices 匹配 layout.keys 原始下标（decal 在前不误标/不漏标）", () => {
+    const keys = [
+      mk({ x: 0, y: 1, d: true }),                    // decal，原始下标 0
+      mk({ x: 1, y: 0, compat: 1, compatOption: 0 }), // 原始下标 1（应被标灰）
+      mk({ x: 2, y: 0 }),                             // 原始下标 2
+    ];
+    const layout = makeLayout(keys);
+    // 标记原始下标 1（= compat 键）→ 出现浅灰兼容层
+    expect(generatePCB(layout, socketCfg, undefined, undefined, new Set([1])).svg).toContain("lightgray");
+    // 标记原始下标 0（= decal，被过滤）→ 不应有任何浅灰（旧 bug 会把 keyInfos[0] 误标）
+    expect(generatePCB(layout, socketCfg, undefined, undefined, new Set([0])).svg).not.toContain("lightgray");
+  });
+
+  it("干涉轴座 keyIndex 使用原始下标（decal 在前）", () => {
+    const keys = [
+      mk({ x: 0, y: 2, d: true }), // decal，原始下标 0
+      mk({ x: 1, y: 0, w: 2 }),    // 原始下标 1（与下一个重叠）
+      mk({ x: 1, y: 0, w: 1 }),    // 原始下标 2
+    ];
+    const r = generatePCB(makeLayout(keys), socketCfg);
+    const s = new Set(r.interference.marks.map((m) => m.id));
+    expect(s.has("socket-1")).toBe(true);
+    expect(s.has("socket-2")).toBe(true);
+    expect(s.has("socket-0")).toBe(false);
+  });
+});
