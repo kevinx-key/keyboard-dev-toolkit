@@ -1,8 +1,8 @@
 # Keyboard Dev Toolkit
 
-> All-in-one custom keyboard design tool that runs entirely in your browser — draw the layout, generate the plate, generate the PCB, and export the files you need to build it.
+> All-in-one custom keyboard design tool — draw the layout in your browser, generate the plate and PCB, and export the files you need to build it (core features run locally, advanced geometry & STP assembly are computed in the cloud).
 
-**KLE-compatible · 100% client-side · works offline · free & open source**
+**KLE-compatible · core runs locally · advanced features in the cloud · free & open source**
 
 **[▶ Try it in your browser — no install needed](https://kevinx-key.github.io/keyboard-dev-toolkit/)**
 
@@ -14,7 +14,7 @@
 
 ## What is this?
 
-Keyboard Dev Toolkit is a keyboard design tool that runs **entirely in your browser**. Whether you're building a one-off custom keyboard for yourself or prototyping a PCB for mass production, the whole pipeline lives in one place:
+Keyboard Dev Toolkit is a keyboard design tool whose **core runs locally in your browser**; advanced geometry and STP assembly are computed in the cloud. Whether you're building a one-off custom keyboard for yourself or prototyping a PCB for mass production, the pipeline lives in one place:
 
 1. **Draw the layout** — drag-and-drop key placement like KLE, with rotated clusters, stepped/homing/decal keys and more
 2. **Generate the plate** — one-click plate geometry, exported as DXF for CNC / laser cutting
@@ -22,14 +22,14 @@ Keyboard Dev Toolkit is a keyboard design tool that runs **entirely in your brow
 4. **Export 3D models** — production-grade STEP (STP) models of the PCB, the plate and the components on them, ready to import into any 3D software
 5. **AI assistant** — describe your layout in natural language, and the AI designs it for you (supports DeepSeek, OpenAI-compatible APIs)
 
-Everything is computed locally in your browser — no server involved, fully usable offline.
+Core features — KLE parsing, editing, matrix assignment, and simple rectangular PCB / plate generation — are computed locally in your browser and work offline. Advanced geometry and STP assembly are online services (see [Privacy & Data Handling](./docs/隐私与数据处置.md)).
 
 ## Why this tool
 
 | Pain point | How we solve it |
 |-----------|-----------------|
 | KLE only draws layouts — no structural output | Plates and PCBs are generated automatically, turning drawings into manufacturable files |
-| Reluctant to share unreleased designs | Runs 100% locally on your device — no server, fully offline |
+| Reluctant to share unreleased designs | Core editing runs locally on your device; advanced geometry / STP are online, and exactly what is uploaded is disclosed in our privacy notice |
 | High switching costs to new tools | Fully KLE-compatible — import your existing layouts and migrate with zero friction |
 | "Free" tools that are painful to use | Modern UI (Next.js / React): marquee select, drag, zoom/pan, undo/redo, context menus, 9 UI languages |
 | No accurate 3D models for case design | Standard, production-grade, high-precision STEP models of the PCB and its components — no more guessing |
@@ -64,7 +64,7 @@ This matters more than it sounds: many keyboard designers get stuck at exactly t
 - **Custom keyboard enthusiasts** — design your own layout and get a machinable plate
 - **Keyboard makers & indie developers** — from drawing to PCB, one tool
 - **Small studios / startups** — fast prototyping before mass production; change the layout and the PCB follows
-- **AI & automation workflows** — fully client-side, standard JSON data format, scriptable and callable by AI tools
+- **AI & automation workflows** — core client-side, standard JSON data format, scriptable and callable by AI tools
 - **Beginners** — use the AI assistant to design layouts with natural language, no prior keyboard knowledge needed
 
 ## Getting started
@@ -158,7 +158,7 @@ npm start      # serves on http://localhost:3000
 ## Architecture (for AI & developers)
 
 - **Stack**: Next.js 16 / React 19 / TypeScript 5 / Tailwind v4 + Tauri v2 (Rust) desktop shell
-- **100% client-side**: static export, no backend, no server, works offline
+- **Core local, advanced cloud**: KLE editing, matrix assignment and basic plate / PCB are client-side (static export, works offline); advanced geometry and STP assembly call the cloud service at `starthock.com`
 - **Data flow**: `KLE JSON / URL hash(##@@) / localStorage → parseKLE → KeyProps[] → editorReducer (undo/redo) → canvas & generators → multi-format export`
 - **matrix-core**: geometry → matrix assignment engine (with orphan-key detection), shared by the PCB preview and export pipelines
 - **Compatibility**: bidirectional KLE data format — paste KLE JSON or share links directly in/out
@@ -171,10 +171,15 @@ npm start      # serves on http://localhost:3000
 A: Yes. KLE JSON or URL share links import directly — no conversion needed.
 
 **Q: Does the app need an internet connection?**
-A: No. The app runs entirely in your browser on your device — no server involved, fully usable offline.
+A: For core features, yes — they run locally on your device and work offline. Advanced geometry and STP assembly require an internet connection.
 
 **Q: Can the exported files go straight to a fab?**
 A: Yes. The plate DXF is machinable directly, and the PCB design files are ready to send to your PCB manufacturer.
+
+## Privacy & terms
+
+- [Privacy & Data Handling](./docs/隐私与数据处置.md) — what stays local, what is uploaded, and how it is handled.
+- [Cloud Service Terms](./docs/云服务条款.md) — scope, acceptable use, quotas and disclaimers for the online services.
 
 ## Contributing
 
@@ -199,7 +204,7 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 
 ## 中文简介
 
-键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**全程本地运行、可离线使用**。
+键盘配列编辑器（兼容 KLE 数据格式）+ 键盘 PCB / 定位板自动生成工具，**基础能力本地运行、可离线使用；高级几何与 STP 装配为在线服务**（推荐阅读：[隐私与数据处置](./docs/隐私与数据处置.md)、[云服务条款](./docs/云服务条款.md)）。
 
 - 画配列 → 出定位板（DXF 直接加工）→ 生成 PCB（直接交给厂家制造）→ 导出 STEP 3D 模型
 - **AI 助手**：用自然语言描述你想要的配列，AI 自动帮你设计（支持 DeepSeek、OpenAI 兼容接口）

@@ -67,6 +67,7 @@ docs/订单中枢系统计划.md
 docs/防复制架构实施计划.md
 docs/成本护栏设计.md
 docs/资产溯源与合规记录.md
+docs/运维手册-成本护栏.md
 
 # Generated test reports
 playwright-report/
