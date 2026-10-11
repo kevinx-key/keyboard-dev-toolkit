@@ -14,15 +14,18 @@ const API_BASE = (process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$
 /** 云端几何是否启用（构建期决定） */
 export const geometryCloudEnabled = API_BASE.length > 0;
 
-export interface CloudStpInput {
-  boundary: [number, number][];
-  polyHoles?: [number, number][][];
-  circleHoles?: [number, number, number][];
-  modelPlacements?: unknown[];
+/** 单板 STEP 云端入参（S1：快照/参数入，服务端自算 stpData）。 */
+export interface CloudStpRequest {
+  kind: CloudKind;
+  snapshot: unknown;
+  params: Record<string, unknown>;
+  thickness: number;
 }
 
-/** 装配图单个部件（与公开仓 AssemblyPart 对齐，去掉了本地字段） */
-export interface CloudAssemblyPart extends CloudStpInput {
+/** 装配图单个部件描述（S1：kind + 参数 + 落位；snapshot 由调用方共享传入）。 */
+export interface CloudAssemblyPart {
+  kind: CloudKind;
+  params: Record<string, unknown>;
   thickness: number;
   dx: number;
   dy: number;
@@ -86,21 +89,21 @@ async function enqueueAndPoll(
   }
 }
 
-/** 生成单板 STEP（云端）。 */
+/** 生成单板 STEP（云端）：客户端只传快照+参数，服务端自算 stpData（S1，§G-B5）。 */
 export function generateStpCloud(
-  data: CloudStpInput,
-  thickness: number,
+  req: CloudStpRequest,
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
-  return enqueueAndPoll("/api/v1/geometry/stp", { data, thickness }, onProgress);
+  return enqueueAndPoll("/api/v1/geometry/stp", { ...req, engine: CLOUD_ENGINES[req.kind] }, onProgress);
 }
 
-/** 生成装配图 STEP（云端）：逐部件挤出/挖孔 + 平移 + 合并。 */
+/** 生成装配图 STEP（云端）：共享 snapshot + 部件描述，服务端逐部件自算 stpData 再装配。 */
 export function generateAssemblyStpCloud(
+  snapshot: unknown,
   parts: CloudAssemblyPart[],
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
-  return enqueueAndPoll("/api/v1/geometry/assembly", { parts }, onProgress);
+  return enqueueAndPoll("/api/v1/geometry/assembly", { snapshot, parts }, onProgress);
 }
 
 // ── 高级 2D 几何：PCB / 定位板 / 轴下垫 / 底棉 / 轴间棉 云端生成（§G-B3 / M1·M2a）──

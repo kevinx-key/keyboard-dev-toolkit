@@ -3,34 +3,30 @@
  * ==================================================
  *
  * 将多个部件 (定位板 / PCB / 轴间棉 / 轴下垫 / 底棉 …) 各自的 2D 挤出几何
- * 交给 Rust 后端：逐部件挤出 → 挖孔 → 装配嵌入模型 → 按 (dx,dy,dz) 平移，
+ * 交给后端：逐部件挤出 → 挖孔 → 装配嵌入模型 → 按 (dx,dy,dz) 平移，
  * 最后合并写入**同一个** STEP 文件。
+ *
+ * S1（§G-B5）：云端只收「快照 + 部件描述（kind/参数/落位）」，由服务端自算
+ * 各部件 stpData 再装配；本地 `data` 仅供 Tauri 离线回落。
  *
  * 对齐约定 (由调用方 AssemblySection 计算)：
  *   原点 = 定位板 esc 轴孔上顶面中心；
  *   各部件 dx/dy 相同 (esc 轴心对齐)，dz 决定该板在 Z 向的落位。
- *
- * 数据流：
- *   AssemblySection → AssemblyPart[] → Tauri IPC
- *   → Rust cadrum (extrude + boolean + assemble + translate) → STEP 字节写盘
  */
 
-import type { ModelPlacement, StpProgressEvent } from "./stp-export";
+import type { StpExtrudeData, StpProgressEvent } from "./stp-export";
 import { isTauri } from "./stp-export";
 import { geometryCloudEnabled, generateAssemblyStpCloud } from "./geometry-api";
-import type { CloudAssemblyPart } from "./geometry-api";
+import type { CloudAssemblyPart, CloudKind } from "./geometry-api";
 import { saveFile } from "./platform-bridge";
 
-/** 装配图中的一个部件 */
+/** 装配图中的一个部件（S1：kind + 参数 + 落位；snapshot 由调用方共享传入）。 */
 export interface AssemblyPart {
-  /** 外边界多边形，[[x,y], ...]，绝对布局 mm (Y 已取反)，首尾自动闭合 */
-  boundary: [number, number][];
+  /** 几何种类（决定服务端用哪个生成器自算 stpData）。 */
+  kind: CloudKind;
 
-  /** 多边形孔洞 */
-  polyHoles: [number, number][][];
-
-  /** 圆形孔洞: [cx, cy, 半径] */
-  circleHoles: [number, number, number][];
+  /** 生成参数（与 /analyze 同形）。 */
+  params: Record<string, unknown>;
 
   /** 挤出厚度 (mm) */
   thickness: number;
@@ -40,8 +36,8 @@ export interface AssemblyPart {
   dy: number;
   dz: number;
 
-  /** 额外 3D 模型放置 (仅 PCB 层携带) */
-  modelPlacements?: ModelPlacement[];
+  /** 本地 2D 挤出几何（Tauri 离线回落用）。 */
+  data: StpExtrudeData | null;
 }
 
 export interface AssemblyExportResult {
@@ -52,11 +48,13 @@ export interface AssemblyExportResult {
 /**
  * 将多个部件装配成一个 STP 文件并触发下载。
  *
- * @param parts      - 各部件几何 + 厚度 + 平移量
+ * @param snapshot   - 设计快照（KLELayout），各部件共用
+ * @param parts      - 各部件描述 + 落位 + 本地回落几何
  * @param filename   - 下载文件名，例如 "my-keyboard_assembly.stp"
  * @param onProgress - 可选的进度回调
  */
 export async function exportAssemblySTP(
+  snapshot: unknown,
   parts: AssemblyPart[],
   filename: string,
   onProgress?: (evt: StpProgressEvent) => void,
@@ -66,19 +64,17 @@ export async function exportAssemblySTP(
   }
 
   // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
-  // 防复制计划 §G-B9：装配 STP 上云。未配置 → 回落本地桌面版（云端本地双版过渡）。
+  // 防复制计划 §G-B9：装配 STP 上云。S1 起只传快照+部件描述，服务端自算 stpData。
   if (geometryCloudEnabled) {
     const cloudParts: CloudAssemblyPart[] = parts.map((p) => ({
-      boundary: p.boundary,
-      polyHoles: p.polyHoles,
-      circleHoles: p.circleHoles,
+      kind: p.kind,
+      params: p.params,
       thickness: p.thickness,
       dx: p.dx,
       dy: p.dy,
       dz: p.dz,
-      modelPlacements: p.modelPlacements,
     }));
-    const r = await generateAssemblyStpCloud(cloudParts, (phase) =>
+    const r = await generateAssemblyStpCloud(snapshot, cloudParts, (phase) =>
       onProgress?.({
         percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
         phase: 0,
@@ -120,17 +116,20 @@ export async function exportAssemblySTP(
 
   try {
     // 大配列 STEP 可达数十 MB，由 Rust 端直接写盘，仅回传成功消息。
-    const resultMsg: string = await invoke("generate_assembly_stp", {
-      parts: parts.map((p) => ({
-        boundary: p.boundary,
-        polyHoles: p.polyHoles,
-        circleHoles: p.circleHoles,
+    const localParts = parts
+      .filter((p) => p.data)
+      .map((p) => ({
+        boundary: p.data!.boundary,
+        polyHoles: p.data!.polyHoles,
+        circleHoles: p.data!.circleHoles,
         thickness: p.thickness,
         dx: p.dx,
         dy: p.dy,
         dz: p.dz,
-        modelPlacements: p.modelPlacements || [],
-      })),
+        modelPlacements: p.data!.modelPlacements || [],
+      }));
+    const resultMsg: string = await invoke("generate_assembly_stp", {
+      parts: localParts,
       outputPath: filePath,
     });
 

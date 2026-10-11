@@ -20,7 +20,7 @@
  *   → Rust cadrum → STEP 字节 → 浏览器下载
  */
 
-import { geometryCloudEnabled, generateStpCloud } from "./geometry-api";
+import { geometryCloudEnabled, generateStpCloud, type CloudKind } from "./geometry-api";
 import { saveFile } from "./platform-bridge";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -111,31 +111,39 @@ export interface StpProgressEvent {
   message: string;
 }
 
+/** exportSTP 入参：云端只需快照+参数；`data` 仅用于本地桌面（Tauri）回落。 */
+export interface StpExportInput {
+  /** 本地 2D 挤出几何（来自生成器 stpData），Tauri 离线回落用。 */
+  data: StpExtrudeData | null;
+  /** 挤出厚度，mm（定位板 1.5 / PCB 1.6）。 */
+  thickness: number;
+  /** 几何种类（决定云端用哪个生成器自算 stpData）。 */
+  kind: CloudKind;
+  /** 设计快照（KLELayout）。 */
+  snapshot: unknown;
+  /** 生成参数（与 /analyze 同形）。 */
+  params: Record<string, unknown>;
+}
+
 /**
- * 将键盘布局几何数据转换为 3D STP 文件并触发下载。
+ * 将键盘布局几何转为 3D STP 并触发下载。
  *
- * @param data       - 多边形/圆形几何数据 (来自 plate-export 或 pcb-export)
- * @param thickness  - 挤出厚度，单位 mm (定位板 1.5mm, PCB 1.6mm)
+ * @param input      - { data(本地回落), thickness, kind, snapshot, params(云端自算) }
  * @param filename   - 下载文件名，例如 "my-keyboard_plate.stp"
- * @param onProgress - 可选的进度回调 (在 Tauri 模式下接收 Rust 端实时进度)
+ * @param onProgress - 可选进度回调
  */
 export async function exportSTP(
-  data: StpExtrudeData,
-  thickness: number,
+  input: StpExportInput,
   filename: string,
   onProgress?: (evt: StpProgressEvent) => void,
 ): Promise<StpExportResult> {
+  const { data, thickness, kind, snapshot, params } = input;
+
   // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
-  // 防复制计划 §G-B9：STP 上云。未配置 → 回落本地桌面版（云端本地双版过渡）。
+  // 防复制计划 §G-B9：STP 上云。S1 起客户端只传快照+参数，服务端自算 stpData（§G-B5）。
   if (geometryCloudEnabled) {
     const r = await generateStpCloud(
-      {
-        boundary: data.boundary,
-        polyHoles: data.polyHoles,
-        circleHoles: data.circleHoles,
-        modelPlacements: data.modelPlacements,
-      },
-      thickness,
+      { kind, snapshot, params, thickness },
       (phase) =>
         onProgress?.({
           percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
@@ -155,6 +163,9 @@ export async function exportSTP(
   if (!(await isTauri())) {
     // UI 层据此标记用 t("export.requireDesktop") 渲染本地化文案
     return { success: false, message: "DESKTOP_REQUIRED" };
+  }
+  if (!data) {
+    return { success: false, message: "NO_GEOMETRY" };
   }
 
   const { invoke } = await import("@tauri-apps/api/core");

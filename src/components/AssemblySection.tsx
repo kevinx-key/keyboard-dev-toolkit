@@ -156,58 +156,79 @@ export default function AssemblySection({
     // ── 各板 Z 向落位（定位板顶面 = 0） ──
     const pcbTop = -(PLATE_THICKNESS + PLATE_PCB_GAP); // = -5.0
 
+    const compat = Array.from(compatDimIndices);
     const parts: AssemblyPart[] = [];
-    const push = (stpData: StpExtrudeData | null, thickness: number, dz: number) => {
-      if (!stpData) return;
-      parts.push({
-        boundary: stpData.boundary,
-        polyHoles: stpData.polyHoles,
-        circleHoles: stpData.circleHoles,
-        thickness,
-        dx,
-        dy,
-        dz,
-        modelPlacements: stpData.modelPlacements,
-      });
+    const push = (
+      kind: AssemblyPart["kind"],
+      params: Record<string, unknown>,
+      data: StpExtrudeData | null,
+      thickness: number,
+      dz: number,
+    ) => {
+      parts.push({ kind, params, data, thickness, dx, dy, dz });
     };
 
     // 定位板：顶面 = 0 → 局部挤出 0..1.5，平移 -1.5
     if (sel.plate) {
-      const r = generatePlate(layout, buildPlateConfig(plateConfig), rotationOverrides, {
+      const cfg = buildPlateConfig(plateConfig);
+      const r = generatePlate(layout, cfg, rotationOverrides, {
         compatKeyIndices: compatDimIndices,
         holeFillet: plateConfig.holeFillet,
       });
-      push(r.stpData, PLATE_THICKNESS, 0 - PLATE_THICKNESS);
+      push(
+        "plate",
+        { config: cfg, rotationOverrides, holeFillet: plateConfig.holeFillet, compatKeyIndices: compat },
+        r.stpData,
+        PLATE_THICKNESS,
+        0 - PLATE_THICKNESS,
+      );
     }
 
     // PCB 板：顶面 = -5 → 平移 -6.6（连同元件模型）
     if (sel.pcb) {
       const r = generatePCB(layout, pcbConfig, switchRotations, stabRotations, compatDimIndices);
-      push(r.stpData, PCB_THICKNESS, pcbTop - PCB_THICKNESS);
+      push(
+        "pcb",
+        { config: pcbConfig, switchRotations, stabRotations, compatKeyIndices: compat },
+        r.stpData,
+        PCB_THICKNESS,
+        pcbTop - PCB_THICKNESS,
+      );
     }
 
     // 轴下垫：顶面 = pcbTop + 0.1 → 平移 pcbTop
     if (sel.pad) {
-      const r = generateSwitchPad(
-        layout,
-        buildPadConfig(pcbConfig, padConfig),
-        switchRotations,
-        stabRotations,
-        compatDimIndices,
+      const cfg = buildPadConfig(pcbConfig, padConfig);
+      const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations, compatDimIndices);
+      push(
+        "pad",
+        { config: cfg, switchRotations, stabRotations, compatKeyIndices: compat },
+        r.stpData,
+        PAD_THICKNESS,
+        pcbTop,
       );
-      push(r.stpData, PAD_THICKNESS, pcbTop);
     }
 
     // 轴间棉：顶面 = pcbTop + 垫厚 + 棉厚 → 平移 pcbTop + 垫厚
     if (sel.foam) {
-      const r = generateSwitchFoam(layout, buildFoamConfig(foamConfig), rotationOverrides, compatDimIndices);
-      push(r.stpData, foamConfig.thickness, pcbTop + PAD_THICKNESS);
+      const cfg = buildFoamConfig(foamConfig);
+      const r = generateSwitchFoam(layout, cfg, rotationOverrides, compatDimIndices);
+      push(
+        "switchfoam",
+        { config: cfg, rotationOverrides, compatKeyIndices: compat },
+        r.stpData,
+        foamConfig.thickness,
+        pcbTop + PAD_THICKNESS,
+      );
     }
 
     // 底棉：顶面 = PCB 底面 → 平移 (pcbTop - pcb厚) - 底棉厚
     if (sel.bottom) {
-      const r = generateBottomFoam(layout, buildBottomConfig(pcbConfig, bottomFoamConfig), switchRotations, compatDimIndices);
+      const cfg = buildBottomConfig(pcbConfig, bottomFoamConfig);
+      const r = generateBottomFoam(layout, cfg, switchRotations, compatDimIndices);
       push(
+        "foam",
+        { config: cfg, switchRotations, compatKeyIndices: compat },
         r.stpData,
         bottomFoamConfig.thickness,
         pcbTop - PCB_THICKNESS - bottomFoamConfig.thickness,
@@ -224,7 +245,7 @@ export default function AssemblySection({
     onStpExportingChange?.(true);
 
     const name = layout.meta.name || "keyboard";
-    const result = await exportAssemblySTP(parts, `${name}_assembly.stp`, onStpProgress);
+    const result = await exportAssemblySTP(layout, parts, `${name}_assembly.stp`, onStpProgress);
 
     onStpExportingChange?.(false);
     setConverting(false);

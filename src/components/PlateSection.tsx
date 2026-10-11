@@ -104,12 +104,16 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
   }, [setRotationOverrides]);
 
   const handleStpExport = useCallback(async () => {
-    if (!plateResult?.stpData) return;
+    if (!plateResult) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
     const name = layout.meta.name || "keyboard";
-    const result = await exportSTP(plateResult.stpData, 1.5, `${name}_plate.stp`, onStpProgress);
+    const result = await exportSTP(
+      { data: plateResult.stpData, thickness: 1.5, kind: "plate", snapshot: layout, params: plateParams },
+      `${name}_plate.stp`,
+      onStpProgress,
+    );
     onStpExportingChange?.(false);
     setConverting(false);
     // cancelled by user — clear spinner, no message
@@ -118,7 +122,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [plateResult, layout.meta.name, onStpExportingChange, t]);
+  }, [plateResult, plateParams, layout, onStpExportingChange, t]);
 
   const handleSvgExport = useCallback(async () => {
     if (!plateResult?.svg) return;

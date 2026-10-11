@@ -69,18 +69,22 @@ export default function SwitchPadSection({
   const [dxfMsg, setDxfMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleStpExport = useCallback(async () => {
-    if (!padResult?.stpData) return;
+    if (!padResult) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
     const name = layout.meta.name || "keyboard";
-    const result = await exportSTP(padResult.stpData, PAD_THICKNESS, `${name}_switch_pad.stp`, onStpProgress);
+    const result = await exportSTP(
+      { data: padResult.stpData, thickness: PAD_THICKNESS, kind: "pad", snapshot: layout, params: padParams },
+      `${name}_switch_pad.stp`,
+      onStpProgress,
+    );
     onStpExportingChange?.(false);
     setConverting(false);
     if (!result.success && result.message === "cancelled") return;
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [padResult, layout.meta.name, onStpExportingChange, onStpProgress, t]);
+  }, [padResult, padParams, layout, onStpExportingChange, onStpProgress, t]);
 
   const handleSvgExport = useCallback(async () => {
     if (!padResult?.svg) return;

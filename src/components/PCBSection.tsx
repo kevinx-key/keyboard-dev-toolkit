@@ -166,12 +166,16 @@ export default function PCBSection({
   }, [matrixResult]);
 
   const handleStpExport = useCallback(async () => {
-    if (!pcbResult?.stpData) return;
+    if (!pcbResult) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
     const name = layout.meta.name || "keyboard";
-    const result = await exportSTP(pcbResult.stpData, 1.6, `${name}_pcb.stp`, onStpProgress);
+    const result = await exportSTP(
+      { data: pcbResult.stpData, thickness: 1.6, kind: "pcb", snapshot: layout, params: pcbParams },
+      `${name}_pcb.stp`,
+      onStpProgress,
+    );
     onStpExportingChange?.(false);
     setConverting(false);
     // cancelled by user — clear spinner, no message
@@ -180,7 +184,7 @@ export default function PCBSection({
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [pcbResult, layout.meta.name, onStpExportingChange, t]);
+  }, [pcbResult, pcbParams, layout, onStpExportingChange, t]);
 
   const handleSvgExport = useCallback(async () => {
     if (!pcbResult?.svg) return;

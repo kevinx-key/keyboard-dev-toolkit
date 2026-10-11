@@ -74,15 +74,19 @@ export default function SwitchFoamSection({
   }, [layout.keys.length]);
 
   const handleStpExport = useCallback(async () => {
-    if (!foamResult?.stpData) return;
+    if (!foamResult) return;
     setConverting(true); setStpMsg(null); onStpExportingChange?.(true);
     const name = layout.meta.name || "keyboard";
-    const result = await exportSTP(foamResult.stpData, thickness, `${name}_switch_foam.stp`, onStpProgress);
+    const result = await exportSTP(
+      { data: foamResult.stpData, thickness, kind: "switchfoam", snapshot: layout, params: foamParams },
+      `${name}_switch_foam.stp`,
+      onStpProgress,
+    );
     onStpExportingChange?.(false); setConverting(false);
     if (!result.success && result.message === "cancelled") return;
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [foamResult, thickness, layout.meta.name, onStpExportingChange, onStpProgress, t]);
+  }, [foamResult, foamParams, thickness, layout, onStpExportingChange, onStpProgress, t]);
 
   const handleSvgExport = useCallback(async () => {
     if (!foamResult?.svg) return;
