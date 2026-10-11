@@ -5,6 +5,8 @@ import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generateSwitchFoam } from "../lib/switch-foam-export";
 import type { SwitchFoamConfig } from "../lib/switch-foam-export";
 import type { PlateResult, PlateRotationOverrides } from "../lib/plate-export";
+import { useCloudGeometry } from "../lib/use-cloud-geometry";
+import CloudNotice from "./CloudNotice";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
@@ -47,10 +49,25 @@ export default function SwitchFoamSection({
     thickness,
   }), [fillet, holeFillet, minFeature, thickness]);
 
-  const foamResult = useMemo((): PlateResult | null => {
-    if (!drawn || layout.keys.length === 0) return null;
-    return generateSwitchFoam(layout, effectiveConfig, rotationOverrides, compatDimIndices);
-  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices]);
+  const foamParams = useMemo(
+    () => ({
+      config: effectiveConfig,
+      rotationOverrides,
+      compatKeyIndices: Array.from(compatDimIndices),
+    }),
+    [effectiveConfig, rotationOverrides, compatDimIndices],
+  );
+  const {
+    result: foamResult,
+    busy: foamCloudBusy,
+    fallback: foamCloudFallback,
+  } = useCloudGeometry<PlateResult>(
+    "switchfoam",
+    drawn && layout.keys.length > 0,
+    layout,
+    foamParams,
+    () => generateSwitchFoam(layout, effectiveConfig, rotationOverrides, compatDimIndices),
+  );
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -176,6 +193,7 @@ export default function SwitchFoamSection({
               selectedKeyIdx={null}
               rotations={rotationOverrides}
             />
+            <CloudNotice busy={foamCloudBusy} fallback={foamCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{foamResult.width.toFixed(1)} × {foamResult.height.toFixed(1)} mm

@@ -8,8 +8,6 @@
 
 import { logger } from "./error-logger";
 import { getTurnstileToken } from "./turnstile";
-import type { KLELayout } from "./kle-types";
-import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations } from "./pcb-export";
 
 const API_BASE = (process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$/, "");
 
@@ -105,29 +103,34 @@ export function generateAssemblyStpCloud(
   return enqueueAndPoll("/api/v1/geometry/assembly", { parts }, onProgress);
 }
 
-// ── 高级 2D 几何：PCB 整板云端生成（§G-B3 / M1）──────────────────
+// ── 高级 2D 几何：PCB / 定位板 / 轴下垫 / 底棉 / 轴间棉 云端生成（§G-B3 / M1·M2a）──
 // 同步端点（非作业）：POST /api/v1/geometry/analyze → 200 { ok, engine, result }。
-// 迁移后与本地 pcb-export 输出**逐字节等价**（服务端已用黄金用例回归验证）。
+// 各生成器服务端与本地**逐字节等价**（服务端黄金用例回归）。离线/失败由调用方回落本地。
 
-/** 引擎/契约版本；须与服务端 PCB_ENGINE 一致（变更即两仓同步升版）。 */
-export const PCB_ENGINE = "pcb@1";
+/** 云几何种类（须与服务端 `ENGINES` 键一致）。 */
+export type CloudKind = "pcb" | "plate" | "pad" | "foam" | "switchfoam";
 
-export interface CloudPcbParams {
-  config: PCBConfig;
-  switchRotations?: PCBSwitchRotations;
-  stabRotations?: PCBStabRotations;
-  /** Set → number[]（JSON 不可直接序列化 Set） */
-  compatKeyIndices?: number[];
-}
+/** 各 kind 引擎/契约版本（变更即两仓同步升版）。 */
+export const CLOUD_ENGINES: Record<CloudKind, string> = {
+  pcb: "pcb@1",
+  plate: "plate@1",
+  pad: "pad@1",
+  foam: "foam@1",
+  switchfoam: "switchfoam@1",
+};
 
-export type CloudPcbResult = { ok: true; result: PCBResult } | { ok: false; code: string };
+export type CloudAnalyzeResult = { ok: true; result: unknown } | { ok: false; code: string };
 
-/** PCB 整板生成（云端）：返回完整 PCBResult。离线/失败由调用方回落本地。 */
-export async function analyzePcbCloud(
-  snapshot: KLELayout,
-  params: CloudPcbParams,
+/**
+ * 高级 2D 几何生成（云端，同步）。返回对应生成器的 Result 对象。
+ * `params` 须 JSON 可序列化（Set 请先转数组）；`snapshot` = KLELayout。
+ */
+export async function analyzeCloud(
+  kind: CloudKind,
+  snapshot: unknown,
+  params: Record<string, unknown>,
   signal?: AbortSignal,
-): Promise<CloudPcbResult> {
+): Promise<CloudAnalyzeResult> {
   if (!API_BASE) return { ok: false, code: "DISABLED" };
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
@@ -137,14 +140,14 @@ export async function analyzePcbCloud(
       method: "POST",
       headers,
       signal,
-      body: JSON.stringify({ snapshot, params, engine: PCB_ENGINE }),
+      body: JSON.stringify({ kind, snapshot, params, engine: CLOUD_ENGINES[kind] }),
     });
     if (!res.ok) {
       const b = (await res.json().catch(() => null)) as { code?: string } | null;
       return { ok: false, code: b?.code || String(res.status) };
     }
-    const data = (await res.json()) as { ok?: boolean; result?: PCBResult };
-    if (!data?.ok || !data.result) return { ok: false, code: "BAD_RESPONSE" };
+    const data = (await res.json()) as { ok?: boolean; result?: unknown };
+    if (!data?.ok || data.result === undefined) return { ok: false, code: "BAD_RESPONSE" };
     return { ok: true, result: data.result };
   } catch (e) {
     if ((e as { name?: string })?.name === "AbortError") return { ok: false, code: "ABORTED" };

@@ -3,7 +3,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Loader2, Package, FileDown, FileCode2, Plus, Trash2 } from "lucide-react";
 import { generateBottomFoam } from "../lib/bottom-foam-export";
-import type { BottomFoamConfig } from "../lib/bottom-foam-export";
+import type { BottomFoamConfig, BottomFoamResult } from "../lib/bottom-foam-export";
+import { useCloudGeometry } from "../lib/use-cloud-geometry";
+import CloudNotice from "./CloudNotice";
 import type { PCBConfig, PCBSwitchRotations, CustomRect } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import type { BottomFoamSettings } from "../lib/editor-settings";
@@ -61,24 +63,40 @@ export default function BottomFoamSection({
     return { x: (minX + maxX) / 2 * U, y: (minY + maxY) / 2 * U };
   }, [layout.keys]);
 
-  const foamResult = useMemo(() => {
-    if (layout.keys.length === 0 && customRects.length === 0) return null;
-    const cfg: BottomFoamConfig = {
-      solderType: pcbConfig.solderType,
-      needLed: pcbConfig.needLed,
-      needTypeC: pcbConfig.needTypeC, typeCX: pcbConfig.typeCX, typeCY: pcbConfig.typeCY, typeCRot: pcbConfig.typeCRot,
-      need4P: pcbConfig.need4P, fourPX: pcbConfig.fourPX, fourPY: pcbConfig.fourPY, fourPRot: pcbConfig.fourPRot,
-      needMCU: pcbConfig.needMCU, mcuX: pcbConfig.mcuX, mcuY: pcbConfig.mcuY, mcuRot: pcbConfig.mcuRot,
-      edgeDistance: pcbConfig.edgeDistance,
-      holeFillet,
-      outerFillet,
-      minFeature,
-      thinWall,
-      customRects,
-    };
-    const r = generateBottomFoam(layout, cfg, switchRotations, compatDimIndices);
-    return r.svg ? r : null;
-  }, [layout, pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet, minFeature, thinWall]);
+  const foamParams = useMemo(
+    () => ({
+      config: {
+        solderType: pcbConfig.solderType,
+        needLed: pcbConfig.needLed,
+        needTypeC: pcbConfig.needTypeC, typeCX: pcbConfig.typeCX, typeCY: pcbConfig.typeCY, typeCRot: pcbConfig.typeCRot,
+        need4P: pcbConfig.need4P, fourPX: pcbConfig.fourPX, fourPY: pcbConfig.fourPY, fourPRot: pcbConfig.fourPRot,
+        needMCU: pcbConfig.needMCU, mcuX: pcbConfig.mcuX, mcuY: pcbConfig.mcuY, mcuRot: pcbConfig.mcuRot,
+        edgeDistance: pcbConfig.edgeDistance,
+        holeFillet,
+        outerFillet,
+        minFeature,
+        thinWall,
+        customRects,
+      } satisfies BottomFoamConfig,
+      switchRotations,
+      compatKeyIndices: Array.from(compatDimIndices),
+    }),
+    [pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet, minFeature, thinWall],
+  );
+  const {
+    result: foamResult,
+    busy: foamCloudBusy,
+    fallback: foamCloudFallback,
+  } = useCloudGeometry<BottomFoamResult | null>(
+    "foam",
+    layout.keys.length > 0 || customRects.length > 0,
+    layout,
+    foamParams,
+    () => {
+      const r = generateBottomFoam(layout, foamParams.config, switchRotations, compatDimIndices);
+      return r.svg ? r : null;
+    },
+  );
 
   const safeSvg = useMemo(() => (foamResult?.svg ? sanitizeSvg(foamResult.svg) : ""), [foamResult]);
 
@@ -315,6 +333,7 @@ export default function BottomFoamSection({
                 </svg>
               )}
             </div>
+            <CloudNotice busy={foamCloudBusy} fallback={foamCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{foamResult.width.toFixed(1)} × {foamResult.height.toFixed(1)} mm

@@ -3,7 +3,9 @@
 import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generateSwitchPad } from "../lib/switch-pad-export";
-import type { SwitchPadConfig } from "../lib/switch-pad-export";
+import type { SwitchPadConfig, SwitchPadResult } from "../lib/switch-pad-export";
+import { useCloudGeometry } from "../lib/use-cloud-geometry";
+import CloudNotice from "./CloudNotice";
 import type { PCBConfig, PCBSwitchRotations, PCBStabRotations } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import type { PadSettings } from "../lib/editor-settings";
@@ -36,18 +38,35 @@ export default function SwitchPadSection({
   const outerFillet = config.outerFillet;
   const setOuterFillet = useCallback((v: number) => setConfig((c) => ({ ...c, outerFillet: v })), [setConfig]);
 
-  const padResult = useMemo(() => {
-    if (layout.keys.length === 0) return null;
-    const cfg: SwitchPadConfig = {
-      solderType: pcbConfig.solderType,
-      needStab: pcbConfig.needStab,
-      needLed: pcbConfig.needLed,
-      edgeDistance: pcbConfig.edgeDistance,
-      fillet: outerFillet,
-    };
-    const r = generateSwitchPad(layout, cfg, switchRotations, stabRotations, compatDimIndices);
-    return r.svg ? r : null;
-  }, [layout, pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, switchRotations, stabRotations, compatDimIndices, outerFillet]);
+  const padParams = useMemo(
+    () => ({
+      config: {
+        solderType: pcbConfig.solderType,
+        needStab: pcbConfig.needStab,
+        needLed: pcbConfig.needLed,
+        edgeDistance: pcbConfig.edgeDistance,
+        fillet: outerFillet,
+      } satisfies SwitchPadConfig,
+      switchRotations,
+      stabRotations,
+      compatKeyIndices: Array.from(compatDimIndices),
+    }),
+    [pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, outerFillet, switchRotations, stabRotations, compatDimIndices],
+  );
+  const {
+    result: padResult,
+    busy: padCloudBusy,
+    fallback: padCloudFallback,
+  } = useCloudGeometry<SwitchPadResult | null>(
+    "pad",
+    layout.keys.length > 0,
+    layout,
+    padParams,
+    () => {
+      const r = generateSwitchPad(layout, padParams.config, switchRotations, stabRotations, compatDimIndices);
+      return r.svg ? r : null;
+    },
+  );
 
   const safeSvg = useMemo(() => (padResult?.svg ? sanitizeSvg(padResult.svg) : ""), [padResult]);
 
@@ -131,6 +150,7 @@ export default function SwitchPadSection({
         {padResult && safeSvg ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
             <div style={{ maxWidth: "100%", overflow: "hidden" }} dangerouslySetInnerHTML={{ __html: safeSvg }} />
+            <CloudNotice busy={padCloudBusy} fallback={padCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{padResult.width.toFixed(1)} × {padResult.height.toFixed(1)} mm

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePCB } from "../lib/pcb-export";
 import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType } from "../lib/pcb-export";
@@ -12,7 +12,8 @@ import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import { getTurnstileToken } from "../lib/turnstile";
-import { geometryCloudEnabled, analyzePcbCloud } from "../lib/geometry-api";
+import { useCloudGeometry } from "../lib/use-cloud-geometry";
+import CloudNotice from "./CloudNotice";
 import InteractivePCBPreview from "./InteractivePCBPreview";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
@@ -130,72 +131,18 @@ export default function PCBSection({
   const [modelDownloading, setModelDownloading] = useState<Record<string, boolean>>({});
   const [modelMsg, setModelMsg] = useState<{ modelKey: string; ok: boolean; text: string } | null>(null);
 
-  // ── PCB 生成：云端优先（§G-B3 / M1 整板上云）；离线/失败回落本地（#8 双版可用）──
-  const [pcbResult, setPcbResult] = useState<PCBResult | null>(null);
-  const [pcbCloudBusy, setPcbCloudBusy] = useState(false);
-  const [pcbCloudFallback, setPcbCloudFallback] = useState(false);
-
-  // 内容签名：抹平对象引用抖动，避免 effect 循环；仅当内容真变才重算。
-  const analyzeSig = useMemo(
-    () =>
-      JSON.stringify({
-        config,
-        switchRotations,
-        stabRotations,
-        compat: Array.from(compatDimIndices).sort((a, b) => a - b),
-        keys: layout.keys,
-      }),
-    [config, switchRotations, stabRotations, compatDimIndices, layout],
+  // ── PCB 生成：云端优先（§G-B3 / M1·M2a）；离线/失败回落本地（#8 双版可用）──
+  const pcbParams = useMemo(
+    () => ({ config, switchRotations, stabRotations, compatKeyIndices: Array.from(compatDimIndices) }),
+    [config, switchRotations, stabRotations, compatDimIndices],
   );
-  const analyzeInputs = useRef({ layout, config, switchRotations, stabRotations, compatDimIndices });
-  analyzeInputs.current = { layout, config, switchRotations, stabRotations, compatDimIndices };
-  const analyzeSeq = useRef(0);
-
-  useEffect(() => {
-    const { layout: lo, config: cfg, switchRotations: sw, stabRotations: st, compatDimIndices: ci } =
-      analyzeInputs.current;
-
-    if (!drawn || lo.keys.length === 0) {
-      setPcbResult(null);
-      setPcbCloudBusy(false);
-      setPcbCloudFallback(false);
-      return;
-    }
-    const local = () => generatePCB(lo, cfg, sw, st, ci);
-    // 未配置云端 → 纯本地（保持原有离线能力）
-    if (!geometryCloudEnabled) {
-      setPcbCloudBusy(false);
-      setPcbCloudFallback(false);
-      setPcbResult(local());
-      return;
-    }
-
-    const seq = ++analyzeSeq.current;
-    const ac = new AbortController();
-    setPcbCloudBusy(true);
-    const timer = setTimeout(async () => {
-      const res = await analyzePcbCloud(
-        lo,
-        { config: cfg, switchRotations: sw, stabRotations: st, compatKeyIndices: Array.from(ci) },
-        ac.signal,
-      );
-      if (seq !== analyzeSeq.current) return; // 已被更新的请求取代
-      setPcbCloudBusy(false);
-      if (res.ok) {
-        setPcbResult(res.result);
-        setPcbCloudFallback(false);
-      } else if (res.code !== "ABORTED") {
-        // 网络/超时/配额/服务端错误 → 回落本地 + 提示
-        setPcbResult(local());
-        setPcbCloudFallback(true);
-      }
-    }, 400);
-
-    return () => {
-      clearTimeout(timer);
-      ac.abort();
-    };
-  }, [drawn, analyzeSig]);
+  const {
+    result: pcbResult,
+    busy: pcbCloudBusy,
+    fallback: pcbCloudFallback,
+  } = useCloudGeometry<PCBResult>("pcb", drawn && layout.keys.length > 0, layout, pcbParams, () =>
+    generatePCB(layout, config, switchRotations, stabRotations, compatDimIndices),
+  );
 
   // ── Matrix mode state ──
   const [matrixMode, setMatrixMode] = useState(false);
@@ -735,17 +682,8 @@ export default function PCBSection({
               interferenceMarks={pcbResult.interference?.marks ?? []}
             />
 
-            {/* 云端生成状态（§G-B3/M1）：busy 轻提示；回落仅本地时提示「需联网」 */}
-            {pcbCloudBusy && (
-              <div style={{ fontSize: 11, color: "var(--theme-text)", opacity: 0.6, textAlign: "center" }}>
-                {t("pcb.cloudBusy")}
-              </div>
-            )}
-            {!pcbCloudBusy && pcbCloudFallback && (
-              <div style={{ fontSize: 11, color: "var(--theme-text)", opacity: 0.75, textAlign: "center" }}>
-                {t("pcb.cloudFallback")}
-              </div>
-            )}
+            {/* 云端生成状态（§G-B3/M1·M2a） */}
+            <CloudNotice busy={pcbCloudBusy} fallback={pcbCloudFallback} />
 
             {/* Stats */}
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
