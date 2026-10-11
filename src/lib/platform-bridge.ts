@@ -140,7 +140,6 @@ function webDownload(
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
-  a.rel = "noopener";
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();
@@ -207,10 +206,17 @@ function webOpenFile(
     const input = document.createElement("input");
     input.type = "file";
     input.accept = accept;
-    input.style.display = "none";
+    // 不用 display:none（个别浏览器/扩展下 click() 可能不弹或行为异常），改为移出视口
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.opacity = "0";
     input.addEventListener("change", () => {
-      document.body.removeChild(input); // 在 change 回调中移除，避免某些浏览器在 click 后立即移除导致文件选择器中止
       const file = input.files?.[0];
+      // 延后移除：避免在 change 回调内同步移除引发的浏览器兼容问题
+      window.setTimeout(() => {
+        if (input.parentNode) input.parentNode.removeChild(input);
+      }, 0);
       if (!file) {
         resolve(null);
         return;
