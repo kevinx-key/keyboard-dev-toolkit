@@ -199,6 +199,17 @@ describe("generatePlate", () => {
     // Without stabilizer, cutPathLength is just the switch perimeter
     expect(noStab.cutPathLength).toBeLessThan(withStab.cutPathLength);
   });
+
+  // ── §G-B4 瘦身：PCB 板载 / FL 腹灵开孔迁云端，本地不画对应孔 ──
+  it("stabType=2/3 本地不画卫星轴孔（同 stabType=0，导出走云端）", () => {
+    const none = generatePlate(makeLayout([spacebar(0, 0, 6.25)]), { stabType: 0 });
+    const pcbStab = generatePlate(makeLayout([spacebar(0, 0, 6.25)]), { stabType: 2 });
+    const fuling = generatePlate(makeLayout([spacebar(0, 0, 6.25)]), { stabType: 3 });
+    const cherry = generatePlate(makeLayout([spacebar(0, 0, 6.25)]), { stabType: 1 });
+    expect(pcbStab.cutPathLength).toBeCloseTo(none.cutPathLength, 6);
+    expect(fuling.cutPathLength).toBeCloseTo(none.cutPathLength, 6);
+    expect(pcbStab.cutPathLength).toBeLessThan(cherry.cutPathLength);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════

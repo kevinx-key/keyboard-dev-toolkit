@@ -11,6 +11,11 @@
  * - Configurable edge distance
  * - SVG preview
  * - DXF export
+ *
+ * ⚠️ 防复制架构（§G-B4）：本文件为**精简子集**（本地同步预览用）。
+ *    碰撞体积干涉检测算法已迁云端（POST /api/v1/geometry/analyze, kind=pcb），
+ *    `PCBResult.interference` 本地恒空；UI「云端校验干涉」按需取云端结果。
+ *    云端权威实现为**完整超集**（私有仓 worker/src/geometry/pcb-export.ts）。
  */
 
 import type { KLELayout } from "./kle-types";
@@ -195,16 +200,6 @@ export interface InterferenceReport {
   marks: InterferenceMark[];
 }
 
-/** 内部：一个碰撞体积（hitPolys 用于相交判定；mark 用于高亮渲染；owner=同键体积不互检） */
-interface CollisionVolume {
-  id: string;
-  /** 体积类型，用于排除规则（socket / stab4 / stab6 / rgb / mcu / 4p / typec） */
-  kind: "socket" | "stab4" | "stab6" | "rgb" | "mcu" | "4p" | "typec";
-  owner: number | null;
-  hitPolys: [number, number][][];
-  mark: InterferenceMark;
-}
-
 export interface PCBResult {
   svg: string;
   dxf: string;
@@ -325,222 +320,6 @@ function hotswapCutout(r = HOTSWAP_CUT.r, seg = 6): [number, number][] {
   arc(x0 + R, y1 - R, Math.PI / 2, Math.PI);   // 左下
   arc(x0 + R, y0 + R, Math.PI, Math.PI * 1.5); // 左上
   return pts;
-}
-
-// ─── 热插拔轴座碰撞面积（据 docs/hotswap.dxf 实测异形边界） ─────
-// 用途：「轴座干涉预警」——两轴座真实碰撞面积重叠即判干涉。
-// 坐标系：SVG（Y 向下）、相对键轴心（swCx/swCy）、未旋转、非 tall 基准。
-// DXF 实测（docs/hotswap.dxf）：
-//   Ø4mm 圆 = 开关轴心（本轮廓的原点基准）；
-//   2×Ø3mm 圆 = 热插拔孔，相对轴心 (2.54,-5.08) / (-3.81,-2.54)（与 MX 焊盘一致）；
-//   异形外边界 = 轴座真实碰撞面积（bbox 16.50×5.89mm；46 控制点三次样条 → 简化 26 顶点）。
-export const HOTSWAP_OUTLINE: [number, number][] = [
-  [7.616, -3.580],
-  [4.816, -3.580],
-  [4.816, -2.303],
-  [-0.063, -2.302],
-  [-0.615, -2.217],
-  [-1.058, -2.039],
-  [-1.501, -1.735],
-  [-1.862, -1.338],
-  [-2.123, -0.865],
-  [-6.084, -0.865],
-  [-6.084, -1.040],
-  [-8.884, -1.040],
-  [-8.884, -4.040],
-  [-6.084, -4.040],
-  [-6.076, -4.581],
-  [-6.015, -4.955],
-  [-5.860, -5.391],
-  [-5.626, -5.784],
-  [-5.323, -6.123],
-  [-4.961, -6.399],
-  [-4.550, -6.603],
-  [-4.099, -6.724],
-  [4.816, -6.755],
-  [4.816, -6.580],
-  [7.616, -6.580],
-  [7.616, -3.580],
-];
-
-/** 判定干涉的相交面积阈值 (mm²)：略高于浮点噪声，避免共边误报 */
-const INTERFERENCE_AREA_EPS = 0.1;
-
-/** 卫星轴孔体积类型（彼此不互检） */
-const isStabKind = (k: string) => k === "stab4" || k === "stab6";
-
-/** 多边形集合的净面积（Shoelace；凸轴座重叠区域无内孔） */
-function polyArea(mp: ClipPoly[]): number {
-  let total = 0;
-  for (const poly of mp) {
-    for (const ring of poly) {
-      let a = 0;
-      for (let i = 0, n = ring.length; i < n; i++) {
-        const p1 = ring[i]!;
-        const p2 = ring[(i + 1) % n]!;
-        a += p1[0] * p2[1] - p2[0] * p1[1];
-      }
-      total += Math.abs(a) / 2;
-    }
-  }
-  return total;
-}
-
-/** 单个键的热插拔轴座碰撞面积（摆放：相对轴心 swCx/swCy，按 key.rot+(tall?90)+switchRot 旋转，再平移到 viewport） */
-function placeHotswapFootprint(
-  ki: KeyInfo, swRot: number, offX: number, offY: number, pad: number,
-): [number, number][] {
-  const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
-  const rotated = angle % 360 !== 0;
-  return HOTSWAP_OUTLINE.map(([dx, dy]) => {
-    const r = rotated ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
-    return [ki.swCx + r.x - offX + pad, ki.swCy + r.y - offY + pad] as [number, number];
-  });
-}
-
-/** 本地矩形（宽 w 沿 X、高 h 沿 Y，绕中心旋转 rot）→ viewport 多边形 */
-function rectPoly(cx: number, cy: number, w: number, h: number, rot: number): [number, number][] {
-  const hw = w / 2, hh = h / 2;
-  return ([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]] as [number, number][]).map(([dx, dy]) => {
-    const r = rot % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, rot, { x: 0, y: 0 }) : { x: dx, y: dy };
-    return [cx + r.x, cy + r.y] as [number, number];
-  });
-}
-
-/** 一组多边形的总包围盒 */
-function polysBBox(polys: [number, number][][]): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const poly of polys) for (const [x, y] of poly) {
-    if (x < minX) minX = x; if (y < minY) minY = y;
-    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-/** 两组多边形是否存在净面积 > 阈值的重叠 */
-function polysOverlap(a: [number, number][][], b: [number, number][][]): boolean {
-  for (const pa of a) for (const pb of b) {
-    let inter: ClipPoly[];
-    try {
-      inter = polygonClipping.intersection(pathToMP(pa), pathToMP(pb));
-    } catch {
-      continue;
-    }
-    if (polyArea(inter) > INTERFERENCE_AREA_EPS) return true;
-  }
-  return false;
-}
-
-/**
- * 构建全部碰撞体积（viewport 坐标）。
- * owner = 所属键原始下标（同一键自身的多个体积不互检）；null = 全局元件（MCU/4P/TypeC）。
- *  - 热插拔轴座：DXF 真实碰撞面积（仅 solderType=socket）
- *  - 卫星轴孔：2×3mm 孔 → 4mm 同心圆；2×4mm 孔 → 6mm 同心圆
- *  - RGB 灯珠：6(X)×3(Y) 矩形（needLed）
- *  - MCU：10×10 正方形；4P：7×7 正方形；Type-C：9.56×7.959 矩形（按各自旋转）
- */
-function buildCollisionVolumes(
-  keyInfos: KeyInfo[], config: PCBConfig,
-  switchRotations: PCBSwitchRotations | undefined,
-  stabRotations: PCBStabRotations | undefined,
-  offX: number, offY: number, pad: number,
-): CollisionVolume[] {
-  const vols: CollisionVolume[] = [];
-  const vx = (x: number) => x - offX + pad;
-  const vy = (y: number) => y - offY + pad;
-
-  for (const ki of keyInfos) {
-    const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
-    const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
-
-    // 热插拔轴座
-    if (config.solderType === "socket") {
-      const poly = placeHotswapFootprint(ki, swRot, offX, offY, pad);
-      const id = `socket-${ki.srcIndex}`;
-      vols.push({ id, kind: "socket", owner: ki.srcIndex, hitPolys: [poly], mark: { id, circles: [], polys: [poly] } });
-    }
-
-    // 卫星轴孔（同心放大圆）：3mm 孔 → 4mm 圆（stab4）；4mm 孔 → 6mm 圆（stab6）
-    if (ki.hasStab) {
-      const size = ki.isTall ? ki.kh : ki.kw;
-      const stabOff = getStabOffset(size);
-      if (stabOff !== null) {
-        const build = (defs: [number, number, number][], prefix: string, kind: "stab4" | "stab6") => {
-          const circles: { cx: number; cy: number; r: number }[] = [];
-          const polys: [number, number][][] = [];
-          for (const [bx, by, r0] of defs) {
-            let ox = bx, oy = by;
-            if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
-            if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
-            if (stRot) { const r = rotatePoint({ x: ox, y: oy }, stRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
-            const cx = vx(ki.visualCx + ox), cy = vy(ki.visualCy + oy);
-            circles.push({ cx, cy, r: r0 });
-            polys.push(circleToPoly(cx, cy, r0));
-          }
-          const id = `${prefix}-${ki.srcIndex}`;
-          vols.push({ id, kind, owner: ki.srcIndex, hitPolys: polys, mark: { id, circles, polys: [] } });
-        };
-        build([[-stabOff, -7.1, 2], [stabOff, -7.1, 2]], "stab4", "stab4");
-        build([[-stabOff, 8.3, 3], [stabOff, 8.3, 3]], "stab6", "stab6");
-      }
-    }
-
-    // RGB 灯珠 6×3（6 沿 X、3 沿 Y）
-    if (config.needLed) {
-      const ledH = 3.5;
-      let ox = 0, oy = 3.35 + ledH / 2;
-      if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
-      if (ki.rot !== 0) { const r = rotatePoint({ x: ox, y: oy }, ki.rot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
-      if (swRot) { const r = rotatePoint({ x: ox, y: oy }, swRot, { x: 0, y: 0 }); ox = r.x; oy = r.y; }
-      const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
-      const rect = rectPoly(vx(ki.swCx + ox), vy(ki.swCy + oy), 6, 3, angle);
-      const id = `rgb-${ki.srcIndex}`;
-      vols.push({ id, kind: "rgb", owner: ki.srcIndex, hitPolys: [rect], mark: { id, circles: [], polys: [rect] } });
-    }
-  }
-
-  // 全局元件
-  if (config.needMCU) {
-    const mcuW = MCU_ICON.viewW * 0.01, mcuH = MCU_ICON.viewH * 0.01;
-    const rect = rectPoly(vx(config.mcuX + mcuW / 2), vy(config.mcuY + mcuH / 2), 10, 10, config.mcuRot || 0);
-    vols.push({ id: "mcu", kind: "mcu", owner: null, hitPolys: [rect], mark: { id: "mcu", circles: [], polys: [rect] } });
-  }
-  if (config.need4P) {
-    const fpW = 6.88, fpH = 5.64;
-    const rect = rectPoly(vx(config.fourPX + fpW / 2), vy(config.fourPY + fpH / 2), 7, 7, config.fourPRot || 0);
-    vols.push({ id: "4p", kind: "4p", owner: null, hitPolys: [rect], mark: { id: "4p", circles: [], polys: [rect] } });
-  }
-  if (config.needTypeC) {
-    const tcW = TYPEC_ICON.viewW * 0.01, tcH = TYPEC_ICON.viewH * 0.01;
-    const rect = rectPoly(vx(config.typeCX + tcW / 2), vy(config.typeCY + tcH / 2), tcW, tcH, config.typeCRot || 0);
-    vols.push({ id: "type-c", kind: "typec", owner: null, hitPolys: [rect], mark: { id: "type-c", circles: [], polys: [rect] } });
-  }
-
-  return vols;
-}
-
-/** 干涉检测：所有体积两两互检（AABB 粗筛 + 多边形求交，面积 > 阈值）；跳过同一键自身的体积对 */
-function computeInterference(volumes: CollisionVolume[]): InterferenceReport {
-  const bbox = volumes.map((v) => polysBBox(v.hitPolys));
-  const pairs: [string, string][] = [];
-  const hit = new Set<string>();
-  for (let i = 0; i < volumes.length; i++) {
-    const a = volumes[i]!;
-    for (let j = i + 1; j < volumes.length; j++) {
-      const b = volumes[j]!;
-      if (a.owner !== null && a.owner === b.owner) continue;
-      if (isStabKind(a.kind) && isStabKind(b.kind)) continue;                       // 卫星轴 × 卫星轴 不互检（唯一排除项）
-      const ba = bbox[i]!, bb = bbox[j]!;
-      if (ba.maxX <= bb.minX || bb.maxX <= ba.minX || ba.maxY <= bb.minY || bb.maxY <= ba.minY) continue;
-      if (polysOverlap(a.hitPolys, b.hitPolys)) {
-        pairs.push([a.id, b.id]);
-        hit.add(a.id);
-        hit.add(b.id);
-      }
-    }
-  }
-  const marks = volumes.filter((v) => hit.has(v.id)).map((v) => v.mark);
-  return { pairs, marks };
 }
 
 // ─── 自定义圆角矩形挖孔 (底棉矩形编辑器) ─────────────────
@@ -1527,11 +1306,9 @@ export function generatePCB(
     keyInfos, switchRegionAccums, stabRegionAccums, holeOffX, holeOffY, pad,
   );
 
-  // ── 碰撞体积干涉预警（所有体积两两互检；viewport 坐标，纯视觉，不影响 DXF/STP） ──
-  const interference: InterferenceReport = computeInterference(
-    buildCollisionVolumes(keyInfos, config, switchRotations, stabRotations, holeOffX, holeOffY, pad),
-  );
-
+  // ── 碰撞体积干涉预警：本地不再计算（§G-B4 瘦身）。
+  //    干涉检测已迁云端（POST /api/v1/geometry/analyze, kind=pcb），由 UI「云端校验干涉」按需触发。
+  //    字段保留（恒空）以兼容类型；云端结果含真实 pairs/marks。──
   return {
     svg,
     dxf: dxfLines.join("\r\n"),
@@ -1543,6 +1320,6 @@ export function generatePCB(
     switchRegions,
     stabRegions,
     componentRegions,
-    interference,
+    interference: { pairs: [], marks: [] },
   };
 }

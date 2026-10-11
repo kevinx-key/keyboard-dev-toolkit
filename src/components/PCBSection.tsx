@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePCB } from "../lib/pcb-export";
-import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType } from "../lib/pcb-export";
+import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType, InterferenceReport } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { useI18n } from "../lib/i18n";
@@ -129,6 +129,10 @@ export default function PCBSection({
   const [dxfMsg, setDxfMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [modelDownloading, setModelDownloading] = useState<Record<string, boolean>>({});
   const [modelMsg, setModelMsg] = useState<{ modelKey: string; ok: boolean; text: string } | null>(null);
+  // 干涉检测：本地不再计算（§G-B4）；「云端校验干涉」按需取云端结果（null = 未校验）。
+  const [cloudInterference, setCloudInterference] = useState<InterferenceReport | null>(null);
+  const [interferenceChecking, setInterferenceChecking] = useState(false);
+  const [interferenceMsg, setInterferenceMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // ── PCB 生成：本地同步即时（交互式预览/拖动/选中），云端仅用于导出（§G-B3/M1·M2a）──
   const pcbResult = useMemo((): PCBResult | null => {
@@ -252,6 +256,20 @@ export default function PCBSection({
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
   }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
 
+  // 干涉检测本地已移除（§G-B4）——按需调云端 /analyze（kind=pcb）取真实 pairs/marks。
+  const handleCheckInterference = useCallback(async () => {
+    if (!pcbResult) return;
+    setInterferenceChecking(true);
+    setInterferenceMsg(null);
+    const cloud = await fetchCloudGeometry<PCBResult>("pcb", layout, pcbParams);
+    setInterferenceChecking(false);
+    if (!cloud) {
+      setInterferenceMsg({ ok: false, text: t("cloud.fallback") });
+      return;
+    }
+    setCloudInterference(cloud.interference ?? { pairs: [], marks: [] });
+  }, [pcbResult, pcbParams, layout, t]);
+
   const handleModelDownload = useCallback(async (modelKey: string, filename: string) => {
     setModelDownloading(prev => ({ ...prev, [modelKey]: true }));
     setModelMsg(null);
@@ -341,7 +359,8 @@ export default function PCBSection({
   }, [setConfig]);
 
   const keyCount = layout.keys.filter((k) => !k.d).length;
-  const interferenceCount = pcbResult?.interference?.pairs.length ?? 0;
+  const interferenceChecked = cloudInterference !== null;
+  const interferenceCount = cloudInterference?.pairs.length ?? 0;
   const selectedPcbKeyInfo = useMemo(() => {
     if (!effSwitchId || !effSwitchId.startsWith("switch-")) return null;
     const idx = parseInt(effSwitchId.replace("switch-", ""), 10);
@@ -681,7 +700,7 @@ export default function PCBSection({
               showMatrix={matrixMode}
               matrixResult={matrixResult ?? undefined}
               layoutKeys={layout.keys}
-              interferenceMarks={pcbResult.interference?.marks ?? []}
+              interferenceMarks={cloudInterference?.marks ?? []}
             />
 
             {/* Stats */}
@@ -695,18 +714,30 @@ export default function PCBSection({
                 )}
                 {selectedPcbKeyInfo}{selectedComponentInfo}
               </span>
-              <span
+              <button
+                onClick={handleCheckInterference}
+                disabled={interferenceChecking}
                 title={t("tip.pcbInterference")}
+                className="kle-btn"
                 style={{
                   fontSize: 12, fontWeight: 600, padding: "2px 8px",
                   borderRadius: "var(--theme-radius-sm)",
-                  backgroundColor: interferenceCount > 0 ? "var(--theme-danger-soft)" : "var(--theme-success-soft)",
-                  color: interferenceCount > 0 ? "var(--theme-danger)" : "var(--theme-success)",
-                  border: interferenceCount > 0 ? "1px solid var(--theme-danger-border)" : "1px solid var(--theme-success-border)",
+                  cursor: interferenceChecking ? "wait" : "pointer", opacity: interferenceChecking ? 0.7 : 1,
+                  backgroundColor: !interferenceChecked
+                    ? "var(--theme-border-light)"
+                    : interferenceCount > 0 ? "var(--theme-danger-soft)" : "var(--theme-success-soft)",
+                  color: !interferenceChecked
+                    ? "var(--theme-text)"
+                    : interferenceCount > 0 ? "var(--theme-danger)" : "var(--theme-success)",
+                  border: !interferenceChecked
+                    ? "1px solid var(--theme-border-light)"
+                    : interferenceCount > 0 ? "1px solid var(--theme-danger-border)" : "1px solid var(--theme-success-border)",
                 }}
               >
-                {t("pcb.interference")}: {interferenceCount}
-              </span>
+                {interferenceChecking
+                  ? <><Loader2 size={12} className="kle-spin" /> {t("pcb.interference")}</>
+                  : <>{t("pcb.interference")}: {interferenceChecked ? interferenceCount : t("pcb.interferenceUnchecked")}</>}
+              </button>
               <div style={{ width: 1, height: 20, backgroundColor: "var(--theme-border-light)" }} />
 
               <button onClick={handleSvgExport} disabled={svgSaving}
@@ -761,6 +792,19 @@ export default function PCBSection({
                 whiteSpace: "pre-wrap", wordBreak: "break-word",
               }}>
                 {stpMsg.text}
+              </div>
+            )}
+
+            {/* 干涉校验状态消息 */}
+            {interferenceMsg && (
+              <div style={{
+                padding: "6px 12px", borderRadius: "var(--theme-radius-sm)", fontSize: 12, fontWeight: 500,
+                backgroundColor: interferenceMsg.ok ? "var(--theme-success-soft)" : "var(--theme-danger-soft)",
+                color: interferenceMsg.ok ? "var(--theme-success)" : "var(--theme-danger)",
+                border: interferenceMsg.ok ? "1px solid var(--theme-success-border)" : "1px solid var(--theme-danger-border)",
+                whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>
+                {interferenceMsg.text}
               </div>
             )}
 
