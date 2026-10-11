@@ -25,6 +25,7 @@ import { keyCenterInMm } from "../lib/coordinate-system";
 import { exportAssemblySTP } from "../lib/assembly-export";
 import type { AssemblyPart } from "../lib/assembly-export";
 import type { StpExtrudeData, StpProgressEvent } from "../lib/stp-export";
+import { localizeStpMessage } from "../lib/stp-export";
 
 // ── 各部件厚度 (mm) 与层间关系（与各编辑器导出保持同源） ──
 const PLATE_THICKNESS = 1.5; // 定位板
@@ -230,11 +231,9 @@ export default function AssemblySection({
 
     if (!result.success && result.message === "cancelled") return;
     const text =
-      result.message === "DESKTOP_REQUIRED"
-        ? t("export.requireDesktop")
-        : result.message === "assembly.needSelect"
-          ? t("assembly.needSelect")
-          : result.message;
+      result.message === "assembly.needSelect"
+        ? t("assembly.needSelect")
+        : localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text });
   }, [
     layout, plateConfig, rotationOverrides, pcbConfig, switchRotations, stabRotations,

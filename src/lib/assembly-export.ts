@@ -17,6 +17,9 @@
 
 import type { ModelPlacement, StpProgressEvent } from "./stp-export";
 import { isTauri } from "./stp-export";
+import { geometryCloudEnabled, generateAssemblyStpCloud } from "./geometry-api";
+import type { CloudAssemblyPart } from "./geometry-api";
+import { saveFile } from "./platform-bridge";
 
 /** 装配图中的一个部件 */
 export interface AssemblyPart {
@@ -60,6 +63,34 @@ export async function exportAssemblySTP(
 ): Promise<AssemblyExportResult> {
   if (parts.length === 0) {
     return { success: false, message: "assembly.needSelect" };
+  }
+
+  // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
+  // 防复制计划 §G-B9：装配 STP 上云。未配置 → 回落本地桌面版（云端本地双版过渡）。
+  if (geometryCloudEnabled) {
+    const cloudParts: CloudAssemblyPart[] = parts.map((p) => ({
+      boundary: p.boundary,
+      polyHoles: p.polyHoles,
+      circleHoles: p.circleHoles,
+      thickness: p.thickness,
+      dx: p.dx,
+      dy: p.dy,
+      dz: p.dz,
+      modelPlacements: p.modelPlacements,
+    }));
+    const r = await generateAssemblyStpCloud(cloudParts, (phase) =>
+      onProgress?.({
+        percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
+        phase: 0,
+        phaseLabel: phase,
+        message: phase,
+      }),
+    );
+    if (r.ok) {
+      await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
+      return { success: true, message: "CLOUD_OK" };
+    }
+    return { success: false, message: `CLOUD_${r.code}` };
   }
 
   // ── 1. 平台检测 ──

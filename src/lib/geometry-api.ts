@@ -7,6 +7,7 @@
 // 错误码：CLOUD_<code>（QUOTA_EXCEEDED / RATE_LIMITED / KILLSWITCH / ...）。
 
 import { logger } from "./error-logger";
+import { getTurnstileToken } from "./turnstile";
 
 const API_BASE = (process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$/, "");
 
@@ -20,6 +21,14 @@ export interface CloudStpInput {
   modelPlacements?: unknown[];
 }
 
+/** 装配图单个部件（与公开仓 AssemblyPart 对齐，去掉了本地字段） */
+export interface CloudAssemblyPart extends CloudStpInput {
+  thickness: number;
+  dx: number;
+  dy: number;
+  dz: number;
+}
+
 export type CloudStpResult =
   | { ok: true; blob: Blob }
   | { ok: false; code: string };
@@ -27,21 +36,24 @@ export type CloudStpResult =
 const POLL_MS = 1500;
 const MAX_WAIT_MS = 10 * 60 * 1000;
 
-/** 生成 STEP（云端）：入队 → 轮询 → 下载字节。 */
-export async function generateStpCloud(
-  data: CloudStpInput,
-  thickness: number,
+/** 通用作业流：POST 入队 → 轮询 → 下载字节。 */
+async function enqueueAndPoll(
+  path: string,
+  body: unknown,
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
   try {
-    const create = await fetch(`${API_BASE}/api/v1/geometry/stp`, {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    const token = await getTurnstileToken();
+    if (token) headers["X-Turnstile-Token"] = token;
+    const create = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data, thickness }),
+      headers,
+      body: JSON.stringify(body),
     });
     if (!create.ok) {
-      const body = (await create.json().catch(() => null)) as { code?: string } | null;
-      return { ok: false, code: body?.code || String(create.status) };
+      const b = (await create.json().catch(() => null)) as { code?: string } | null;
+      return { ok: false, code: b?.code || String(create.status) };
     }
     const { jobId } = (await create.json()) as { jobId: string };
     onProgress?.("queued");
@@ -59,7 +71,9 @@ export async function generateStpCloud(
       onProgress?.(s.status);
 
       if (s.status === "done") {
-        const url = s.downloadUrl ? `${API_BASE}${s.downloadUrl}` : `${API_BASE}/api/v1/geometry/jobs/${jobId}/download`;
+        const url = s.downloadUrl
+          ? `${API_BASE}${s.downloadUrl}`
+          : `${API_BASE}/api/v1/geometry/jobs/${jobId}/download`;
         const dl = await fetch(url);
         if (!dl.ok) return { ok: false, code: String(dl.status) };
         return { ok: true, blob: await dl.blob() };
@@ -67,7 +81,24 @@ export async function generateStpCloud(
       if (s.status === "failed") return { ok: false, code: "GENERATE_FAILED" };
     }
   } catch (e) {
-    logger.error("generateStpCloud failed", e);
+    logger.error("geometry cloud request failed", e);
     return { ok: false, code: "NETWORK" };
   }
+}
+
+/** 生成单板 STEP（云端）。 */
+export function generateStpCloud(
+  data: CloudStpInput,
+  thickness: number,
+  onProgress?: (phase: string) => void,
+): Promise<CloudStpResult> {
+  return enqueueAndPoll("/api/v1/geometry/stp", { data, thickness }, onProgress);
+}
+
+/** 生成装配图 STEP（云端）：逐部件挤出/挖孔 + 平移 + 合并。 */
+export function generateAssemblyStpCloud(
+  parts: CloudAssemblyPart[],
+  onProgress?: (phase: string) => void,
+): Promise<CloudStpResult> {
+  return enqueueAndPoll("/api/v1/geometry/assembly", { parts }, onProgress);
 }

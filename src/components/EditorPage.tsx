@@ -16,6 +16,7 @@ import BottomFoamSection from "./BottomFoamSection";
 import PricingSection from "./PricingSection";
 import AssemblySection from "./AssemblySection";
 import HelpDialog from "./HelpDialog";
+import AboutDialog from "./AboutDialog";
 import BackupDialog from "./BackupDialog";
 import ProjectBackupDialog from "./ProjectBackupDialog";
 import StpExportOverlay from "./StpExportOverlay";
@@ -70,6 +71,7 @@ export default function EditorPage() {
   const editor = useKeyboardEditor(stepRef);
   const { state, moveSelected } = editor;
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [aboutDialogOpen, setAboutDialogOpen] = useState(false);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
   const { theme } = useTheme();
   const [projectRotations, setProjectRotations] = useState<PlateRotationOverrides>({});
@@ -579,18 +581,28 @@ export default function EditorPage() {
           </div>
         </div>
 
-        {/* ═══ Version Bar ═══ */}
-        <div style={{
-          textAlign: "center",
-          padding: "4px 12px 8px 12px",
-          fontSize: 10,
-          color: "var(--theme-text-dim)",
-          fontFamily: "var(--theme-font-mono)",
-          letterSpacing: 0.5,
-          opacity: 0.6,
-        }}>
+        {/* ═══ Version Bar（点击打开「关于 / 许可证」）═══ */}
+        <button
+          type="button"
+          onClick={() => setAboutDialogOpen(true)}
+          title={t("about.title")}
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: "center",
+            padding: "4px 12px 8px 12px",
+            fontSize: 10,
+            color: "var(--theme-text-dim)",
+            fontFamily: "var(--theme-font-mono)",
+            letterSpacing: 0.5,
+            opacity: 0.6,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
           Keyboard Dev Toolkit v{APP_VERSION}
-        </div>
+        </button>
       </div>
 
       {/* ── Overlays — all preserved ── */}
@@ -606,6 +618,10 @@ export default function EditorPage() {
       <HelpDialog
         open={helpDialogOpen}
         onClose={() => setHelpDialogOpen(false)}
+      />
+      <AboutDialog
+        open={aboutDialogOpen}
+        onClose={() => setAboutDialogOpen(false)}
       />
       <BackupDialog
         open={backupDialogOpen}

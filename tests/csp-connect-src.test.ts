@@ -13,6 +13,7 @@ const FETCH_SOURCES = [
   "src/lib/quote-api.ts",
   "src/lib/currency.ts",
   "src/lib/geometry-api.ts",
+  "src/lib/turnstile.ts",
   "src/components/AiFloatingPanel.tsx",
 ];
 

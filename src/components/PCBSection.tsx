@@ -11,6 +11,7 @@ import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
+import { getTurnstileToken } from "../lib/turnstile";
 import InteractivePCBPreview from "./InteractivePCBPreview";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
@@ -248,8 +249,9 @@ export default function PCBSection({
         setModelMsg({ modelKey, ok: false, text: t("export.modelCloudOnly") });
         return;
       }
+      const token = await getTurnstileToken();
       const response = await fetch(`${GEOMETRY_API_BASE}/api/v1/models/${filename}`, {
-        credentials: "include",
+        headers: token ? { "X-Turnstile-Token": token } : undefined,
       });
       if (!response.ok) throw new Error(t("export.downloadFailed").replace("{{status}}", String(response.status)));
       const blob = await response.blob();
