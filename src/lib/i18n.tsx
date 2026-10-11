@@ -8,7 +8,7 @@
  * 不要把此文件改名为 i18n/index.tsx — 会破坏 19 个 import 路径。
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -1238,8 +1238,41 @@ export const I18nContext = createContext<I18nContextValue>({
   t: (key: string) => DICT[key]?.en ?? key,
 });
 
+/**
+ * 初始语言检测：优先本地保存，其次跟随浏览器语言。
+ * 目的：中文用户直接进中文界面 → Chrome 不会自动翻译本页
+ *（Chrome 翻译会改写 DOM，打断动态创建的 file input / <a download> 下载）。
+ */
+function detectLang(): Lang {
+  try {
+    const saved = localStorage.getItem("kdt-lang");
+    if (saved && saved in LANG_LABELS) return saved as Lang;
+  } catch { /* ignore */ }
+  if (typeof navigator === "undefined") return "en";
+  const nav = (navigator.languages?.[0] || navigator.language || "en").toLowerCase();
+  if (nav.startsWith("zh")) return /hant|tw|hk|mo/.test(nav) ? "zh-HK" : "zh";
+  if (nav.startsWith("ko")) return "ko";
+  if (nav.startsWith("ja")) return "ja";
+  if (nav.startsWith("ru")) return "ru";
+  if (nav.startsWith("fr")) return "fr";
+  if (nav.startsWith("pt")) return "pt";
+  if (nav.startsWith("es")) return "es";
+  return "en";
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
+  // SSR/静态导出固定首帧为 "en"，避免水合不一致；挂载后按浏览器语言切换
   const [lang, setLang] = useState<Lang>("en");
+
+  useEffect(() => {
+    setLang((cur) => (cur === "en" ? detectLang() : cur));
+  }, []);
+
+  // 持久化 + 同步 <html lang>：语言一致 → Chrome 不再自动翻译
+  useEffect(() => {
+    try { localStorage.setItem("kdt-lang", lang); } catch { /* ignore */ }
+    if (typeof document !== "undefined") document.documentElement.lang = lang;
+  }, [lang]);
 
   const t = useCallback(
     (key: string): string => {

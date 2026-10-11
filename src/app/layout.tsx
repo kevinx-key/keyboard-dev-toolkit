@@ -13,6 +13,8 @@ export default function RootLayout({
       <head>
         <title>{`Keyboard Dev Toolkit v${APP_VERSION}`}</title>
         <meta name="description" content="Keyboard Dev Toolkit — 在线键盘配列设计与 PCB/定位板生成工具" />
+        {/* 禁止 Chrome/Google 自动翻译本页：翻译会改写 DOM，打断动态 file input / blob 下载，导致「无法加载」 */}
+        <meta name="google" content="notranslate" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="alternate icon" href="/favicon.png" type="image/png" />
         {/* 内联脚本在 React 水合前同步读取 localStorage 并设置主题 class，防止 FOUC */}
