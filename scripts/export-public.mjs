@@ -52,6 +52,9 @@ const FILES = [
   '.gitignore',
   'README.md',
   'LICENSE',
+  'CLA.md',
+  'CONTRIBUTING.md',
+  'THIRD-PARTY-NOTICES.md',
 ];
 
 /** 防线一：即使走白名单也绝不复制的路径（相对 ROOT） */
@@ -147,5 +150,15 @@ if (!existsSync(stubProbe)) {
   process.exit(1);
 }
 
-console.log(`[export-public] ✅ 完成。共检查泄露探针 ${leakProbe.length + 1} 项，全部通过。`);
+/* 终检 2：专有几何 / 三维数据资产不得出现在导出树（防复制 §G-A1a）
+   public/ 走白名单整体复制，故必须显式阻断模型目录，防止误加回来 */
+const geoProbe = [join(OUT, 'public/models')];
+for (const d of geoProbe) {
+  if (existsSync(d)) {
+    console.error(`[export-public] ❌ 泄露风险！检测到专有资产目录: ${d}`);
+    process.exit(1);
+  }
+}
+
+console.log(`[export-public] ✅ 完成。共检查泄露探针 ${leakProbe.length + 1 + geoProbe.length} 项，全部通过。`);
 console.log('[export-public] 下一步: 在导出目录 git init → 孤儿分支推送 GitHub');

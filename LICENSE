@@ -657,5 +657,55 @@ specific requirements.
 
   You should also get your employer (if you work as a programmer) or school,
 if any, to sign a "copyright disclaimer" for the program, if necessary.
-For more information on this, and how to apply and follow the GNU AGPL, see
+For more information on how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+
+------------------------------------------------------------------------------
+ADDITIONAL NOTICE — Scope of this License & Proprietary Design Data
+附加声明 —— 许可范围与专有数据资产
+(Effective for releases from 2026-10-11 onward / 自 2026-10-11 起的版本生效)
+
+This notice clarifies the boundary between the AGPL-licensed source code and
+separately-owned design-data assets. It does not modify, replace, or reduce
+any right granted by the GNU AGPL-3.0 over the source code.
+
+1. SOURCE CODE — licensed under AGPL-3.0-only.
+   All program source code contained in this repository is free software under
+   the GNU Affero General Public License v3.0 (the terms above). You may use,
+   copy, modify, and redistribute it, including over a network, provided you
+   comply with the AGPL-3.0, including its source-disclosure obligations.
+
+2. DESIGN-DATA ASSETS — PROPRIETARY. ALL RIGHTS RESERVED.
+   专有数据资产 —— 保留所有权利。
+   The following materials are NOT part of the AGPL-licensed Program, are NOT
+   covered by the AGPL grant, and are NOT licensed for reuse. They are the
+   exclusive property of K Star Lab ("the Owner"):
+
+     • CAD drawing / dimension data files: `*.dxf`
+     • 3D part & assembly model files: `*.stp`, `*.step`
+     • Standalone dimension specification tables / drawings (e.g. component
+       footprint and outline data such as MCU, Type-C and stabilizer geometry)
+
+   These assets are original works created by the Owner (CAD drawings authored
+   in-house; 3D models authored/remodelled by the Owner).
+
+   Viewing is permitted. Copying, redistribution, sublicensing, publication,
+   commercial exploitation, incorporation into any product, or use in the
+   manufacture of goods is strictly prohibited without the prior written
+   permission of the Owner.
+
+3. WITHDRAWN ASSETS.
+   Certain assets of the kinds listed in §2 that were previously published in
+   this project's public repository, git history, or release artifacts have
+   been withdrawn from distribution. This notice governs the assets of the
+   versions released on or after the effective date above. Any rights the
+   Owner may hold in earlier copies are expressly reserved.
+
+4. THIRD-PARTY COMPONENTS.
+   This project uses certain third-party libraries (notably the OpenCASCADE
+   CAD kernel, statically linked via `cadrum`, under LGPL-2.1 with the
+   OpenCASCADE exception). Those obligations are set out separately in
+   `THIRD-PARTY-NOTICES.md` and are not affected by this notice.
+
+For licensing or commercial-use enquiries, contact K Star Lab.
+-------------------------------------------------------------------------------

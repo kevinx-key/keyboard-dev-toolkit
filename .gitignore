@@ -64,10 +64,19 @@ docs/报价体系保密化实施清单.md
 docs/商业实践计划.md
 docs/软件落地计划.md
 docs/订单中枢系统计划.md
+docs/防复制架构实施计划.md
+docs/成本护栏设计.md
+docs/资产溯源与合规记录.md
 
 # Generated test reports
 playwright-report/
 test-results/
+
+# 专有几何 / 三维数据资产（防复制 §G-A1a：移私有，禁止提交公开仓）
+# 私有仓：keyboardstar-geometry（本地 ../keyboardstar-geometry，§G-B2）
+public/models/
+docs/*.dxf
+docs/*.svg
 
 # Pro 私有源码（由 scripts/fetch-pro.mjs 注入；公开仓使用 pro-stub/ 占位）
 # ⚠ 这些路径永不提交——真实源码在私有仓 keyboard-editor-pro

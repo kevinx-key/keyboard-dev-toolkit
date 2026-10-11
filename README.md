@@ -178,13 +178,20 @@ A: Yes. The plate DXF is machinable directly, and the PCB design files are ready
 
 ## Contributing
 
-PRs welcome! By opening a pull request you agree that your contribution is licensed under **AGPL-3.0**, and grant the maintainer a right to relicense future combined works (keeps dual-licensing possible). Please run `npm run check` before submitting.
+PRs welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) first, then
+[CLA.md](./CLA.md) — **every contributor must sign the CLA** before their first
+PR can be merged (the CLA Assistant bot prompts you automatically). By opening a
+pull request you agree your contribution is licensed under **AGPL-3.0** and
+grant the maintainer a right to relicense future combined works (keeps
+dual-licensing possible). Please run `npm run check` before submitting.
 
 Good first issues: i18n strings (9 languages), canvas rendering performance, export format coverage.
 
 ## License & Trademark
 
-- Code: **[GNU Affero General Public License v3.0](./LICENSE)** (AGPL-3.0-only). Any derivative — including hosted services — must be released under AGPL.
+- **Code:** **[GNU Affero General Public License v3.0](./LICENSE)** (AGPL-3.0-only). Any derivative — including hosted services — must be released under AGPL.
+- **Design data — proprietary:** the CAD drawing / dimension files (`*.dxf`) and 3D model files (`*.stp` / `*.step`) are **not** part of the AGPL-licensed program. They are proprietary assets of K Star Lab: viewing is permitted, but copying, redistribution and commercial/manufacturing use are prohibited without written permission (see [LICENSE](./LICENSE) §2). These files are intentionally excluded from this repository.
+- **Third-party components:** OpenCASCADE Technology (LGPL-2.1 with the OCCT exception) and `cadrum` (MIT) are used for 3D geometry — see [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
 - The project name "Keyboard Dev Toolkit" and the K Star Lab logo belong to K Star Lab. Forks and derived versions should use a different product name and must not present themselves as the original.
 - KLE format compatibility is independent of keyboard-layout-editor.com; that site is not affiliated with this project. Thanks to Ian Prest and the KLE community for the original inspiration.
 
@@ -199,3 +206,4 @@ Good first issues: i18n strings (9 languages), canvas rendering performance, exp
 - **标准 STP 3D 模型**：PCB 板体与板上元器件（轴体、卫星轴等）均有高精度标准模型。很多作者卡在"拿不到准确的 3D 模型导入设计软件"这一步，或用了粗糙模型导致生产文件出错；我们的模型是标准的、可靠的生产有效模型，3D 软件里看到的与工厂实际生产出的产品一致，外壳、垫片、结构件按它设计不会偏差
 - 浏览器即可使用，无需安装：[**在线试用 →**](https://kevinx-key.github.io/keyboard-dev-toolkit/)；已发布 Windows / macOS / Linux 三平台安装包，见 GitHub [Releases](https://github.com/kevinx-key/keyboard-dev-toolkit/releases)
 - 免费开源（AGPL-3.0），本地部署指南见上方英文部分
+- **数据资产为专有**：CAD 图纸 / 尺寸文件（`*.dxf`）与 3D 模型文件（`*.stp` / `*.step`）**不属于** AGPL 开源范围，为 K Star Lab 专有资产——可查看，但未经书面许可禁止复制、再分发及商用/制造；此类文件已从本仓库移除（详见 [LICENSE](./LICENSE) §2）
