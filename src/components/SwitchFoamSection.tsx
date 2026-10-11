@@ -8,7 +8,7 @@ import type { PlateResult, PlateRotationOverrides } from "../lib/plate-export";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
-import { exportSTP } from "../lib/stp-export";
+import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import type { FoamSettings } from "../lib/editor-settings";
@@ -70,7 +70,7 @@ export default function SwitchFoamSection({
     const result = await exportSTP(foamResult.stpData, thickness, `${name}_switch_foam.stp`, onStpProgress);
     onStpExportingChange?.(false); setConverting(false);
     if (!result.success && result.message === "cancelled") return;
-    const stpText = result.message === "DESKTOP_REQUIRED" ? t("export.requireDesktop") : result.message;
+    const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
   }, [foamResult, thickness, layout.meta.name, onStpExportingChange, onStpProgress, t]);
 

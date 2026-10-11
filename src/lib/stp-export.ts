@@ -20,6 +20,9 @@
  *   → Rust cadrum → STEP 字节 → 浏览器下载
  */
 
+import { geometryCloudEnabled, generateStpCloud } from "./geometry-api";
+import { saveFile } from "./platform-bridge";
+
 // ═══════════════════════════════════════════════════════════════════
 // 类型定义 —— 在前端组件与 Rust 后端间传递的几何数据
 // ═══════════════════════════════════════════════════════════════════
@@ -83,7 +86,7 @@ export interface StpExportResult {
  * 同时检查 `window.__TAURI__` 作为快速路径，
  * 适用于 API 已经被引导的情况 (例如本标签页中首次 import 之后)。
  */
-async function isTauri(): Promise<boolean> {
+export async function isTauri(): Promise<boolean> {
   if (typeof window === "undefined") return false;
 
   const win = window as unknown as Record<string, unknown>;
@@ -122,6 +125,32 @@ export async function exportSTP(
   filename: string,
   onProgress?: (evt: StpProgressEvent) => void,
 ): Promise<StpExportResult> {
+  // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
+  // 防复制计划 §G-B9：STP 上云。未配置 → 回落本地桌面版（云端本地双版过渡）。
+  if (geometryCloudEnabled) {
+    const r = await generateStpCloud(
+      {
+        boundary: data.boundary,
+        polyHoles: data.polyHoles,
+        circleHoles: data.circleHoles,
+        modelPlacements: data.modelPlacements,
+      },
+      thickness,
+      (phase) =>
+        onProgress?.({
+          percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
+          phase: 0,
+          phaseLabel: phase,
+          message: phase,
+        }),
+    );
+    if (r.ok) {
+      await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
+      return { success: true, message: "CLOUD_OK" };
+    }
+    return { success: false, message: `CLOUD_${r.code}` };
+  }
+
   // ── 1. 平台检测 ──
   if (!(await isTauri())) {
     // UI 层据此标记用 t("export.requireDesktop") 渲染本地化文案
@@ -174,4 +203,18 @@ export async function exportSTP(
   } finally {
     if (unlisten) unlisten();
   }
+}
+
+/**
+ * 把 exportSTP 返回的 message 本地化为用户可读文案（各组件统一调用）。
+ * - "DESKTOP_REQUIRED" → 提示用桌面版
+ * - "CLOUD_OK"         → 云端成功
+ * - "CLOUD_<code>"     → 云端失败（含错误码）
+ * - 其它               → 原样返回（本地 Rust 的成功/错误串）
+ */
+export function localizeStpMessage(t: (key: string) => string, message: string): string {
+  if (message === "DESKTOP_REQUIRED") return t("export.requireDesktop");
+  if (message === "CLOUD_OK") return t("export.cloudSuccess");
+  if (message.startsWith("CLOUD_")) return t("export.cloudError").replace("{{code}}", message.slice(6));
+  return message;
 }

@@ -10,7 +10,7 @@ import type { PadSettings } from "../lib/editor-settings";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { sanitizeSvg } from "../lib/sanitize";
-import { exportSTP } from "../lib/stp-export";
+import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 
@@ -68,7 +68,7 @@ export default function SwitchPadSection({
     onStpExportingChange?.(false);
     setConverting(false);
     if (!result.success && result.message === "cancelled") return;
-    const stpText = result.message === "DESKTOP_REQUIRED" ? t("export.requireDesktop") : result.message;
+    const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
   }, [padResult, layout.meta.name, onStpExportingChange, onStpProgress, t]);
 
