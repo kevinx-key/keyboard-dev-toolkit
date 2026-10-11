@@ -157,7 +157,7 @@ server.tool(
 
 server.tool(
   "export_layout",
-  "Export free-tier artifacts to the workspace. format=layout-svg (layout picture) / pcb (PCB hole svg+dxf) / plate (plate cutout svg+dxf). QMK/KiCad are Pro-tier and not exposed.",
+  "Export free-tier artifacts to the workspace. format=layout-svg (layout picture) / pcb (PCB hole svg+dxf) / plate (plate cutout svg+dxf). pcb/plate prefer the cloud geometry service (full fidelity) and fall back to the local subset when offline. QMK/KiCad are Pro-tier and not exposed.",
   {
     path: z.string().describe("Source layout file"),
     format: z.enum(["layout-svg", "pcb", "plate"]),
@@ -166,7 +166,7 @@ server.tool(
   async ({ path: p, format, out_prefix }) => {
     try {
       const layout = layoutFromRows(parseJsonField(wsRead(WORKSPACE, p), p));
-      const out = exportFree(layout, format);
+      const out = await exportFree(layout, format);
       const base = out_prefix ?? p.replace(/\.json$/i, "");
       const written: string[] = [];
       wsWrite(WORKSPACE, `${base}.svg`, out.svg);
@@ -175,7 +175,7 @@ server.tool(
         wsWrite(WORKSPACE, `${base}-${format}.dxf`, out.dxf);
         written.push(`${base}-${format}.dxf (${out.dxf.length} bytes)`);
       }
-      return text(`Exported [${format}] ${out.widthMm}x${out.heightMm}mm:\n` + written.join("\n"));
+      return text(`Exported [${format}] ${out.widthMm}x${out.heightMm}mm (${out.source}):\n` + written.join("\n"));
     } catch (e) {
       return fail(e);
     }

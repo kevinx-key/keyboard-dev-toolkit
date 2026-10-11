@@ -142,22 +142,24 @@ describe("workspace guard", () => {
 });
 
 describe("导出", () => {
-  it("layout-svg 输出 SVG 字符串", () => {
-    const out = exportFree(testLayout(), "layout-svg");
+  it("layout-svg 输出 SVG 字符串（本地）", async () => {
+    const out = await exportFree(testLayout(), "layout-svg");
     expect(out.svg).toContain("<svg");
+    expect(out.source).toBe("local");
   });
 
-  it("pcb 与 plate 输出 svg + dxf 及尺寸", () => {
+  it("pcb 与 plate 输出 svg + dxf 及尺寸（未配置云端 → 本地回落）", async () => {
     for (const fmt of ["pcb", "plate"] as const) {
-      const out = exportFree(testLayout(), fmt);
+      const out = await exportFree(testLayout(), fmt);
       expect(out.svg.length).toBeGreaterThan(100);
       expect(out.dxf.length).toBeGreaterThan(10);
       expect(out.widthMm).toBeGreaterThan(0);
+      expect(out.source).toBe("local");
     }
   });
 
-  it("空布局导出 PCB 报错", () => {
-    expect(() => exportFree(layoutFromRows([]), "pcb")).toThrow(/为空/);
+  it("空布局导出 PCB 报错", async () => {
+    await expect(exportFree(layoutFromRows([]), "pcb")).rejects.toThrow(/为空/);
   });
 
   it("Pro 功能返回提示文本", () => {

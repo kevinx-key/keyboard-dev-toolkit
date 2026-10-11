@@ -72,6 +72,20 @@ npx tsx tools/cli.ts url board.json             # 生成分享链接
 }
 ```
 
+## 云端几何（§G-B4）
+
+`export --format pcb|plate`（及 MCP `export_layout` 的 pcb/plate）**云端优先**：连上几何服务时用云端完整几何（含干涉/FL/板载等高级算法），失败/离线时**回落本地精简子集**（PCB 无干涉；定位板仅 Cherry 卫星轴）。`layout-svg` 始终本地。
+
+- **地址**：环境变量 `KDT_GEOMETRY_API_BASE`（优先），回落 `NEXT_PUBLIC_GEOMETRY_API_BASE`。二者都无 → 云端关闭、走本地。
+- **自动加载**：若上述变量都未设，启动时 best-effort 读取**仓库根 `.env.local`**（Node ≥20.12 `process.loadEnvFile`）；显式 env 始终优先。测试环境（`VITEST`）不自动加载。
+- **返回值**：CLI 打印 / MCP 文本包含来源标注 `(cloud)` 或 `(local)`，避免把低保真结果误当完整结果。
+- **单次超时** 15s。
+- **已知限制**：tools 无浏览器、不带 Turnstile token，依赖服务端**软模式**（IP 日配额）。若服务端开启硬模式（`TURNSTILE_ENFORCE=1`），tools 的云端导出会被拦、自动回落本地。
+
+```bash
+KDT_GEOMETRY_API_BASE=https://starthock.com npx tsx tools/cli.ts export board.json --format pcb
+```
+
 ## MCP 工具列表
 
 | 工具 | 说明 |
@@ -81,7 +95,7 @@ npx tsx tools/cli.ts url board.json             # 生成分享链接
 | `create_layout` | 用预设或行 JSON 创建布局文件 |
 | `read_layout` | 读取布局文件（可选附键位明细） |
 | `edit_layout` | 按 ops 序列修改布局（无状态，每次传全量） |
-| `export_layout` | 导出 layout-svg / pcb / plate |
+| `export_layout` | 导出 layout-svg / pcb / plate（pcb/plate 云端优先、失败回落本地） |
 | `share_url` | 生成网页端分享链接 |
 | `list_workspace` | 列出工作区文件 |
 

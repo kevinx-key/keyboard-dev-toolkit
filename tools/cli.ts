@@ -47,7 +47,7 @@ function loadArg(name: string): string {
   return v;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
   if (!cmd || cmd === "help" || cmd === "--help") {
     console.log(USAGE);
@@ -106,7 +106,7 @@ function main(): void {
       const format = loadArg("--format") as "layout-svg" | "pcb" | "plate";
       if (!file) die("用法: kdt export <文件> --format layout-svg|pcb|plate");
       const layout = layoutFromRows(JSON.parse(wsRead(WORKSPACE, file)));
-      const out = exportFree(layout, format);
+      const out = await exportFree(layout, format);
       const base = arg("-o") ?? file.replace(/\.json$/i, "");
       wsWrite(WORKSPACE, `${base}.svg`, out.svg);
       let line = `${base}.svg`;
@@ -114,7 +114,7 @@ function main(): void {
         wsWrite(WORKSPACE, `${base}-${format}.dxf`, out.dxf);
         line += ` + ${base}-${format}.dxf`;
       }
-      console.log(`导出完成 [${format}] ${out.widthMm}×${out.heightMm}mm → ${line}`);
+      console.log(`导出完成 [${format}] ${out.widthMm}×${out.heightMm}mm (${out.source}) → ${line}`);
       return;
     }
 
@@ -143,4 +143,4 @@ function die(msg: string): never {
   process.exit(1);
 }
 
-main();
+void main();

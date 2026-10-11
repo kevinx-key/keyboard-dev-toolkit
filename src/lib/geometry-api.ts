@@ -9,10 +9,17 @@
 import { logger } from "./error-logger";
 import { getTurnstileToken } from "./turnstile";
 
-const API_BASE = (process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$/, "");
+/**
+ * 云端 base（惰性读取）。
+ * web：构建期由 Next 内联 NEXT_PUBLIC_GEOMETRY_API_BASE。
+ * tools/Node：运行时读 KDT_GEOMETRY_API_BASE（可导入后再注入 env），回落 NEXT_PUBLIC_…。
+ */
+function apiBase(): string {
+  return (process.env.KDT_GEOMETRY_API_BASE || process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$/, "");
+}
 
-/** 云端几何是否启用（构建期决定） */
-export const geometryCloudEnabled = API_BASE.length > 0;
+/** 云端几何是否启用（构建期决定；web 侧使用） */
+export const geometryCloudEnabled = apiBase().length > 0;
 
 /** 单板 STEP 云端入参（S1：快照/参数入，服务端自算 stpData）。 */
 export interface CloudStpRequest {
@@ -49,7 +56,7 @@ async function enqueueAndPoll(
     const headers: Record<string, string> = { "content-type": "application/json" };
     const token = await getTurnstileToken();
     if (token) headers["X-Turnstile-Token"] = token;
-    const create = await fetch(`${API_BASE}${path}`, {
+    const create = await fetch(`${apiBase()}${path}`, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -66,7 +73,7 @@ async function enqueueAndPoll(
       if (Date.now() > deadline) return { ok: false, code: "TIMEOUT" };
       await new Promise((r) => setTimeout(r, POLL_MS));
 
-      const s = (await fetch(`${API_BASE}/api/v1/geometry/jobs/${jobId}`).then((r) => r.json())) as {
+      const s = (await fetch(`${apiBase()}/api/v1/geometry/jobs/${jobId}`).then((r) => r.json())) as {
         status: string;
         error?: string;
         downloadUrl?: string;
@@ -75,8 +82,8 @@ async function enqueueAndPoll(
 
       if (s.status === "done") {
         const url = s.downloadUrl
-          ? `${API_BASE}${s.downloadUrl}`
-          : `${API_BASE}/api/v1/geometry/jobs/${jobId}/download`;
+          ? `${apiBase()}${s.downloadUrl}`
+          : `${apiBase()}/api/v1/geometry/jobs/${jobId}/download`;
         const dl = await fetch(url);
         if (!dl.ok) return { ok: false, code: String(dl.status) };
         return { ok: true, blob: await dl.blob() };
@@ -134,12 +141,12 @@ export async function analyzeCloud(
   params: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<CloudAnalyzeResult> {
-  if (!API_BASE) return { ok: false, code: "DISABLED" };
+  if (!apiBase()) return { ok: false, code: "DISABLED" };
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
     const token = await getTurnstileToken();
     if (token) headers["X-Turnstile-Token"] = token;
-    const res = await fetch(`${API_BASE}/api/v1/geometry/analyze`, {
+    const res = await fetch(`${apiBase()}/api/v1/geometry/analyze`, {
       method: "POST",
       headers,
       signal,
@@ -168,7 +175,7 @@ export async function fetchCloudGeometry<T>(
   snapshot: unknown,
   params: Record<string, unknown>,
 ): Promise<T | null> {
-  if (!API_BASE) return null;
+  if (!apiBase()) return null;
   const res = await analyzeCloud(kind, snapshot, params);
   return res.ok ? (res.result as T) : null;
 }

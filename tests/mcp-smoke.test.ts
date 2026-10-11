@@ -36,14 +36,15 @@ describe("MCP 参数兼容性", () => {
     expect(layout.meta.name).toBe("MCP-Test");
   });
 
-  it("导出格式全部为字符串（JSON-RPC 兼容）", () => {
+  it("导出格式全部为字符串（JSON-RPC 兼容）", async () => {
     const layout = presetLayout("ANSI 104");
     for (const fmt of ["layout-svg", "pcb", "plate"] as const) {
-      const out = exportFree(layout, fmt);
+      const out = await exportFree(layout, fmt);
       expect(typeof out.svg).toBe("string");
       expect(typeof out.dxf).toBe("string");
       expect(typeof out.widthMm).toBe("number");
       expect(out.widthMm).toBeGreaterThan(0);
+      expect(["cloud", "local"]).toContain(out.source);
     }
   });
 
