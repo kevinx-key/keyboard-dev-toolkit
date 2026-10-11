@@ -140,11 +140,16 @@ function webDownload(
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // 延后清理：过早 removeChild / revokeObjectURL 会打断下载（Chrome/Edge 已知问题，
+  // 表现为下载失败，或浏览器跳到「此页面无法加载」错误页）。
+  window.setTimeout(() => {
+    if (a.parentNode) a.parentNode.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 10_000);
 }
 
 // ─── File: Open ──────────────────────────────────────────────────
@@ -276,7 +281,7 @@ export function registerProtocolHandler(): void {
 // ─── App Info ────────────────────────────────────────────────────
 
 /** 应用版本号（同步常量，用于 UI 直接展示） */
-export const APP_VERSION = "1.0.100";
+export const APP_VERSION = "1.0.101";
 
 /**
  * Get the app version string.

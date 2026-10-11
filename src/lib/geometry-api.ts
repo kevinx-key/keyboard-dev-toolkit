@@ -155,3 +155,17 @@ export async function analyzeCloud(
     return { ok: false, code: "NETWORK" };
   }
 }
+
+/**
+ * 导出时取「云端权威几何」（§G-B3）。未配置云端 / 失败 → 返回 null，调用方回落本地结果。
+ * 交互式预览**不走这里**（预览用本地同步计算，即时响应）。
+ */
+export async function fetchCloudGeometry<T>(
+  kind: CloudKind,
+  snapshot: unknown,
+  params: Record<string, unknown>,
+): Promise<T | null> {
+  if (!API_BASE) return null;
+  const res = await analyzeCloud(kind, snapshot, params);
+  return res.ok ? (res.result as T) : null;
+}

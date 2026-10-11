@@ -4,8 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Loader2, Package, FileDown, FileCode2, Plus, Trash2 } from "lucide-react";
 import { generateBottomFoam } from "../lib/bottom-foam-export";
 import type { BottomFoamConfig, BottomFoamResult } from "../lib/bottom-foam-export";
-import { useCloudGeometry } from "../lib/use-cloud-geometry";
-import CloudNotice from "./CloudNotice";
+import { fetchCloudGeometry } from "../lib/geometry-api";
 import type { PCBConfig, PCBSwitchRotations, CustomRect } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import type { BottomFoamSettings } from "../lib/editor-settings";
@@ -83,20 +82,12 @@ export default function BottomFoamSection({
     }),
     [pcbConfig, switchRotations, customRects, compatDimIndices, holeFillet, outerFillet, minFeature, thinWall],
   );
-  const {
-    result: foamResult,
-    busy: foamCloudBusy,
-    fallback: foamCloudFallback,
-  } = useCloudGeometry<BottomFoamResult | null>(
-    "foam",
-    layout.keys.length > 0 || customRects.length > 0,
-    layout,
-    foamParams,
-    () => {
-      const r = generateBottomFoam(layout, foamParams.config, switchRotations, compatDimIndices);
-      return r.svg ? r : null;
-    },
-  );
+  // 本地同步即时结果（交互式预览），云端仅用于导出。
+  const foamResult = useMemo((): BottomFoamResult | null => {
+    if (layout.keys.length === 0 && customRects.length === 0) return null;
+    const r = generateBottomFoam(layout, foamParams.config, switchRotations, compatDimIndices);
+    return r.svg ? r : null;
+  }, [layout, foamParams, switchRotations, compatDimIndices, customRects.length]);
 
   const safeSvg = useMemo(() => (foamResult?.svg ? sanitizeSvg(foamResult.svg) : ""), [foamResult]);
 
@@ -179,21 +170,23 @@ export default function BottomFoamSection({
     if (!foamResult?.svg) return;
     setSvgSaving(true); setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(foamResult.svg, { defaultName: `${name}_bottom_foam.svg`, mimeType: "image/svg+xml" });
+    const cloud = await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
+    const path = await saveFile(cloud?.svg ?? foamResult.svg, { defaultName: `${name}_bottom_foam.svg`, mimeType: "image/svg+xml" });
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [foamResult, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, layout.meta.name, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!foamResult?.dxf) return;
     setDxfSaving(true); setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(foamResult.dxf, { defaultName: `${name}_bottom_foam.dxf`, mimeType: "application/dxf" });
+    const cloud = await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
+    const path = await saveFile(cloud?.dxf ?? foamResult.dxf, { defaultName: `${name}_bottom_foam.dxf`, mimeType: "application/dxf" });
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [foamResult, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, layout.meta.name, t]);
 
   const numInput: React.CSSProperties = {
     width: 58, padding: "2px 4px", fontSize: 12, borderRadius: 4,
@@ -333,7 +326,6 @@ export default function BottomFoamSection({
                 </svg>
               )}
             </div>
-            <CloudNotice busy={foamCloudBusy} fallback={foamCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{foamResult.width.toFixed(1)} × {foamResult.height.toFixed(1)} mm

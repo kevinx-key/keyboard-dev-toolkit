@@ -5,8 +5,7 @@ import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generateSwitchFoam } from "../lib/switch-foam-export";
 import type { SwitchFoamConfig } from "../lib/switch-foam-export";
 import type { PlateResult, PlateRotationOverrides } from "../lib/plate-export";
-import { useCloudGeometry } from "../lib/use-cloud-geometry";
-import CloudNotice from "./CloudNotice";
+import { fetchCloudGeometry } from "../lib/geometry-api";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
@@ -57,17 +56,11 @@ export default function SwitchFoamSection({
     }),
     [effectiveConfig, rotationOverrides, compatDimIndices],
   );
-  const {
-    result: foamResult,
-    busy: foamCloudBusy,
-    fallback: foamCloudFallback,
-  } = useCloudGeometry<PlateResult>(
-    "switchfoam",
-    drawn && layout.keys.length > 0,
-    layout,
-    foamParams,
-    () => generateSwitchFoam(layout, effectiveConfig, rotationOverrides, compatDimIndices),
-  );
+  // 本地同步即时结果（交互式预览），云端仅用于导出。
+  const foamResult = useMemo((): PlateResult | null => {
+    if (!drawn || layout.keys.length === 0) return null;
+    return generateSwitchFoam(layout, effectiveConfig, rotationOverrides, compatDimIndices);
+  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices]);
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -95,21 +88,23 @@ export default function SwitchFoamSection({
     if (!foamResult?.svg) return;
     setSvgSaving(true); setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(foamResult.svg, { defaultName: `${name}_switch_foam.svg`, mimeType: "image/svg+xml" });
+    const cloud = await fetchCloudGeometry<PlateResult>("switchfoam", layout, foamParams);
+    const path = await saveFile(cloud?.svg ?? foamResult.svg, { defaultName: `${name}_switch_foam.svg`, mimeType: "image/svg+xml" });
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [foamResult, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, layout.meta.name, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!foamResult?.dxf) return;
     setDxfSaving(true); setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(foamResult.dxf, { defaultName: `${name}_switch_foam.dxf`, mimeType: "application/dxf" });
+    const cloud = await fetchCloudGeometry<PlateResult>("switchfoam", layout, foamParams);
+    const path = await saveFile(cloud?.dxf ?? foamResult.dxf, { defaultName: `${name}_switch_foam.dxf`, mimeType: "application/dxf" });
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [foamResult, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, layout.meta.name, t]);
 
   const numInput: React.CSSProperties = {
     width: 60, padding: "2px 4px", fontSize: 12, borderRadius: 4,
@@ -193,7 +188,6 @@ export default function SwitchFoamSection({
               selectedKeyIdx={null}
               rotations={rotationOverrides}
             />
-            <CloudNotice busy={foamCloudBusy} fallback={foamCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{foamResult.width.toFixed(1)} × {foamResult.height.toFixed(1)} mm

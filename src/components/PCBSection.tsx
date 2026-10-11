@@ -12,8 +12,7 @@ import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import { getTurnstileToken } from "../lib/turnstile";
-import { useCloudGeometry } from "../lib/use-cloud-geometry";
-import CloudNotice from "./CloudNotice";
+import { fetchCloudGeometry } from "../lib/geometry-api";
 import InteractivePCBPreview from "./InteractivePCBPreview";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
@@ -131,17 +130,14 @@ export default function PCBSection({
   const [modelDownloading, setModelDownloading] = useState<Record<string, boolean>>({});
   const [modelMsg, setModelMsg] = useState<{ modelKey: string; ok: boolean; text: string } | null>(null);
 
-  // ── PCB 生成：云端优先（§G-B3 / M1·M2a）；离线/失败回落本地（#8 双版可用）──
+  // ── PCB 生成：本地同步即时（交互式预览/拖动/选中），云端仅用于导出（§G-B3/M1·M2a）──
+  const pcbResult = useMemo((): PCBResult | null => {
+    if (!drawn || layout.keys.length === 0) return null;
+    return generatePCB(layout, config, switchRotations, stabRotations, compatDimIndices);
+  }, [drawn, config, layout, switchRotations, stabRotations, compatDimIndices]);
   const pcbParams = useMemo(
     () => ({ config, switchRotations, stabRotations, compatKeyIndices: Array.from(compatDimIndices) }),
     [config, switchRotations, stabRotations, compatDimIndices],
-  );
-  const {
-    result: pcbResult,
-    busy: pcbCloudBusy,
-    fallback: pcbCloudFallback,
-  } = useCloudGeometry<PCBResult>("pcb", drawn && layout.keys.length > 0, layout, pcbParams, () =>
-    generatePCB(layout, config, switchRotations, stabRotations, compatDimIndices),
   );
 
   // ── Matrix mode state ──
@@ -191,14 +187,15 @@ export default function PCBSection({
     setSvgSaving(true);
     setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(pcbResult.svg, {
+    const cloud = await fetchCloudGeometry<PCBResult>("pcb", layout, pcbParams);
+    const path = await saveFile(cloud?.svg ?? pcbResult.svg, {
       defaultName: `${name}_pcb.svg`,
       mimeType: "image/svg+xml",
     });
     setSvgSaving(false);
     if (path === null) return; // cancelled or web fallback
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [pcbResult, layout.meta.name, t]);
+  }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
 
   const [kicadSaving, setKicadSaving] = useState(false);
   const [kicadMsg, setKicadMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -241,14 +238,15 @@ export default function PCBSection({
     setDxfSaving(true);
     setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(pcbResult.dxf, {
+    const cloud = await fetchCloudGeometry<PCBResult>("pcb", layout, pcbParams);
+    const path = await saveFile(cloud?.dxf ?? pcbResult.dxf, {
       defaultName: `${name}_pcb.dxf`,
       mimeType: "application/dxf",
     });
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [pcbResult, layout.meta.name, t]);
+  }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
 
   const handleModelDownload = useCallback(async (modelKey: string, filename: string) => {
     setModelDownloading(prev => ({ ...prev, [modelKey]: true }));
@@ -681,9 +679,6 @@ export default function PCBSection({
               layoutKeys={layout.keys}
               interferenceMarks={pcbResult.interference?.marks ?? []}
             />
-
-            {/* 云端生成状态（§G-B3/M1·M2a） */}
-            <CloudNotice busy={pcbCloudBusy} fallback={pcbCloudFallback} />
 
             {/* Stats */}
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>

@@ -4,8 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generateSwitchPad } from "../lib/switch-pad-export";
 import type { SwitchPadConfig, SwitchPadResult } from "../lib/switch-pad-export";
-import { useCloudGeometry } from "../lib/use-cloud-geometry";
-import CloudNotice from "./CloudNotice";
+import { fetchCloudGeometry } from "../lib/geometry-api";
 import type { PCBConfig, PCBSwitchRotations, PCBStabRotations } from "../lib/pcb-export";
 import type { KLELayout } from "../lib/kle-types";
 import type { PadSettings } from "../lib/editor-settings";
@@ -53,20 +52,12 @@ export default function SwitchPadSection({
     }),
     [pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, outerFillet, switchRotations, stabRotations, compatDimIndices],
   );
-  const {
-    result: padResult,
-    busy: padCloudBusy,
-    fallback: padCloudFallback,
-  } = useCloudGeometry<SwitchPadResult | null>(
-    "pad",
-    layout.keys.length > 0,
-    layout,
-    padParams,
-    () => {
-      const r = generateSwitchPad(layout, padParams.config, switchRotations, stabRotations, compatDimIndices);
-      return r.svg ? r : null;
-    },
-  );
+  // 本地同步即时结果（交互式预览），云端仅用于导出。
+  const padResult = useMemo((): SwitchPadResult | null => {
+    if (layout.keys.length === 0) return null;
+    const r = generateSwitchPad(layout, padParams.config, switchRotations, stabRotations, compatDimIndices);
+    return r.svg ? r : null;
+  }, [layout, padParams, switchRotations, stabRotations, compatDimIndices]);
 
   const safeSvg = useMemo(() => (padResult?.svg ? sanitizeSvg(padResult.svg) : ""), [padResult]);
 
@@ -96,22 +87,24 @@ export default function SwitchPadSection({
     setSvgSaving(true);
     setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(padResult.svg, { defaultName: `${name}_switch_pad.svg`, mimeType: "image/svg+xml" });
+    const cloud = await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
+    const path = await saveFile(cloud?.svg ?? padResult.svg, { defaultName: `${name}_switch_pad.svg`, mimeType: "image/svg+xml" });
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [padResult, layout.meta.name, t]);
+  }, [padResult, padParams, layout, layout.meta.name, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!padResult?.dxf) return;
     setDxfSaving(true);
     setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(padResult.dxf, { defaultName: `${name}_switch_pad.dxf`, mimeType: "application/dxf" });
+    const cloud = await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
+    const path = await saveFile(cloud?.dxf ?? padResult.dxf, { defaultName: `${name}_switch_pad.dxf`, mimeType: "application/dxf" });
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [padResult, layout.meta.name, t]);
+  }, [padResult, padParams, layout, layout.meta.name, t]);
 
   return (
     <div className="kle-panel" style={{
@@ -150,7 +143,6 @@ export default function SwitchPadSection({
         {padResult && safeSvg ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
             <div style={{ maxWidth: "100%", overflow: "hidden" }} dangerouslySetInnerHTML={{ __html: safeSvg }} />
-            <CloudNotice busy={padCloudBusy} fallback={padCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{padResult.width.toFixed(1)} × {padResult.height.toFixed(1)} mm

@@ -4,8 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePlate } from "../lib/plate-export";
 import type { PlateConfig, PlateResult, PlateRotationOverrides } from "../lib/plate-export";
-import { useCloudGeometry } from "../lib/use-cloud-geometry";
-import CloudNotice from "./CloudNotice";
+import { fetchCloudGeometry } from "../lib/geometry-api";
 import type { KLELayout } from "../lib/kle-types";
 import { useI18n } from "../lib/i18n";
 import { useCompatMarkedIndices } from "../lib/compat-layer";
@@ -58,6 +57,14 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
   // ── Interactive preview state (selection only — rotations from parent) ──
   const [selectedKeyIdx, setSelectedKeyIdx] = useState<number | null>(null);
 
+  // 本地同步即时结果（交互式预览），云端仅用于导出。
+  const plateResult = useMemo((): PlateResult | null => {
+    if (!drawn || layout.keys.length === 0) return null;
+    return generatePlate(layout, effectiveConfig, rotationOverrides, {
+      compatKeyIndices: compatDimIndices,
+      holeFillet: config.holeFillet,
+    });
+  }, [drawn, effectiveConfig, layout, rotationOverrides, compatDimIndices, config.holeFillet]);
   const plateParams = useMemo(
     () => ({
       config: effectiveConfig,
@@ -66,21 +73,6 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
       compatKeyIndices: Array.from(compatDimIndices),
     }),
     [effectiveConfig, rotationOverrides, config.holeFillet, compatDimIndices],
-  );
-  const {
-    result: plateResult,
-    busy: plateCloudBusy,
-    fallback: plateCloudFallback,
-  } = useCloudGeometry<PlateResult>(
-    "plate",
-    drawn && layout.keys.length > 0,
-    layout,
-    plateParams,
-    () =>
-      generatePlate(layout, effectiveConfig, rotationOverrides, {
-        compatKeyIndices: compatDimIndices,
-        holeFillet: config.holeFillet,
-      }),
   );
 
   const [converting, setConverting] = useState(false);
@@ -133,28 +125,30 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     setSvgSaving(true);
     setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(plateResult.svg, {
+    const cloud = await fetchCloudGeometry<PlateResult>("plate", layout, plateParams);
+    const path = await saveFile(cloud?.svg ?? plateResult.svg, {
       defaultName: `${name}_plate.svg`,
       mimeType: "image/svg+xml",
     });
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [plateResult, layout.meta.name, t]);
+  }, [plateResult, plateParams, layout, layout.meta.name, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!plateResult?.dxf) return;
     setDxfSaving(true);
     setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const path = await saveFile(plateResult.dxf, {
+    const cloud = await fetchCloudGeometry<PlateResult>("plate", layout, plateParams);
+    const path = await saveFile(cloud?.dxf ?? plateResult.dxf, {
       defaultName: `${name}_plate.dxf`,
       mimeType: "application/dxf",
     });
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [plateResult, layout.meta.name, t]);
+  }, [plateResult, plateParams, layout, layout.meta.name, t]);
 
   // ── Interactive preview handlers ──
   // Issue 3: When selecting in plate, clear canvas selection to prevent dual control
@@ -264,7 +258,6 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
               onSpaceRotate={handleSpaceRotate}
               rotations={rotationOverrides}
             />
-            <CloudNotice busy={plateCloudBusy} fallback={plateCloudFallback} />
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
               <span style={{ fontSize: 12, color: "var(--theme-text)", fontWeight: 500 }}>
                 {t("plate.boardSize")}：{plateResult.width.toFixed(1)} × {plateResult.height.toFixed(1)} mm
