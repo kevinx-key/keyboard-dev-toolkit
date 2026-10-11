@@ -8,6 +8,8 @@
 
 import { logger } from "./error-logger";
 import { getTurnstileToken } from "./turnstile";
+import type { KLELayout } from "./kle-types";
+import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations } from "./pcb-export";
 
 const API_BASE = (process.env.NEXT_PUBLIC_GEOMETRY_API_BASE || "").replace(/\/+$/, "");
 
@@ -101,4 +103,52 @@ export function generateAssemblyStpCloud(
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
   return enqueueAndPoll("/api/v1/geometry/assembly", { parts }, onProgress);
+}
+
+// ── 高级 2D 几何：PCB 整板云端生成（§G-B3 / M1）──────────────────
+// 同步端点（非作业）：POST /api/v1/geometry/analyze → 200 { ok, engine, result }。
+// 迁移后与本地 pcb-export 输出**逐字节等价**（服务端已用黄金用例回归验证）。
+
+/** 引擎/契约版本；须与服务端 PCB_ENGINE 一致（变更即两仓同步升版）。 */
+export const PCB_ENGINE = "pcb@1";
+
+export interface CloudPcbParams {
+  config: PCBConfig;
+  switchRotations?: PCBSwitchRotations;
+  stabRotations?: PCBStabRotations;
+  /** Set → number[]（JSON 不可直接序列化 Set） */
+  compatKeyIndices?: number[];
+}
+
+export type CloudPcbResult = { ok: true; result: PCBResult } | { ok: false; code: string };
+
+/** PCB 整板生成（云端）：返回完整 PCBResult。离线/失败由调用方回落本地。 */
+export async function analyzePcbCloud(
+  snapshot: KLELayout,
+  params: CloudPcbParams,
+  signal?: AbortSignal,
+): Promise<CloudPcbResult> {
+  if (!API_BASE) return { ok: false, code: "DISABLED" };
+  try {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    const token = await getTurnstileToken();
+    if (token) headers["X-Turnstile-Token"] = token;
+    const res = await fetch(`${API_BASE}/api/v1/geometry/analyze`, {
+      method: "POST",
+      headers,
+      signal,
+      body: JSON.stringify({ snapshot, params, engine: PCB_ENGINE }),
+    });
+    if (!res.ok) {
+      const b = (await res.json().catch(() => null)) as { code?: string } | null;
+      return { ok: false, code: b?.code || String(res.status) };
+    }
+    const data = (await res.json()) as { ok?: boolean; result?: PCBResult };
+    if (!data?.ok || !data.result) return { ok: false, code: "BAD_RESPONSE" };
+    return { ok: true, result: data.result };
+  } catch (e) {
+    if ((e as { name?: string })?.name === "AbortError") return { ok: false, code: "ABORTED" };
+    logger.error("geometry analyze request failed", e);
+    return { ok: false, code: "NETWORK" };
+  }
 }
