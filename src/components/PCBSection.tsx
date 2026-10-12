@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePCB } from "../lib/pcb-export";
 import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType, InterferenceReport } from "../lib/pcb-export";
@@ -12,7 +12,7 @@ import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import { getTurnstileToken } from "../lib/turnstile";
-import { fetchCloudGeometry } from "../lib/geometry-api";
+import { fetchCloudGeometry, analyzeCloud } from "../lib/geometry-api";
 import InteractivePCBPreview from "./InteractivePCBPreview";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
@@ -256,19 +256,34 @@ export default function PCBSection({
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
   }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
 
-  // 干涉检测本地已移除（§G-B4）——按需调云端 /analyze（kind=pcb）取真实 pairs/marks。
-  const handleCheckInterference = useCallback(async () => {
+  // 干涉检测本地已移除（§G-B4）——云端 /analyze（kind=pcb）取真实 pairs/marks。
+  // 自动校验：板子/配置变化 → 先清旧值 → 防抖后重算（#1 默认开、#2 解除即清）。
+  const runInterference = useCallback(async (signal?: AbortSignal): Promise<void> => {
     if (!pcbResult) return;
+    setCloudInterference(null);
     setInterferenceChecking(true);
     setInterferenceMsg(null);
-    const cloud = await fetchCloudGeometry<PCBResult>("pcb", layout, pcbParams);
+    const res = await analyzeCloud("pcb", layout, pcbParams, signal);
+    if (signal?.aborted) return;
     setInterferenceChecking(false);
-    if (!cloud) {
+    if (res.ok) {
+      const r = res.result as PCBResult | null;
+      setCloudInterference(r?.interference ?? { pairs: [], marks: [] });
+    } else if (res.code !== "ABORTED" && res.code !== "DISABLED") {
       setInterferenceMsg({ ok: false, text: t("cloud.fallback") });
-      return;
     }
-    setCloudInterference(cloud.interference ?? { pairs: [], marks: [] });
   }, [pcbResult, pcbParams, layout, t]);
+
+  useEffect(() => {
+    if (!pcbResult) { setCloudInterference(null); setInterferenceChecking(false); return; }
+    const ac = new AbortController();
+    setCloudInterference(null); // 改动后立即清旧数字，避免残留误导
+    setInterferenceMsg(null);
+    const timer = setTimeout(() => { void runInterference(ac.signal); }, 900);
+    return () => { clearTimeout(timer); ac.abort(); };
+  }, [pcbResult, runInterference]);
+
+  const handleCheckInterference = useCallback(() => { void runInterference(); }, [runInterference]);
 
   const handleModelDownload = useCallback(async (modelKey: string, filename: string) => {
     setModelDownloading(prev => ({ ...prev, [modelKey]: true }));

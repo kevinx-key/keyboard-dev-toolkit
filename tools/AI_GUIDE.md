@@ -120,9 +120,17 @@ Supported properties: `x y w h x2 y2 w2 h2 r rx ry align labelSize f2 c t d g l 
 
 | format | Output | Notes |
 |--------|--------|-------|
-| `layout-svg` | .svg | Layout visualization (keycaps + labels) |
-| `pcb` | .svg + .dxf | PCB hole pattern (switches + stabilizers + LEDs) |
-| `plate` | .svg + .dxf | Plate cutouts (switches + stabilizers) |
+| `layout-svg` | .svg | Layout visualization (keycaps + labels). Always local. |
+| `pcb` | .svg + .dxf | PCB hole pattern (switches + stabilizers + LEDs). **Cloud-first**; local fallback is a reduced subset. |
+| `plate` | .svg + .dxf | Plate cutouts (switches + stabilizers). **Cloud-first**; local fallback draws Cherry stabilizers only. |
+
+### Cloud geometry (pcb/plate)
+
+`pcb` / `plate` exports prefer the **cloud geometry service** (full fidelity) and fall back to a **local subset** when offline.
+
+- Enable the cloud path with the env var **`KDT_GEOMETRY_API_BASE`** (e.g. `https://starthock.com`), falling back to `NEXT_PUBLIC_GEOMETRY_API_BASE`. If neither is set, the tool runs fully local.
+- The export result carries a **`source`** field (`cloud` / `local`), also shown in CLI output and the MCP reply text.
+- **Report `source` honestly.** A `local` result is a reduced subset (no collision-interference; only Cherry stabilizers). Never claim full geometry when `source` is `local`.
 
 **Pro features** (QMK export, KiCad, STP) are NOT exposed to the AI tool layer.
 

@@ -207,7 +207,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
             onChange={v => update("switchType", v as 1)}
           />
           <ConfigSelect label={t("plate.stabType")} tip={t("tip.plStab")} value={config.stabType}
-            options={[{ value: 0, label: t("plate.stabNone") }, { value: 1, label: "Cherry" }, { value: 2, label: `${t("plate.stabPCB")}${t("plate.cloudRender")}` }, { value: 3, label: `${t("plate.stabFuling")}${t("plate.cloudRender")}` }]}
+            options={[{ value: 0, label: t("plate.stabNone") }, { value: 1, label: "Cherry" }, { value: 2, label: t("plate.stabPCB") }, { value: 3, label: t("plate.stabFuling") }]}
             onChange={v => update("stabType", v as 0 | 1 | 2 | 3)}
           />
           <ConfigNumber label={t("plate.kerf")} tip={t("tip.plKerf")} value={config.kerf} enabled={config.kerfEnabled} onToggle={v => update("kerfEnabled", v)} onChange={v => update("kerf", v)} min={0} max={2} step={0.05} />
