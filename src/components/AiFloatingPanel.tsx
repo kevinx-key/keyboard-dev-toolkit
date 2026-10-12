@@ -17,6 +17,12 @@ import {
   type AiSession,
   type ChatMsg,
 } from "../lib/ai-context";
+import {
+  COMMUNITY_GLOSSARY_CATEGORIES,
+  COMMUNITY_GLOSSARY_FULL,
+  COMMUNITY_TERMS,
+  glossaryByCategory,
+} from "../lib/community-terms";
 
 const U_MM = 19.05;
 const LS_BASE_URL = "kdt-ai-base-url";
@@ -197,6 +203,23 @@ const TOOL_DEFS = [
       parameters: { type: "object" as const, properties: {} },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "read_glossary",
+      description:
+        "Read the keyboard-community (键圈) terminology glossary: bilingual Chinese↔English terms with definitions (e.g. GB/IC/MOQ, gasket, plate materials, keycap profiles, switches, thock/clack). Call it when the user uses a hobby term you are unsure about, or to speak the community's language accurately. Optionally pass a category to fetch only that group.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          category: {
+            type: "string",
+            description: `Optional category. One of: ${COMMUNITY_GLOSSARY_CATEGORIES.join(" / ")}`,
+          },
+        },
+      },
+    },
+  },
 ];
 
 function freshSession(): AiSession {
@@ -299,6 +322,12 @@ export default function AiFloatingPanel({ layout, onAiCommit }: { layout: KLELay
     const cur = layoutRef.current;
     if (name === "read_layout") return summarize(cur);
     if (name === "read_doc") return AI_QUICKREF;
+    if (name === "read_glossary") {
+      const cat = typeof args.category === "string" ? args.category : "";
+      const section = cat ? glossaryByCategory(cat) : null;
+      if (cat && !section) return `Unknown category "${cat}". Available: ${COMMUNITY_GLOSSARY_CATEGORIES.join(" / ")}`;
+      return section ?? COMMUNITY_GLOSSARY_FULL;
+    }
     if (name === "export_svg") return exportSVG(cur, 2).slice(0, 2000) + "\n...(truncated)";
     if (name === "edit_layout") {
       const ops = args.ops as Op[] | undefined;
@@ -426,6 +455,8 @@ Assistant: [read_layout → locate Enter #69 (e.g. w=2.25 h=1 at x=12.75 y=3.5) 
 - Use industry terminology naturally (1u, stagger, ortho, hotswap, plate cutout, etc.).
 
 ${KEYBOARD_TERMS}
+
+${COMMUNITY_TERMS}
 
 ## DOMAIN KNOWLEDGE
 

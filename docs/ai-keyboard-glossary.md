@@ -5,6 +5,10 @@
 > The web AI panel inlines a condensed version of this table in its system prompt; this file is the full version.
 > Rule: if a term is genuinely ambiguous (e.g. 「大回车」), ask the user ONCE for row/column/width with a
 > default option — never guess silently.
+>
+> **Broader hobby (键圈) vocabulary** — commerce, structure/mount, keycap profiles, switches, sound terms and
+> community slang — lives in `docs/键圈术语资料包/` (see `键圈文化百科-LLM知识文档.md` for the culture
+> knowledge pack and `键圈术语表-中英对照.md` for the full 223-term bilingual table).
 
 ---
 

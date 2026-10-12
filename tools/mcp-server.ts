@@ -83,6 +83,28 @@ server.tool(
 );
 
 server.tool(
+  "get_community_glossary",
+  "Read the keyboard-community (键圈) knowledge so replies speak the hobby's own language: GB/IC/MOQ commerce model, structure/mount, plate materials, keycap profiles, switches, sound terms (thock/clack), community slang and values. section=culture (default) -> the LLM knowledge pack; section=terms -> the full 223-term bilingual term table.",
+  {
+    section: z
+      .enum(["culture", "terms"])
+      .optional()
+      .describe("culture (default) = 键圈文化百科 knowledge pack; terms = full 223-term bilingual table"),
+  },
+  async ({ section }) => {
+    const rel =
+      section === "terms"
+        ? "docs/键圈术语资料包/键圈术语表-中英对照.md"
+        : "docs/键圈术语资料包/键圈文化百科-LLM知识文档.md";
+    try {
+      return text(readRepoDoc(rel));
+    } catch (e) {
+      return fail(e);
+    }
+  },
+);
+
+server.tool(
   "list_presets",
   "List available keyboard preset templates (60%, ANSI 104, ISO 105, ErgoDox, ...)",
   {},

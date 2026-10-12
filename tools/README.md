@@ -91,6 +91,8 @@ KDT_GEOMETRY_API_BASE=https://starthock.com npx tsx tools/cli.ts export board.js
 | 工具 | 说明 |
 |------|------|
 | `get_guide` | 获取 AI 使用指南（KLE 格式规范 + ops 语法） |
+| `get_glossary` | 读取键帽/配列等术语的中英对照（中文俗称→标准规格） |
+| `get_community_glossary` | 读取键圈社区术语与文化（`section=culture` 知识包 / `section=terms` 223 条术语表） |
 | `list_presets` | 列出可用键盘预设模板 |
 | `create_layout` | 用预设或行 JSON 创建布局文件 |
 | `read_layout` | 读取布局文件（可选附键位明细） |

@@ -5,6 +5,11 @@
 > **Terminology**: users name keys with Chinese hobbyist colloquialisms (e.g. 「7字回车」「分裂空格」「大回车」).
 > The full bilingual mapping lives in `docs/ai-keyboard-glossary.md`. Consult it when the user uses such terms;
 > if a term is genuinely ambiguous (e.g. 「大回车」), ask ONCE with a default instead of guessing.
+>
+> **Community (键圈) context**: the user is a mechanical-keyboard hobbyist, not a generic buyer. Speak the hobby's
+> own language — structure/mount (gasket/top/tray), plate materials, keycap profiles, switches, sound terms
+> (thock/clack), and commerce terms (GB/IC/MOQ). For hobby terms and culture call `get_community_glossary`
+> (`section=culture` for the knowledge pack, `section=terms` for the full 223-term bilingual table).
 
 ## KLE Row Format (core data format)
 

@@ -1,0 +1,2012 @@
+{
+ "count": 223,
+ "terms": [
+  {
+   "en": "GB (Group Buy)",
+   "abbr": "GB",
+   "full": "Group Buy",
+   "cn": "团购/开团",
+   "category": "行业机制",
+   "definition": "社区自发组织的预售模式：团长发布设计→IC收集意向→达MOQ后向工厂下单→生产→全球发货，全程常需6-18个月。",
+   "significance": "客制化键盘最核心的商业模式，决定了整个圈子的交易节奏与风险结构。"
+  },
+  {
+   "en": "IC (Interest Check)",
+   "abbr": "IC",
+   "full": "Interest Check",
+   "cn": "意向调查",
+   "category": "行业机制",
+   "definition": "GB前的调研阶段，团长公布设计概念与渲染图，收集社区反馈、投票与预登记，用于判断需求与定价。",
+   "significance": "产品能否立项的风向标；IC热度直接决定后续GB是否开得起来。"
+  },
+  {
+   "en": "MOQ (Minimum Order Quantity)",
+   "abbr": "MOQ",
+   "full": "Minimum Order Quantity",
+   "cn": "最小起订量",
+   "category": "行业机制",
+   "definition": "工厂/厂家要求的最低订单数量，未达标则可能流产、涨价或延期。",
+   "significance": "GB能否成团的红线；很多好设计因达不到MOQ而夭折。"
+  },
+  {
+   "en": "Vendor",
+   "abbr": "Vendor",
+   "full": "",
+   "cn": "代理商/经销",
+   "category": "行业机制",
+   "definition": "经团长授权、负责特定地区(如EU/NA/SEA)收款与发货的合作商家。",
+   "significance": "降低跨境物流与关税门槛，是GB全球化交付的关键角色。"
+  },
+  {
+   "en": "Proxy",
+   "abbr": "Proxy",
+   "full": "",
+   "cn": "代理/代购",
+   "category": "行业机制",
+   "definition": "帮助无法直连团购的地区用户代下单、代收、代发的个人或商家。",
+   "significance": "解决支付与物流壁垒，但也带来信任与加价问题。"
+  },
+  {
+   "en": "Raffle",
+   "abbr": "Raffle",
+   "full": "",
+   "cn": "抽签",
+   "category": "行业机制",
+   "definition": "热门GB用随机抽签分配购买资格，防止服务器秒崩和黄牛。",
+   "significance": "稀缺性的象征，被抽中约等于中奖。"
+  },
+  {
+   "en": "FCFS (First Come First Serve)",
+   "abbr": "FCFS",
+   "full": "First Come First Serve",
+   "cn": "先到先得/抢购",
+   "category": "行业机制",
+   "definition": "按下单先后顺序售卖，先抢到先得，常在几分钟内售罄。",
+   "significance": "考验网速与手速，热门款秒空。"
+  },
+  {
+   "en": "Extras",
+   "abbr": "Extras",
+   "full": "",
+   "cn": "余量/加购",
+   "category": "行业机制",
+   "definition": "GB结束后额外生产的备用库存，通常在vendor处现货销售。",
+   "significance": "没赶上GB的补救渠道，但价格常高于团购价。"
+  },
+  {
+   "en": "In-stock",
+   "abbr": "In-stock",
+   "full": "",
+   "cn": "现货",
+   "category": "行业机制",
+   "definition": "不等团购周期，直接购买即发货的销售形式。",
+   "significance": "与GB相对，交付快但选择性少、多为量产款。"
+  },
+  {
+   "en": "Pre-order",
+   "abbr": "Pre-order",
+   "full": "",
+   "cn": "预售",
+   "category": "行业机制",
+   "definition": "提前下单、后续生产的销售形式，介于GB与现货之间。",
+   "significance": ""
+  },
+  {
+   "en": "B-stock (B品)",
+   "abbr": "B-stock",
+   "full": "B品",
+   "cn": "瑕疵品/次品",
+   "category": "行业机制",
+   "definition": "存在轻微外观或工艺瑕疵但功能正常的正品，折价出售。",
+   "significance": "性价比玩家的捡漏渠道。"
+  },
+  {
+   "en": "QC (Quality Control)",
+   "abbr": "QC",
+   "full": "Quality Control",
+   "cn": "质检",
+   "category": "行业机制",
+   "definition": "出厂前的质量把控；跳票、瑕疵率高会引发社区公愤。",
+   "significance": "QC翻车是GB口碑崩塌的头号原因。"
+  },
+  {
+   "en": "Deposit",
+   "abbr": "Deposit",
+   "full": "",
+   "cn": "定金",
+   "category": "行业机制",
+   "definition": "下单时先付的部分款项，常见50%，尾款于发货前结清。",
+   "significance": ""
+  },
+  {
+   "en": "Invoice",
+   "abbr": "Invoice",
+   "full": "",
+   "cn": "账单/付款通知",
+   "category": "行业机制",
+   "definition": "团长或vendor发出的付款请求，通常有付款截止日。",
+   "significance": "逾期未付视为放弃购买资格。"
+  },
+  {
+   "en": "Round / R1 / R2",
+   "abbr": "Round / R1 / R2",
+   "full": "",
+   "cn": "第几期/复刻",
+   "category": "行业机制",
+   "definition": "同一产品多次开团的编号，R2=第二次复刻。",
+   "significance": "火爆款复刻(重开团)是社区长期呼声。"
+  },
+  {
+   "en": "TBD (To Be Determined)",
+   "abbr": "TBD",
+   "full": "To Be Determined",
+   "cn": "待定",
+   "category": "行业机制",
+   "definition": "价格、日期等尚未确定，常用于IC阶段。",
+   "significance": ""
+  },
+  {
+   "en": "GB Cancellation",
+   "abbr": "GB Cancellation",
+   "full": "",
+   "cn": "团购取消/流团",
+   "category": "行业机制",
+   "definition": "因未达MOQ、成本暴涨或团长跑路而终止，涉及退款纠纷。",
+   "significance": "键圈最大信任风险来源。"
+  },
+  {
+   "en": "Flipping / Flip",
+   "abbr": "Flipping / Flip",
+   "full": "",
+   "cn": "倒卖/炒货",
+   "category": "行业机制",
+   "definition": "抢购后高价转售赚差价的行为，社区普遍反感。",
+   "significance": "催生二手溢价与黄牛文化。"
+  },
+  {
+   "en": "Aftermarket",
+   "abbr": "Aftermarket",
+   "full": "",
+   "cn": "二级市场/二手市场",
+   "category": "行业机制",
+   "definition": "GB结束后的转售市场，价格随稀缺度波动。",
+   "significance": ""
+  },
+  {
+   "en": "Group Buy Lifecycle",
+   "abbr": "Group Buy Lifecycle",
+   "full": "",
+   "cn": "团购生命周期",
+   "category": "行业机制",
+   "definition": "IC→GB→生产→QC→发货→Extras 的标准流程链。",
+   "significance": "理解键圈一切话题的时间轴框架。"
+  },
+  {
+   "en": "Case",
+   "abbr": "Case",
+   "full": "",
+   "cn": "外壳",
+   "category": "结构",
+   "definition": "键盘的外壳，材质常见6063/7075铝合金，工艺有CNC、阳极氧化、PVD、电泳、喷涂。",
+   "significance": "外观、重量、声音的第一决定因素。"
+  },
+  {
+   "en": "CNC (Computer Numerical Control)",
+   "abbr": "CNC",
+   "full": "Computer Numerical Control",
+   "cn": "数控加工",
+   "category": "结构",
+   "definition": "用数控机床铣削铝块成型，高端客制化的标准工艺。",
+   "significance": "CNC铝壳是高端键盘的身份证。"
+  },
+  {
+   "en": "Anodized",
+   "abbr": "Anodized",
+   "full": "",
+   "cn": "阳极氧化",
+   "category": "结构",
+   "definition": "铝表面电解着色工艺，色彩耐久、有金属质感。",
+   "significance": "常见色号如黑、银、蓝、紫。"
+  },
+  {
+   "en": "PVD (Physical Vapor Deposition)",
+   "abbr": "PVD",
+   "full": "Physical Vapor Deposition",
+   "cn": "物理气相沉积",
+   "category": "结构",
+   "definition": "真空镀膜工艺，用于做出镜面金、玫瑰金等金属光泽，耐磨。",
+   "significance": "高端配重/外壳的奢华工艺。"
+  },
+  {
+   "en": "E-coat / Electrophoresis",
+   "abbr": "E-coat / Electrophoresis",
+   "full": "",
+   "cn": "电泳涂装",
+   "category": "结构",
+   "definition": "电泳上色，色彩均匀、可做白色，常用于铝壳。",
+   "significance": ""
+  },
+  {
+   "en": "Mount",
+   "abbr": "Mount",
+   "full": "",
+   "cn": "结构/固定方式",
+   "category": "结构",
+   "definition": "PCB与外壳/定位板的连接方式，决定手感与声音的核心变量。",
+   "significance": "客制化键盘的'灵魂'。"
+  },
+  {
+   "en": "Tray Mount",
+   "abbr": "Tray Mount",
+   "full": "",
+   "cn": "托架结构",
+   "category": "结构",
+   "definition": "PCB直接固定在底壳螺柱上的传统结构，成本低、手感偏硬。",
+   "significance": ""
+  },
+  {
+   "en": "Top Mount",
+   "abbr": "Top Mount",
+   "full": "",
+   "cn": "上固定",
+   "category": "结构",
+   "definition": "定位板固定在上壳，手感统一扎实、声音清脆。",
+   "significance": ""
+  },
+  {
+   "en": "Bottom Mount",
+   "abbr": "Bottom Mount",
+   "full": "",
+   "cn": "下固定",
+   "category": "结构",
+   "definition": "定位板固定在下壳的结构。",
+   "significance": ""
+  },
+  {
+   "en": "Sandwich Mount",
+   "abbr": "Sandwich Mount",
+   "full": "",
+   "cn": "三明治结构",
+   "category": "结构",
+   "definition": "定位板上下被外壳夹住，结构简单、声音直接。",
+   "significance": ""
+  },
+  {
+   "en": "Gasket Mount",
+   "abbr": "Gasket Mount",
+   "full": "",
+   "cn": "垫圈结构/软弹结构",
+   "category": "结构",
+   "definition": "PCB/定位板通过硅胶或泡棉垫圈悬空固定，手感软弹、声音柔和。",
+   "significance": "当代客制化主流结构，'软弹(gasket)'是核心卖点。"
+  },
+  {
+   "en": "Burger Mount",
+   "abbr": "Burger Mount",
+   "full": "",
+   "cn": "汉堡结构",
+   "category": "结构",
+   "definition": "用O型圈将定位板'夹'在上下壳之间的做法。",
+   "significance": ""
+  },
+  {
+   "en": "Leaf Spring Mount",
+   "abbr": "Leaf Spring Mount",
+   "full": "",
+   "cn": "板簧结构",
+   "category": "结构",
+   "definition": "定位板通过板簧悬臂支撑，提供弹性。",
+   "significance": ""
+  },
+  {
+   "en": "Integrated Plate",
+   "abbr": "Integrated Plate",
+   "full": "",
+   "cn": "一体定位板",
+   "category": "结构",
+   "definition": "外壳与定位板一体成型，最硬的结构。",
+   "significance": ""
+  },
+  {
+   "en": "Plate",
+   "abbr": "Plate",
+   "full": "",
+   "cn": "定位板",
+   "category": "结构",
+   "definition": "固定轴体的板，材质有PC、POM、FR4、铝、黄铜、不锈钢、碳纤维、钛。",
+   "significance": "材质直接决定手感软硬与声音。"
+  },
+  {
+   "en": "PC Plate (Polycarbonate)",
+   "abbr": "PC Plate",
+   "full": "Polycarbonate",
+   "cn": "PC定位板",
+   "category": "结构",
+   "definition": "聚碳酸酯，软弹、声音温和，主流热门。",
+   "significance": ""
+  },
+  {
+   "en": "POM Plate",
+   "abbr": "POM Plate",
+   "full": "",
+   "cn": "POM定位板",
+   "category": "结构",
+   "definition": "聚甲醛，比PC更硬一点，声音扎实。",
+   "significance": ""
+  },
+  {
+   "en": "FR4 Plate",
+   "abbr": "FR4 Plate",
+   "full": "",
+   "cn": "FR4定位板",
+   "category": "结构",
+   "definition": "玻纤板，硬朗、声音清脆。",
+   "significance": ""
+  },
+  {
+   "en": "Brass Plate",
+   "abbr": "Brass Plate",
+   "full": "",
+   "cn": "黄铜定位板",
+   "category": "结构",
+   "definition": "极硬、声音高亢明亮。",
+   "significance": ""
+  },
+  {
+   "en": "PCB (Printed Circuit Board)",
+   "abbr": "PCB",
+   "full": "Printed Circuit Board",
+   "cn": "电路板",
+   "category": "结构",
+   "definition": "键盘主板，分热插拔版与焊接版。",
+   "significance": "键圈讨论的核心硬件之一。"
+  },
+  {
+   "en": "Hotswap",
+   "abbr": "Hotswap",
+   "full": "",
+   "cn": "热插拔",
+   "category": "结构",
+   "definition": "用热插拔座(Kailh等)免焊接换轴，插拔即换。",
+   "significance": "降低玩轴门槛，量产键盘标配趋势。"
+  },
+  {
+   "en": "Solder PCB",
+   "abbr": "Solder PCB",
+   "full": "",
+   "cn": "焊接版PCB",
+   "category": "结构",
+   "definition": "轴体需焊接到PCB，手感一致性更好、更可靠，客制化传统主流。",
+   "significance": ""
+  },
+  {
+   "en": "Multi-layout",
+   "abbr": "Multi-layout",
+   "full": "",
+   "cn": "多配列支持",
+   "category": "结构",
+   "definition": "一块PCB支持多种配列(ANSI/ISO/分裂空格等)，用跳线/双焊盘实现。",
+   "significance": ""
+  },
+  {
+   "en": "Flex Cut",
+   "abbr": "Flex Cut",
+   "full": "",
+   "cn": "开槽/柔性切割",
+   "category": "结构",
+   "definition": "PCB上开槽以提升弹性，常与gasket结构搭配；1.6mm non-flex cut=无开槽。",
+   "significance": ""
+  },
+  {
+   "en": "Foam",
+   "abbr": "Foam",
+   "full": "",
+   "cn": "消音棉",
+   "category": "结构",
+   "definition": "填充空腔以改变声音，分Case foam(底棉)、Plate foam(夹心棉)、PE foam。",
+   "significance": "调音的核心道具。"
+  },
+  {
+   "en": "Gasket",
+   "abbr": "Gasket",
+   "full": "",
+   "cn": "垫圈",
+   "category": "结构",
+   "definition": "硅胶/泡棉条，用于gasket mount的弹性支撑。",
+   "significance": ""
+  },
+  {
+   "en": "Dampening",
+   "abbr": "Dampening",
+   "full": "",
+   "cn": "减震/消音",
+   "category": "结构",
+   "definition": "泛指各类减震消音处理。",
+   "significance": ""
+  },
+  {
+   "en": "Weight",
+   "abbr": "Weight",
+   "full": "",
+   "cn": "配重",
+   "category": "结构",
+   "definition": "增加键盘重量与质感的金属块，材质有黄铜、不锈钢、铜、钨。",
+   "significance": "高端键盘'沉甸甸'的象征，常刻有品牌/序号。"
+  },
+  {
+   "en": "Stabilizer",
+   "abbr": "Stabilizer",
+   "full": "",
+   "cn": "卫星轴",
+   "category": "结构",
+   "definition": "大键(空格/Shift/Enter等)的平衡机构。",
+   "significance": "大键手感(是否'肉'、'晃'、'响')是键盘好坏的关键评判点。"
+  },
+  {
+   "en": "Screw-in / Clip-in",
+   "abbr": "Screw-in / Clip-in",
+   "full": "",
+   "cn": "螺丝固定/卡扣固定",
+   "category": "结构",
+   "definition": "卫星轴固定方式，螺丝固定更稳、更易调。",
+   "significance": ""
+  },
+  {
+   "en": "Dielectric Grease",
+   "abbr": "Dielectric Grease",
+   "full": "",
+   "cn": "绝缘硅脂",
+   "category": "结构",
+   "definition": "常用作卫星轴润滑剂。",
+   "significance": ""
+  },
+  {
+   "en": "Standoff",
+   "abbr": "Standoff",
+   "full": "",
+   "cn": "铜柱",
+   "category": "结构",
+   "definition": "支撑PCB与外壳的支柱。",
+   "significance": ""
+  },
+  {
+   "en": "Typing Angle",
+   "abbr": "Typing Angle",
+   "full": "",
+   "cn": "打字倾角",
+   "category": "结构",
+   "definition": "键面倾斜角度(如6°/7°/8°)，影响打字舒适度。",
+   "significance": ""
+  },
+  {
+   "en": "Front Height",
+   "abbr": "Front Height",
+   "full": "",
+   "cn": "前高",
+   "category": "结构",
+   "definition": "键盘最前端离桌面高度，越低越舒适，是玩家重点关注参数。",
+   "significance": ""
+  },
+  {
+   "en": "Wrist Rest",
+   "abbr": "Wrist Rest",
+   "full": "",
+   "cn": "掌托/腕托",
+   "category": "结构",
+   "definition": "支撑手腕的配件，提升长时间打字舒适度。",
+   "significance": ""
+  },
+  {
+   "en": "Layout",
+   "abbr": "Layout",
+   "full": "",
+   "cn": "配列/布局",
+   "category": "配列",
+   "definition": "键位排列方式，如60%、65%、TKL等。",
+   "significance": "决定键盘尺寸与功能取舍。"
+  },
+  {
+   "en": "60%",
+   "abbr": "60%",
+   "full": "",
+   "cn": "60%配列",
+   "category": "配列",
+   "definition": "只保留主键区，去掉方向键、F区、小键盘，最紧凑。",
+   "significance": ""
+  },
+  {
+   "en": "65%",
+   "abbr": "65%",
+   "full": "",
+   "cn": "65%配列",
+   "category": "配列",
+   "definition": "60%+方向键列，兼顾紧凑与实用。",
+   "significance": ""
+  },
+  {
+   "en": "75%",
+   "abbr": "75%",
+   "full": "",
+   "cn": "75%配列",
+   "category": "配列",
+   "definition": "65%+F区，功能齐全且紧凑。",
+   "significance": ""
+  },
+  {
+   "en": "TKL (Tenkeyless)",
+   "abbr": "TKL",
+   "full": "Tenkeyless",
+   "cn": "87键/无小键盘",
+   "category": "配列",
+   "definition": "去掉数字小键盘的87键配列，最受欢迎之一。",
+   "significance": ""
+  },
+  {
+   "en": "Full-size / 100%",
+   "abbr": "Full-size / 100%",
+   "full": "",
+   "cn": "104键全尺寸",
+   "category": "配列",
+   "definition": "含数字小键盘的标准配列。",
+   "significance": ""
+  },
+  {
+   "en": "1800 / 96%",
+   "abbr": "1800 / 96%",
+   "full": "",
+   "cn": "紧凑全尺寸",
+   "category": "配列",
+   "definition": "把小键盘与主键区紧凑排列的全尺寸变体。",
+   "significance": ""
+  },
+  {
+   "en": "HHKB (Happy Hacking Keyboard)",
+   "abbr": "HHKB",
+   "full": "Happy Hacking Keyboard",
+   "cn": "HHKB配列",
+   "category": "配列",
+   "definition": "Ctrl在Caps位置、无独立方向键的极简配列，源于静电容键盘。",
+   "significance": ""
+  },
+  {
+   "en": "WKL (Winkeyless)",
+   "abbr": "WKL",
+   "full": "Winkeyless",
+   "cn": "无Win键",
+   "category": "配列",
+   "definition": "底排为1.5u+1u+1.5u、去掉Win键的配列。",
+   "significance": "复古与美感取向，客制化经典。"
+  },
+  {
+   "en": "WK (Winkey)",
+   "abbr": "WK",
+   "full": "Winkey",
+   "cn": "有Win键",
+   "category": "配列",
+   "definition": "标准底排(1.25u+1.25u+1.25u+6.25u)含Win键的配列。",
+   "significance": ""
+  },
+  {
+   "en": "Alice",
+   "abbr": "Alice",
+   "full": "",
+   "cn": "Alice配列",
+   "category": "配列",
+   "definition": "左右分区的类人体工学配列，弧形排列，缓解手腕外翻。",
+   "significance": ""
+  },
+  {
+   "en": "Ortholinear",
+   "abbr": "Ortholinear",
+   "full": "",
+   "cn": "直列配列",
+   "category": "配列",
+   "definition": "按键呈正交网格排列(非错位)的配列。",
+   "significance": ""
+  },
+  {
+   "en": "Split / Ergo",
+   "abbr": "Split / Ergo",
+   "full": "",
+   "cn": "分体/人体工学",
+   "category": "配列",
+   "definition": "左右分开的键盘，可自定义间距与角度。",
+   "significance": ""
+  },
+  {
+   "en": "ISO",
+   "abbr": "ISO",
+   "full": "",
+   "cn": "ISO欧式配列",
+   "category": "配列",
+   "definition": "大Enter+左Shift短+多一个键，欧洲标准。",
+   "significance": ""
+  },
+  {
+   "en": "ANSI",
+   "abbr": "ANSI",
+   "full": "",
+   "cn": "ANSI美式配列",
+   "category": "配列",
+   "definition": "长Enter+长Shift，美式标准，最常见。",
+   "significance": ""
+  },
+  {
+   "en": "JIS",
+   "abbr": "JIS",
+   "full": "",
+   "cn": "JIS日式配列",
+   "category": "配列",
+   "definition": "日本标准，多出假名键与变窄空格。",
+   "significance": ""
+  },
+  {
+   "en": "7u / 6.25u / 6u Spacebar",
+   "abbr": "7u / 6.25u / 6u Spacebar",
+   "full": "",
+   "cn": "空格键尺寸",
+   "category": "配列",
+   "definition": "空格键宽度单位(u=1个标准键宽)，7u为复古大空格。",
+   "significance": ""
+  },
+  {
+   "en": "Split Spacebar",
+   "abbr": "Split Spacebar",
+   "full": "",
+   "cn": "分裂空格",
+   "category": "配列",
+   "definition": "把一个空格拆成2-3个键，提升功能利用率。",
+   "significance": ""
+  },
+  {
+   "en": "Split Backspace",
+   "abbr": "Split Backspace",
+   "full": "",
+   "cn": "分裂退格",
+   "category": "配列",
+   "definition": "退格键拆成两个键。",
+   "significance": ""
+  },
+  {
+   "en": "Stepped Caps Lock",
+   "abbr": "Stepped Caps Lock",
+   "full": "",
+   "cn": "阶梯Caps",
+   "category": "配列",
+   "definition": "Caps键带阶梯造型，复古防误触设计。",
+   "significance": ""
+  },
+  {
+   "en": "Bottom Row",
+   "abbr": "Bottom Row",
+   "full": "",
+   "cn": "底排",
+   "category": "配列",
+   "definition": "键盘最下排，其键位组合(1.5u/1.25u等)决定键帽适配。",
+   "significance": ""
+  },
+  {
+   "en": "F-row",
+   "abbr": "F-row",
+   "full": "",
+   "cn": "F区/功能键排",
+   "category": "配列",
+   "definition": "键盘顶部的F1-F12键区。",
+   "significance": ""
+  },
+  {
+   "en": "Keycap (Keycaps)",
+   "abbr": "Keycap",
+   "full": "Keycaps",
+   "cn": "键帽",
+   "category": "键帽",
+   "definition": "装在轴体上的按键帽，客制化的'化妆品'。",
+   "significance": ""
+  },
+  {
+   "en": "Profile",
+   "abbr": "Profile",
+   "full": "",
+   "cn": "键帽高度/球帽型",
+   "category": "键帽",
+   "definition": "键帽的造型与高度体系，如Cherry、SA、DSA、KAT等。",
+   "significance": "决定敲击手感与视觉风格。"
+  },
+  {
+   "en": "Cherry Profile / GMK",
+   "abbr": "Cherry Profile / GMK",
+   "full": "",
+   "cn": "原厂高度",
+   "category": "键帽",
+   "definition": "Cherry原厂台阶圆柱形高度，GMK制造的ABS二色键帽是行业标杆。",
+   "significance": "'GMK'几乎等同于高端键帽的代名词。"
+  },
+  {
+   "en": "SA Profile",
+   "abbr": "SA Profile",
+   "full": "",
+   "cn": "SA球帽",
+   "category": "键帽",
+   "definition": "高球形键帽，复古厚重、声音低沉。",
+   "significance": ""
+  },
+  {
+   "en": "DSA Profile",
+   "abbr": "DSA Profile",
+   "full": "",
+   "cn": "DSA球帽",
+   "category": "键帽",
+   "definition": "矮球形，统一高度(全排同高)，简洁。",
+   "significance": ""
+  },
+  {
+   "en": "XDA Profile",
+   "abbr": "XDA Profile",
+   "full": "",
+   "cn": "XDA",
+   "category": "键帽",
+   "definition": "矮球帽，接触面大、扁平。",
+   "significance": ""
+  },
+  {
+   "en": "MT3 Profile",
+   "abbr": "MT3 Profile",
+   "full": "",
+   "cn": "MT3",
+   "category": "键帽",
+   "definition": "Drop出品的高球帽，深凹弧面，手感独特。",
+   "significance": ""
+  },
+  {
+   "en": "DSS / DCS",
+   "abbr": "DSS / DCS",
+   "full": "",
+   "cn": "DSS/DCS",
+   "category": "键帽",
+   "definition": "SP出品的球面/柱面高度，DCS为经典矮柱面。",
+   "significance": ""
+  },
+  {
+   "en": "KAT / KAM",
+   "abbr": "KAT / KAM",
+   "full": "",
+   "cn": "KAT/KAM",
+   "category": "键帽",
+   "definition": "Keyreative出品的高度，KAT球面、KAM矮球面。",
+   "significance": ""
+  },
+  {
+   "en": "OEM Profile",
+   "abbr": "OEM Profile",
+   "full": "",
+   "cn": "OEM高度",
+   "category": "键帽",
+   "definition": "常见于量产键盘的台阶高度。",
+   "significance": ""
+  },
+  {
+   "en": "MDA / ASA",
+   "abbr": "MDA / ASA",
+   "full": "",
+   "cn": "MDA/ASA",
+   "category": "键帽",
+   "definition": "Akko等推广的球面高度，兼顾美观与手感。",
+   "significance": ""
+  },
+  {
+   "en": "ABS",
+   "abbr": "ABS",
+   "full": "",
+   "cn": "ABS材质",
+   "category": "键帽",
+   "definition": "易打油但色彩鲜艳、透光好、声音清脆，GMK标配。",
+   "significance": ""
+  },
+  {
+   "en": "PBT",
+   "abbr": "PBT",
+   "full": "",
+   "cn": "PBT材质",
+   "category": "键帽",
+   "definition": "耐磨不打油、声音厚实、表面磨砂，热升华主流。",
+   "significance": ""
+  },
+  {
+   "en": "POM",
+   "abbr": "POM",
+   "full": "",
+   "cn": "POM材质",
+   "category": "键帽",
+   "definition": "自润滑、顺滑，多见于原厂或特殊键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Resin",
+   "abbr": "Resin",
+   "full": "",
+   "cn": "树脂",
+   "category": "键帽",
+   "definition": "手工个性键帽常用材质。",
+   "significance": ""
+  },
+  {
+   "en": "Doubleshot",
+   "abbr": "Doubleshot",
+   "full": "",
+   "cn": "二色成型",
+   "category": "键帽",
+   "definition": "双色注塑，字符与键帽一体，永不磨损，GMK/SP标配。",
+   "significance": ""
+  },
+  {
+   "en": "Dye-sub (Dye Sublimation)",
+   "abbr": "Dye-sub",
+   "full": "Dye Sublimation",
+   "cn": "热升华",
+   "category": "键帽",
+   "definition": "高温把颜料渗入PBT，色彩丰富可做复杂图案。",
+   "significance": ""
+  },
+  {
+   "en": "Pad Printing",
+   "abbr": "Pad Printing",
+   "full": "",
+   "cn": "丝印",
+   "category": "键帽",
+   "definition": "表面印刷字符，成本低但易磨损。",
+   "significance": ""
+  },
+  {
+   "en": "Laser Etched",
+   "abbr": "Laser Etched",
+   "full": "",
+   "cn": "激光蚀刻",
+   "category": "键帽",
+   "definition": "激光刻字，常见于背光键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Alphas",
+   "abbr": "Alphas",
+   "full": "",
+   "cn": "字母区/主键区",
+   "category": "键帽",
+   "definition": "键帽套装中的字母键部分。",
+   "significance": ""
+  },
+  {
+   "en": "Mods",
+   "abbr": "Mods",
+   "full": "",
+   "cn": "修饰键区",
+   "category": "键帽",
+   "definition": "Shift/Ctrl/Alt/Enter等功能键部分。",
+   "significance": ""
+  },
+  {
+   "en": "Novelties",
+   "abbr": "Novelties",
+   "full": "",
+   "cn": "个性键/趣味键",
+   "category": "键帽",
+   "definition": "带有主题图案的特殊键帽，是套装的卖点与收藏点。",
+   "significance": ""
+  },
+  {
+   "en": "Base Kit",
+   "abbr": "Base Kit",
+   "full": "",
+   "cn": "基础套装",
+   "category": "键帽",
+   "definition": "覆盖标准配列(如TKL)的完整键帽套装。",
+   "significance": ""
+  },
+  {
+   "en": "Extension",
+   "abbr": "Extension",
+   "full": "",
+   "cn": "扩展套装",
+   "category": "键帽",
+   "definition": "补齐特殊配列所需的额外键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Numpad Kit",
+   "abbr": "Numpad Kit",
+   "full": "",
+   "cn": "小键盘套装",
+   "category": "键帽",
+   "definition": "补数字小键盘的键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Ortho Kit",
+   "abbr": "Ortho Kit",
+   "full": "",
+   "cn": "直列套装",
+   "category": "键帽",
+   "definition": "补直列配列所需键帽。",
+   "significance": ""
+  },
+  {
+   "en": "ISO Kit",
+   "abbr": "ISO Kit",
+   "full": "",
+   "cn": "ISO套装",
+   "category": "键帽",
+   "definition": "补ISO配列(大回车等)键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Spacebar Kit",
+   "abbr": "Spacebar Kit",
+   "full": "",
+   "cn": "空格套装",
+   "category": "键帽",
+   "definition": "补各种尺寸/颜色空格的套件。",
+   "significance": ""
+  },
+  {
+   "en": "Sublegends",
+   "abbr": "Sublegends",
+   "full": "",
+   "cn": "副刻",
+   "category": "键帽",
+   "definition": "主字符之外的附加刻字(如日文假名、俄文)。",
+   "significance": ""
+  },
+  {
+   "en": "Legends",
+   "abbr": "Legends",
+   "full": "",
+   "cn": "字符/刻字",
+   "category": "键帽",
+   "definition": "键帽上的文字图案。",
+   "significance": ""
+  },
+  {
+   "en": "Blanks",
+   "abbr": "Blanks",
+   "full": "",
+   "cn": "无刻",
+   "category": "键帽",
+   "definition": "无字符键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Barred / Icon Mods",
+   "abbr": "Barred / Icon Mods",
+   "full": "",
+   "cn": "条状/图标修饰键",
+   "category": "键帽",
+   "definition": "修饰键用横条或纯图标代替文字的风格。",
+   "significance": ""
+  },
+  {
+   "en": "Stepped Caps",
+   "abbr": "Stepped Caps",
+   "full": "",
+   "cn": "阶梯Caps键帽",
+   "category": "键帽",
+   "definition": "阶梯造型的Caps键帽。",
+   "significance": ""
+  },
+  {
+   "en": "Artisan",
+   "abbr": "Artisan",
+   "full": "",
+   "cn": "个性键帽/艺术键帽",
+   "category": "键帽",
+   "definition": "手工或限量制作的装饰性键帽，如RAMA、Jelly Key。",
+   "significance": "键圈的'收藏品'与身份象征，二级市场溢价惊人。"
+  },
+  {
+   "en": "Switch",
+   "abbr": "Switch",
+   "full": "",
+   "cn": "轴体/开关",
+   "category": "轴体",
+   "definition": "键盘的机械开关键，客制化玩法核心之一。",
+   "significance": ""
+  },
+  {
+   "en": "Linear",
+   "abbr": "Linear",
+   "full": "",
+   "cn": "线性轴",
+   "category": "轴体",
+   "definition": "直上直下无段落，代表手感'红轴'，顺滑。",
+   "significance": ""
+  },
+  {
+   "en": "Tactile",
+   "abbr": "Tactile",
+   "full": "",
+   "cn": "段落轴",
+   "category": "轴体",
+   "definition": "有明显段落反馈，代表手感'茶轴'。",
+   "significance": ""
+  },
+  {
+   "en": "Clicky",
+   "abbr": "Clicky",
+   "full": "",
+   "cn": "发声轴",
+   "category": "轴体",
+   "definition": "段落+清脆响声，代表手感'青轴'，扰民但爽。",
+   "significance": ""
+  },
+  {
+   "en": "MX",
+   "abbr": "MX",
+   "full": "",
+   "cn": "MX规格",
+   "category": "轴体",
+   "definition": "Cherry MX十字轴心标准，绝大多数键帽适配此规格。",
+   "significance": ""
+  },
+  {
+   "en": "ALPS",
+   "abbr": "ALPS",
+   "full": "",
+   "cn": "ALPS轴",
+   "category": "轴体",
+   "definition": "阿尔卑斯老式轴体，手感扎实，复古玩家所爱。",
+   "significance": ""
+  },
+  {
+   "en": "Topre / EC (Electrostatic Capacitive)",
+   "abbr": "Topre / EC",
+   "full": "Electrostatic Capacitive",
+   "cn": "静电容轴",
+   "category": "轴体",
+   "definition": "静电电容触发，手感独特'橡胶圆顶+电容'，如HHKB/Realforce。",
+   "significance": ""
+  },
+  {
+   "en": "Hall Effect / HE",
+   "abbr": "Hall Effect / HE",
+   "full": "",
+   "cn": "磁轴",
+   "category": "轴体",
+   "definition": "霍尔效应磁轴，可调触发点、支持快速触发(Rapid Trigger)。",
+   "significance": "当前电竞/高端键盘最热技术方向。"
+  },
+  {
+   "en": "Optical",
+   "abbr": "Optical",
+   "full": "",
+   "cn": "光轴",
+   "category": "轴体",
+   "definition": "光学触发，无触点磨损、响应快。",
+   "significance": ""
+  },
+  {
+   "en": "Vintage",
+   "abbr": "Vintage",
+   "full": "",
+   "cn": "老轴/复古轴",
+   "category": "轴体",
+   "definition": "停产的老轴(如老Cherry MX Black)，手感与收藏价值兼备。",
+   "significance": ""
+  },
+  {
+   "en": "Actuation Force",
+   "abbr": "Actuation Force",
+   "full": "",
+   "cn": "触发力度",
+   "category": "轴体",
+   "definition": "按下触发所需的克数(如45g)，决定手感轻重。",
+   "significance": ""
+  },
+  {
+   "en": "Actuation Point",
+   "abbr": "Actuation Point",
+   "full": "",
+   "cn": "触发行程",
+   "category": "轴体",
+   "definition": "按键触发所需的行程(如2mm)。",
+   "significance": ""
+  },
+  {
+   "en": "Bottom Out",
+   "abbr": "Bottom Out",
+   "full": "",
+   "cn": "触底",
+   "category": "轴体",
+   "definition": "按到底的力度/行程。",
+   "significance": ""
+  },
+  {
+   "en": "Total Travel",
+   "abbr": "Total Travel",
+   "full": "",
+   "cn": "总行程",
+   "category": "轴体",
+   "definition": "轴体可按下总距离(常见4mm)。",
+   "significance": ""
+  },
+  {
+   "en": "Spring Weight",
+   "abbr": "Spring Weight",
+   "full": "",
+   "cn": "弹簧力度",
+   "category": "轴体",
+   "definition": "弹簧克数，决定回弹与手感。",
+   "significance": ""
+  },
+  {
+   "en": "Long Spring",
+   "abbr": "Long Spring",
+   "full": "",
+   "cn": "长弹簧",
+   "category": "轴体",
+   "definition": "更长弹簧带来更快回弹，近年流行。",
+   "significance": ""
+  },
+  {
+   "en": "Progressive Spring",
+   "abbr": "Progressive Spring",
+   "full": "",
+   "cn": "渐进弹簧",
+   "category": "轴体",
+   "definition": "越按越重的非线性弹簧。",
+   "significance": ""
+  },
+  {
+   "en": "Lubing",
+   "abbr": "Lubing",
+   "full": "",
+   "cn": "润滑",
+   "category": "轴体",
+   "definition": "给轴体涂油/脂以提升顺滑度与声音，'润轴'。",
+   "significance": ""
+  },
+  {
+   "en": "Filming",
+   "abbr": "Filming",
+   "full": "",
+   "cn": "贴轴膜",
+   "category": "轴体",
+   "definition": "在轴体上下盖间加薄膜，减少晃动、改善声音。",
+   "significance": ""
+  },
+  {
+   "en": "Spring Swap",
+   "abbr": "Spring Swap",
+   "full": "",
+   "cn": "换弹簧",
+   "category": "轴体",
+   "definition": "更换弹簧改变手感力度。",
+   "significance": ""
+  },
+  {
+   "en": "Hotswap Socket",
+   "abbr": "Hotswap Socket",
+   "full": "",
+   "cn": "热插拔座",
+   "category": "轴体",
+   "definition": "PCB上的插拔座(如Kailh)，免焊接换轴。",
+   "significance": ""
+  },
+  {
+   "en": "Microswitch",
+   "abbr": "Microswitch",
+   "full": "",
+   "cn": "微动",
+   "category": "轴体",
+   "definition": "鼠标/键盘用的小型开关。",
+   "significance": ""
+  },
+  {
+   "en": "QMK (Quantum Mechanical Keyboard)",
+   "abbr": "QMK",
+   "full": "Quantum Mechanical Keyboard",
+   "cn": "QMK固件",
+   "category": "固件",
+   "definition": "开源键盘固件生态，客制化键盘的软件标准。",
+   "significance": ""
+  },
+  {
+   "en": "VIA",
+   "abbr": "VIA",
+   "full": "",
+   "cn": "VIA配置器",
+   "category": "固件",
+   "definition": "QMK的可视化在线改键工具，无需编译。",
+   "significance": ""
+  },
+  {
+   "en": "Vial",
+   "abbr": "Vial",
+   "full": "",
+   "cn": "Vial",
+   "category": "固件",
+   "definition": "VIA的增强分支，支持更多功能与本地配置。",
+   "significance": ""
+  },
+  {
+   "en": "ZMK",
+   "abbr": "ZMK",
+   "full": "",
+   "cn": "ZMK固件",
+   "category": "固件",
+   "definition": "面向无线(蓝牙)分体键盘的开源固件。",
+   "significance": ""
+  },
+  {
+   "en": "Remap",
+   "abbr": "Remap",
+   "full": "",
+   "cn": "改键/键位重映射",
+   "category": "固件",
+   "definition": "自定义每个键的功能与层。",
+   "significance": ""
+  },
+  {
+   "en": "NKRO (N-Key Rollover)",
+   "abbr": "NKRO",
+   "full": "N-Key Rollover",
+   "cn": "全键无冲",
+   "category": "固件",
+   "definition": "同时按下任意键都能正确识别。",
+   "significance": ""
+  },
+  {
+   "en": "6KRO",
+   "abbr": "6KRO",
+   "full": "",
+   "cn": "6键无冲",
+   "category": "固件",
+   "definition": "最多6键同时无冲，常见于USB HID限制。",
+   "significance": ""
+  },
+  {
+   "en": "Polling Rate",
+   "abbr": "Polling Rate",
+   "full": "",
+   "cn": "回报率",
+   "category": "固件",
+   "definition": "每秒向电脑报告次数，1000Hz/8000Hz。",
+   "significance": "8000Hz是当前电竞键盘的军备竞赛点。"
+  },
+  {
+   "en": "RGB / Underglow",
+   "abbr": "RGB / Underglow",
+   "full": "",
+   "cn": "RGB灯效/底部氛围灯",
+   "category": "固件",
+   "definition": "每键RGB或底部灯带。",
+   "significance": ""
+  },
+  {
+   "en": "Per-key RGB",
+   "abbr": "Per-key RGB",
+   "full": "",
+   "cn": "单键RGB",
+   "category": "固件",
+   "definition": "每个键独立可控的灯效。",
+   "significance": ""
+  },
+  {
+   "en": "WS2812 / SK6812",
+   "abbr": "WS2812 / SK6812",
+   "full": "",
+   "cn": "幻彩灯珠",
+   "category": "固件",
+   "definition": "可寻址RGB灯珠型号，常被键圈称为'幻彩'。",
+   "significance": ""
+  },
+  {
+   "en": "MCU (Microcontroller Unit)",
+   "abbr": "MCU",
+   "full": "Microcontroller Unit",
+   "cn": "主控芯片",
+   "category": "固件",
+   "definition": "键盘的大脑，如STM32、RP2040、ATmega32U4。",
+   "significance": ""
+  },
+  {
+   "en": "Thock",
+   "abbr": "Thock",
+   "full": "",
+   "cn": "低沉厚实声",
+   "category": "声音",
+   "definition": "形容沉闷、饱满、有质感的打字声。",
+   "significance": "键圈声音审美的高阶追求。"
+  },
+  {
+   "en": "Clack",
+   "abbr": "Clack",
+   "full": "",
+   "cn": "清脆敲击声",
+   "category": "声音",
+   "definition": "形容高亢清脆的敲击声。",
+   "significance": ""
+  },
+  {
+   "en": "Marbly",
+   "abbr": "Marbly",
+   "full": "",
+   "cn": "大理石声",
+   "category": "声音",
+   "definition": "形容像弹珠的圆润声音。",
+   "significance": ""
+  },
+  {
+   "en": "Creamy",
+   "abbr": "Creamy",
+   "full": "",
+   "cn": "奶油声",
+   "category": "声音",
+   "definition": "形容顺滑柔和的声音。",
+   "significance": ""
+  },
+  {
+   "en": "Sound Test",
+   "abbr": "Sound Test",
+   "full": "",
+   "cn": "声音测试",
+   "category": "声音",
+   "definition": "录制打字声音供社区评测，B站/YouTube常见。",
+   "significance": "是键盘选购的重要参考。"
+  },
+  {
+   "en": "Typing Feel",
+   "abbr": "Typing Feel",
+   "full": "",
+   "cn": "手感",
+   "category": "声音",
+   "definition": "按键的软硬、弹性和反馈的综合体验。",
+   "significance": ""
+  },
+  {
+   "en": "GeekHack",
+   "abbr": "GeekHack",
+   "full": "",
+   "cn": "GeekHack论坛",
+   "category": "社区",
+   "definition": "geekhack.org，全球最大、历史最悠久的机械键盘论坛与GB主阵地。",
+   "significance": "键圈文化的发源地与交易中心。"
+  },
+  {
+   "en": "r/MechanicalKeyboards",
+   "abbr": "r/MechanicalKeyboards",
+   "full": "",
+   "cn": "Reddit机械键盘版",
+   "category": "社区",
+   "definition": "Reddit的机械键盘社区(简称r/mk)，全球第二大聚集地。",
+   "significance": ""
+  },
+  {
+   "en": "Deskthority",
+   "abbr": "Deskthority",
+   "full": "",
+   "cn": "Deskthority",
+   "category": "社区",
+   "definition": "老牌社区，专注复古键盘、IBM、ALPS、复古轴体。",
+   "significance": ""
+  },
+  {
+   "en": "keebtalk",
+   "abbr": "keebtalk",
+   "full": "",
+   "cn": "keebtalk论坛",
+   "category": "社区",
+   "definition": "较新的键盘社区论坛。",
+   "significance": ""
+  },
+  {
+   "en": "Discord",
+   "abbr": "Discord",
+   "full": "",
+   "cn": "Discord社群",
+   "category": "社区",
+   "definition": "当代GB运营、客服、玩家交流的主要即时平台。",
+   "significance": ""
+  },
+  {
+   "en": "Keyboard Meetup",
+   "abbr": "Keyboard Meetup",
+   "full": "",
+   "cn": "键盘聚会",
+   "category": "社区",
+   "definition": "线下玩家聚会，交流、试打字、抽奖。",
+   "significance": ""
+  },
+  {
+   "en": "KeyCon (Keyboard Convention)",
+   "abbr": "KeyCon",
+   "full": "Keyboard Convention",
+   "cn": "键盘展会",
+   "category": "社区",
+   "definition": "键盘主题展会，厂商与玩家齐聚。",
+   "significance": ""
+  },
+  {
+   "en": "Enthusiast",
+   "abbr": "Enthusiast",
+   "full": "",
+   "cn": "玩家/发烧友",
+   "category": "社区",
+   "definition": "深度投入键圈的爱好者。",
+   "significance": ""
+  },
+  {
+   "en": "Keeb",
+   "abbr": "Keeb",
+   "full": "",
+   "cn": "键盘(俚语)",
+   "category": "社区",
+   "definition": "keyboard的昵称。",
+   "significance": ""
+  },
+  {
+   "en": "Endgame",
+   "abbr": "Endgame",
+   "full": "",
+   "cn": "退烧/终极配置",
+   "category": "社区",
+   "definition": "找到心中完美的键盘、从此不再买——通常是个玩笑。",
+   "significance": ""
+  },
+  {
+   "en": "Rip Wallet / Wallet Hurts",
+   "abbr": "Rip Wallet / Wallet Hurts",
+   "full": "",
+   "cn": "钱包疼/剁手",
+   "category": "社区",
+   "definition": "自嘲键圈花钱如流水的梗。",
+   "significance": ""
+  },
+  {
+   "en": "'Why do you hate money?'",
+   "abbr": "'Why do you hate money?'",
+   "full": "",
+   "cn": "'你为什么讨厌钱?'",
+   "category": "社区",
+   "definition": "键圈经典梗，调侃烧钱。",
+   "significance": ""
+  },
+  {
+   "en": "mechmarket (r/mechmarket)",
+   "abbr": "mechmarket",
+   "full": "r/mechmarket",
+   "cn": "二手交易版",
+   "category": "社区",
+   "definition": "Reddit上的键盘二手交易社区。",
+   "significance": ""
+  },
+  {
+   "en": "Flip / Flipper",
+   "abbr": "Flip / Flipper",
+   "full": "",
+   "cn": "倒卖/倒爷",
+   "category": "社区",
+   "definition": "抢购后加价转售的人，社区普遍鄙视。",
+   "significance": ""
+  },
+  {
+   "en": "客制化",
+   "abbr": "客制化",
+   "full": "",
+   "cn": "客制化(custom)",
+   "category": "中文黑话",
+   "definition": "对键盘的深度自定义改造，中文键圈对custom keyboard的统称，也指整个高端键盘圈。",
+   "significance": ""
+  },
+  {
+   "en": "键圈",
+   "abbr": "键圈",
+   "full": "",
+   "cn": "键圈",
+   "category": "中文黑话",
+   "definition": "中文键盘爱好者的圈子。",
+   "significance": ""
+  },
+  {
+   "en": "开团",
+   "abbr": "开团",
+   "full": "",
+   "cn": "开团",
+   "category": "中文黑话",
+   "definition": "组织/发起团购，等同于开GB。",
+   "significance": ""
+  },
+  {
+   "en": "发车 / 开车",
+   "abbr": "发车 / 开车",
+   "full": "",
+   "cn": "发车/开车",
+   "category": "中文黑话",
+   "definition": "组织团购的俗称，团长=发起人。",
+   "significance": ""
+  },
+  {
+   "en": "上车",
+   "abbr": "上车",
+   "full": "",
+   "cn": "上车",
+   "category": "中文黑话",
+   "definition": "参与团购、付款加入。",
+   "significance": ""
+  },
+  {
+   "en": "下车",
+   "abbr": "下车",
+   "full": "",
+   "cn": "下车",
+   "category": "中文黑话",
+   "definition": "退出团购/退团。",
+   "significance": ""
+  },
+  {
+   "en": "车价",
+   "abbr": "车价",
+   "full": "",
+   "cn": "车价",
+   "category": "中文黑话",
+   "definition": "团购价。",
+   "significance": ""
+  },
+  {
+   "en": "现货车",
+   "abbr": "现货车",
+   "full": "",
+   "cn": "现货车",
+   "category": "中文黑话",
+   "definition": "有现货的团购。",
+   "significance": ""
+  },
+  {
+   "en": "拼车",
+   "abbr": "拼车",
+   "full": "",
+   "cn": "拼车",
+   "category": "中文黑话",
+   "definition": "多人合买分摊成本/运费。",
+   "significance": ""
+  },
+  {
+   "en": "团长",
+   "abbr": "团长",
+   "full": "",
+   "cn": "团长",
+   "category": "中文黑话",
+   "definition": "团购发起人/组织者。",
+   "significance": ""
+  },
+  {
+   "en": "跑路",
+   "abbr": "跑路",
+   "full": "",
+   "cn": "跑路",
+   "category": "中文黑话",
+   "definition": "团长收款后不发货消失，键圈最恶劣的欺诈。",
+   "significance": ""
+  },
+  {
+   "en": "冲",
+   "abbr": "冲",
+   "full": "",
+   "cn": "冲/冲鸭",
+   "category": "中文黑话",
+   "definition": "抢购、支持、下单。",
+   "significance": ""
+  },
+  {
+   "en": "真香",
+   "abbr": "真香",
+   "full": "",
+   "cn": "真香",
+   "category": "中文黑话",
+   "definition": "原本不屑、体验后却真香的打脸梗。",
+   "significance": ""
+  },
+  {
+   "en": "入坑",
+   "abbr": "入坑",
+   "full": "",
+   "cn": "入坑",
+   "category": "中文黑话",
+   "definition": "开始接触并沉迷某个爱好。",
+   "significance": ""
+  },
+  {
+   "en": "烧 / 退烧",
+   "abbr": "烧 / 退烧",
+   "full": "",
+   "cn": "烧/退烧",
+   "category": "中文黑话",
+   "definition": "投入花钱/退出不再买。",
+   "significance": ""
+  },
+  {
+   "en": "氪金",
+   "abbr": "氪金",
+   "full": "",
+   "cn": "氪金",
+   "category": "中文黑话",
+   "definition": "花钱(源于游戏充值)。",
+   "significance": ""
+  },
+  {
+   "en": "萌新 / 大佬",
+   "abbr": "萌新 / 大佬",
+   "full": "",
+   "cn": "萌新/大佬",
+   "category": "中文黑话",
+   "definition": "新手/资深玩家。",
+   "significance": ""
+  },
+  {
+   "en": "开箱",
+   "abbr": "开箱",
+   "full": "",
+   "cn": "开箱",
+   "category": "中文黑话",
+   "definition": "收到产品后拆封展示。",
+   "significance": ""
+  },
+  {
+   "en": "评测 / 测评",
+   "abbr": "评测 / 测评",
+   "full": "",
+   "cn": "评测",
+   "category": "中文黑话",
+   "definition": "对产品的体验评价。",
+   "significance": ""
+  },
+  {
+   "en": "代组",
+   "abbr": "代组",
+   "full": "",
+   "cn": "代组",
+   "category": "中文黑话",
+   "definition": "替他人组装客制化键盘的服务。",
+   "significance": ""
+  },
+  {
+   "en": "套件",
+   "abbr": "套件",
+   "full": "",
+   "cn": "套件",
+   "category": "中文黑话",
+   "definition": "客制化键盘的主体(外壳+PCB+定位板等)，不含键帽轴体。",
+   "significance": ""
+  },
+  {
+   "en": "热插拔",
+   "abbr": "热插拔",
+   "full": "",
+   "cn": "热插拔",
+   "category": "中文黑话",
+   "definition": "免焊接换轴。",
+   "significance": ""
+  },
+  {
+   "en": "焊轴 / 焊轴工",
+   "abbr": "焊轴 / 焊轴工",
+   "full": "",
+   "cn": "焊接轴体",
+   "category": "中文黑话",
+   "definition": "把轴体焊到PCB上，也指代组服务者。",
+   "significance": ""
+  },
+  {
+   "en": "拔轴器",
+   "abbr": "拔轴器",
+   "full": "",
+   "cn": "拔轴器",
+   "category": "中文黑话",
+   "definition": "拆热插拔轴体的工具。",
+   "significance": ""
+  },
+  {
+   "en": "吸锡",
+   "abbr": "吸锡",
+   "full": "",
+   "cn": "吸锡",
+   "category": "中文黑话",
+   "definition": "拆除焊锡的工具/操作。",
+   "significance": ""
+  },
+  {
+   "en": "卫星轴",
+   "abbr": "卫星轴",
+   "full": "",
+   "cn": "卫星轴",
+   "category": "中文黑话",
+   "definition": "大键平衡机构(stabilizer)。",
+   "significance": ""
+  },
+  {
+   "en": "静电容",
+   "abbr": "静电容",
+   "full": "",
+   "cn": "静电容",
+   "category": "中文黑话",
+   "definition": "静电容键盘/轴体。",
+   "significance": ""
+  },
+  {
+   "en": "键帽卡位",
+   "abbr": "键帽卡位",
+   "full": "",
+   "cn": "卡位/菊孔",
+   "category": "中文黑话",
+   "definition": "键帽与轴心配合的松紧度。",
+   "significance": ""
+  },
+  {
+   "en": "打油",
+   "abbr": "打油",
+   "full": "",
+   "cn": "打油",
+   "category": "中文黑话",
+   "definition": "键帽表面被磨出光泽，ABS常见。",
+   "significance": ""
+  },
+  {
+   "en": "外设天下",
+   "abbr": "外设天下",
+   "full": "",
+   "cn": "外设天下",
+   "category": "中文黑话",
+   "definition": "中文老牌外设论坛(键盘鼠标社区)。",
+   "significance": ""
+  },
+  {
+   "en": "什么值得买",
+   "abbr": "什么值得买",
+   "full": "",
+   "cn": "什么值得买",
+   "category": "中文黑话",
+   "definition": "张大妈，中文导购社区，键盘评测聚集地。",
+   "significance": ""
+  },
+  {
+   "en": "键盘吧",
+   "abbr": "键盘吧",
+   "full": "",
+   "cn": "百度机械键盘吧",
+   "category": "中文黑话",
+   "definition": "中文最大的机械键盘贴吧社区。",
+   "significance": ""
+  },
+  {
+   "en": "ZFrontier",
+   "abbr": "ZFrontier",
+   "full": "",
+   "cn": "zFrontier装备前线",
+   "category": "中文黑话",
+   "definition": "中文客制化键盘社区与团购平台。",
+   "significance": ""
+  },
+  {
+   "en": "GMK",
+   "abbr": "GMK",
+   "full": "",
+   "cn": "GMK",
+   "category": "品牌",
+   "definition": "德国Uniqey旗下，ABS二色成型键帽标杆厂商。",
+   "significance": "'GMK'是高端键帽的代名词。"
+  },
+  {
+   "en": "SP (Signature Plastics)",
+   "abbr": "SP",
+   "full": "Signature Plastics",
+   "cn": "SP",
+   "category": "品牌",
+   "definition": "美国厂商，SA/DSA/DCS高度键帽的制造者。",
+   "significance": ""
+  },
+  {
+   "en": "EnjoyPBT / ePBT",
+   "abbr": "EnjoyPBT / ePBT",
+   "full": "",
+   "cn": "ePBT",
+   "category": "品牌",
+   "definition": "知名PBT热升华键帽品牌。",
+   "significance": ""
+  },
+  {
+   "en": "NovelKeys",
+   "abbr": "NovelKeys",
+   "full": "",
+   "cn": "NovelKeys",
+   "category": "品牌",
+   "definition": "美国键帽/轴体/套件品牌(简称NK)。",
+   "significance": ""
+  },
+  {
+   "en": "JTK",
+   "abbr": "JTK",
+   "full": "",
+   "cn": "JTK",
+   "category": "品牌",
+   "definition": "中国键帽品牌，性价比高。",
+   "significance": ""
+  },
+  {
+   "en": "Maxkey",
+   "abbr": "Maxkey",
+   "full": "",
+   "cn": "Maxkey",
+   "category": "品牌",
+   "definition": "SA高度键帽厂商。",
+   "significance": ""
+  },
+  {
+   "en": "Keyreative",
+   "abbr": "Keyreative",
+   "full": "",
+   "cn": "Keyreative",
+   "category": "品牌",
+   "definition": "KAT/KAM高度键帽厂商。",
+   "significance": ""
+  },
+  {
+   "en": "KBDFans",
+   "abbr": "KBDFans",
+   "full": "",
+   "cn": "KBDFans",
+   "category": "品牌",
+   "definition": "中国知名客制化套件与键帽电商。",
+   "significance": ""
+  },
+  {
+   "en": "Drop (Massdrop)",
+   "abbr": "Drop",
+   "full": "Massdrop",
+   "cn": "Drop",
+   "category": "品牌",
+   "definition": "美国团购平台(原名Massdrop)，MT3键帽出品方。",
+   "significance": ""
+  },
+  {
+   "en": "Gateron",
+   "abbr": "Gateron",
+   "full": "",
+   "cn": "佳达隆",
+   "category": "品牌",
+   "definition": "中国主流轴体厂商。",
+   "significance": ""
+  },
+  {
+   "en": "Cherry",
+   "abbr": "Cherry",
+   "full": "",
+   "cn": "樱桃",
+   "category": "品牌",
+   "definition": "德国老牌开关厂商，MX轴鼻祖。",
+   "significance": ""
+  },
+  {
+   "en": "Kailh",
+   "abbr": "Kailh",
+   "full": "",
+   "cn": "凯华",
+   "category": "品牌",
+   "definition": "中国轴体/热插拔座厂商。",
+   "significance": ""
+  },
+  {
+   "en": "TTC",
+   "abbr": "TTC",
+   "full": "",
+   "cn": "TTC",
+   "category": "品牌",
+   "definition": "中国轴体厂商，金粉/快银等知名。",
+   "significance": ""
+  },
+  {
+   "en": "JWK",
+   "abbr": "JWK",
+   "full": "",
+   "cn": "JWK",
+   "category": "品牌",
+   "definition": "知名轴体代工厂。",
+   "significance": ""
+  },
+  {
+   "en": "RAMA Works",
+   "abbr": "RAMA Works",
+   "full": "",
+   "cn": "RAMA",
+   "category": "品牌",
+   "definition": "澳洲高端键盘/键帽/配件品牌。",
+   "significance": ""
+  },
+  {
+   "en": "Jelly Key",
+   "abbr": "Jelly Key",
+   "full": "",
+   "cn": "Jelly Key",
+   "category": "品牌",
+   "definition": "越南个性键帽工作室。",
+   "significance": ""
+  },
+  {
+   "en": "Keychron",
+   "abbr": "Keychron",
+   "full": "",
+   "cn": "Keychron",
+   "category": "品牌",
+   "definition": "主打无线/多系统的量产键盘品牌。",
+   "significance": ""
+  },
+  {
+   "en": "Varmilo",
+   "abbr": "Varmilo",
+   "full": "",
+   "cn": "阿米洛",
+   "category": "品牌",
+   "definition": "中国高端量产键盘品牌(Varmilo)。",
+   "significance": ""
+  },
+  {
+   "en": "IQUNIX",
+   "abbr": "IQUNIX",
+   "full": "",
+   "cn": "IQUNIX",
+   "category": "品牌",
+   "definition": "中国铝制键盘品牌。",
+   "significance": ""
+  },
+  {
+   "en": "Ducky",
+   "abbr": "Ducky",
+   "full": "",
+   "cn": "Ducky",
+   "category": "品牌",
+   "definition": "台湾键盘品牌，量产客制化过渡热门。",
+   "significance": ""
+  },
+  {
+   "en": "Akko",
+   "abbr": "Akko",
+   "full": "",
+   "cn": "Akko",
+   "category": "品牌",
+   "definition": "中国键帽/轴体/键盘品牌。",
+   "significance": ""
+  },
+  {
+   "en": "Owlabs",
+   "abbr": "Owlabs",
+   "full": "",
+   "cn": "Owlabs",
+   "category": "品牌",
+   "definition": "知名客制化轴体/套件品牌。",
+   "significance": ""
+  },
+  {
+   "en": "Feker",
+   "abbr": "Feker",
+   "full": "",
+   "cn": "Feker",
+   "category": "品牌",
+   "definition": "轴体/键盘品牌。",
+   "significance": ""
+  },
+  {
+   "en": "IBM Model M",
+   "abbr": "IBM Model M",
+   "full": "",
+   "cn": "IBM Model M",
+   "category": "品牌",
+   "definition": "经典的屈曲弹簧(buckling spring)键盘，复古圣物。",
+   "significance": ""
+  },
+  {
+   "en": "Buckling Spring",
+   "abbr": "Buckling Spring",
+   "full": "",
+   "cn": "屈曲弹簧",
+   "category": "品牌",
+   "definition": "IBM Model M/F的机械结构，键圈复古经典。",
+   "significance": ""
+  }
+ ]
+}
