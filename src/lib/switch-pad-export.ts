@@ -12,7 +12,7 @@ import polygonClipping from "polygon-clipping";
 import type { KLELayout } from "./kle-types";
 import type { StpExtrudeData } from "./stp-export";
 import type { SolderType, PCBSwitchRotations, PCBStabRotations } from "./pcb-export";
-import { computeSwitchPadGeometry } from "./pcb-export";
+import { computeSwitchPadGeometry, getGH60Board } from "./pcb-export";
 import type { SwitchPadGeometry } from "./pcb-export";
 
 export interface SwitchPadConfig {
@@ -23,6 +23,8 @@ export interface SwitchPadConfig {
   edgeDistance: number;
   /** 外形圆角半径 (mm, 0 = 直角) */
   fillet: number;
+  /** 片材外形：auto = 键位包围盒圆角矩形；gh60 = GH60 板框预设 */
+  boardShape?: "auto" | "gh60";
 }
 
 /** 默认外框圆角 (mm) */
@@ -133,9 +135,12 @@ export function generateSwitchPad(
   compatKeyIndices?: Set<number>,
 ): SwitchPadResult {
   const geo = computeSwitchPadGeometry(layout, config, switchRotations, stabRotations, compatKeyIndices);
-  const width = geo.maxX - geo.minX;
-  const height = geo.maxY - geo.minY;
-  if ((geo.circles.length === 0 && geo.polys.length === 0) || width <= 0 || height <= 0) {
+  const isGH60 = config.boardShape === "gh60";
+  const gh60 = isGH60 ? getGH60Board(config.edgeDistance, config.fillet) : null;
+
+  const autoW = geo.maxX - geo.minX;
+  const autoH = geo.maxY - geo.minY;
+  if (!isGH60 && ((geo.circles.length === 0 && geo.polys.length === 0) || autoW <= 0 || autoH <= 0)) {
     return { svg: "", dxf: "", width: 0, height: 0, minX: 0, minY: 0, pad: 5, stpData: null };
   }
 
@@ -145,24 +150,47 @@ export function generateSwitchPad(
   ];
   const emitShapes = anyOverlap(shapes) ? unionShapes(shapes) : shapes;
 
+  // 片材包围盒：GH60 取外轮廓 ∪ 全部孔（侧槽伸出板边，靠 SVG 5mm 边距展示，不计入尺寸）；否则沿用几何外包
+  let minX = geo.minX, minY = geo.minY, maxX = geo.maxX, maxY = geo.maxY;
+  if (gh60) {
+    minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+    const acc = (x: number, y: number) => {
+      if (x < minX) minX = x; if (y < minY) minY = y;
+      if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+    };
+    for (const [x, y] of gh60.outline) acc(x, y);
+    for (const s of emitShapes) { const b = shapeAabb(s); acc(b[0], b[1]); acc(b[2], b[3]); }
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+
   const pad = 5;
   const svgW = width + pad * 2;
   const svgH = height + pad * 2;
   const filletR = Math.min(config.fillet > 0 ? config.fillet : 0, width / 2, height / 2);
-  const vx = (x: number) => (x - geo.minX + pad).toFixed(3);
-  const vy = (y: number) => (y - geo.minY + pad).toFixed(3);
+  const vx = (x: number) => (x - minX + pad).toFixed(3);
+  const vy = (y: number) => (y - minY + pad).toFixed(3);
 
   // ── SVG ──
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path,circle{vector-effect:non-scaling-stroke}</style>
-  <rect x="${pad}" y="${pad}" width="${width}" height="${height}" rx="${filletR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>
+  ${gh60
+    ? `<path d="${gh60.outline.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("")}Z" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>`
+    : `<rect x="${pad}" y="${pad}" width="${width}" height="${height}" rx="${filletR}" fill="#e8e8e8" stroke="#bbb" stroke-width="0.5"/>`}
   <g fill="#fff" stroke="#888" stroke-width="0.3">`;
   for (const s of emitShapes) {
     if (s.kind === "circle") {
       svg += `<circle cx="${vx(s.x)}" cy="${vy(s.y)}" r="${s.r.toFixed(3)}"/>`;
     } else {
       const d = s.pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z";
+      svg += `<path d="${d}"/>`;
+    }
+  }
+  if (gh60) {
+    // 板框侧槽按挖孔处理
+    for (const poly of gh60.slots) {
+      const d = poly.map(([x, y], i) => `${i === 0 ? "M" : "L"}${vx(x)},${vy(y)}`).join("") + "Z";
       svg += `<path d="${d}"/>`;
     }
   }
@@ -191,7 +219,7 @@ export function generateSwitchPad(
 </svg>`;
 
   // ── DXF ──
-  const dxf = buildDXF(emitShapes, geo, width, height, filletR);
+  const dxf = buildDXF(emitShapes, { minX, minY, maxX, maxY }, width, height, filletR, gh60 ?? undefined);
 
   // ── STP ──
   const circleHoles: [number, number, number][] = [];
@@ -200,16 +228,16 @@ export function generateSwitchPad(
     if (s.kind === "circle") circleHoles.push([s.x, -s.y, s.r]);
     else polyHoles.push(s.pts.map(([x, y]) => [x, -y] as [number, number]));
   }
+  if (gh60) for (const poly of gh60.slots) polyHoles.push(poly.map(([x, y]) => [x, -y] as [number, number]));
   const stpData: StpExtrudeData = {
-    boundary: [
-      [geo.minX, -geo.minY], [geo.maxX, -geo.minY],
-      [geo.maxX, -geo.maxY], [geo.minX, -geo.maxY],
-    ],
+    boundary: gh60
+      ? gh60.outline.map(([x, y]) => [x, -y] as [number, number])
+      : [[minX, -minY], [maxX, -minY], [maxX, -maxY], [minX, -maxY]],
     polyHoles,
     circleHoles,
   };
 
-  return { svg, dxf, width, height, minX: geo.minX, minY: geo.minY, pad, stpData };
+  return { svg, dxf, width, height, minX, minY, pad, stpData };
 }
 
 // ─── DXF builder (片材圆角外框 + 圆孔 + 多边形孔) ──────────
@@ -224,7 +252,14 @@ function arcPoints(cx: number, cy: number, r: number, a0: number, a1: number, se
   return pts;
 }
 
-function buildDXF(shapes: Shape[], geo: SwitchPadGeometry, width: number, height: number, filletR: number): string {
+function buildDXF(
+  shapes: Shape[],
+  bounds: Pick<SwitchPadGeometry, "minX" | "minY" | "maxX" | "maxY">,
+  width: number,
+  height: number,
+  filletR: number,
+  gh60?: { outline: [number, number][]; slots: [number, number][][] },
+): string {
   const lines: string[] = [];
   const w = (s: string | number) => { lines.push(s.toString()); };
 
@@ -242,7 +277,7 @@ function buildDXF(shapes: Shape[], geo: SwitchPadGeometry, width: number, height
   w(0); w("ENDTAB"); w(0); w("ENDSEC");
   w(0); w("SECTION"); w(2); w("ENTITIES");
 
-  const toDxf = (x: number, y: number): [number, number] => [x - geo.minX, -(y - geo.minY)];
+  const toDxf = (x: number, y: number): [number, number] => [x - bounds.minX, -(y - bounds.minY)];
 
   function addPoly(pts: [number, number][], layer: string) {
     if (pts.length < 3) return;
@@ -255,24 +290,28 @@ function buildDXF(shapes: Shape[], geo: SwitchPadGeometry, width: number, height
     w(0); w("SEQEND");
   }
 
-  // 圆角矩形外框
-  const x0 = geo.minX, y0 = geo.minY, x1 = geo.maxX, y1 = geo.maxY;
-  const r = Math.min(filletR, width / 2, height / 2);
-  const SEG = 4;
-  const rect: [number, number][] = [];
-  if (r > 0) {
-    rect.push([x0 + r, y0], [x1 - r, y0]);
-    rect.push(...arcPoints(x1 - r, y0 + r, r, -Math.PI / 2, 0, SEG));
-    rect.push([x1, y1 - r]);
-    rect.push(...arcPoints(x1 - r, y1 - r, r, 0, Math.PI / 2, SEG));
-    rect.push([x0 + r, y1]);
-    rect.push(...arcPoints(x0 + r, y1 - r, r, Math.PI / 2, Math.PI, SEG));
-    rect.push([x0, y0 + r]);
-    rect.push(...arcPoints(x0 + r, y0 + r, r, Math.PI, Math.PI * 1.5, SEG));
+  // 外框：GH60 用轮廓多边形，否则圆角矩形
+  if (gh60) {
+    addPoly(gh60.outline, "PAD");
   } else {
-    rect.push([x0, y0], [x1, y0], [x1, y1], [x0, y1]);
+    const x0 = bounds.minX, y0 = bounds.minY, x1 = bounds.maxX, y1 = bounds.maxY;
+    const r = Math.min(filletR, width / 2, height / 2);
+    const SEG = 4;
+    const rect: [number, number][] = [];
+    if (r > 0) {
+      rect.push([x0 + r, y0], [x1 - r, y0]);
+      rect.push(...arcPoints(x1 - r, y0 + r, r, -Math.PI / 2, 0, SEG));
+      rect.push([x1, y1 - r]);
+      rect.push(...arcPoints(x1 - r, y1 - r, r, 0, Math.PI / 2, SEG));
+      rect.push([x0 + r, y1]);
+      rect.push(...arcPoints(x0 + r, y1 - r, r, Math.PI / 2, Math.PI, SEG));
+      rect.push([x0, y0 + r]);
+      rect.push(...arcPoints(x0 + r, y0 + r, r, Math.PI, Math.PI * 1.5, SEG));
+    } else {
+      rect.push([x0, y0], [x1, y0], [x1, y1], [x0, y1]);
+    }
+    addPoly(rect, "PAD");
   }
-  addPoly(rect, "PAD");
 
   for (const s of shapes) {
     if (s.kind === "circle") {
@@ -284,6 +323,7 @@ function buildDXF(shapes: Shape[], geo: SwitchPadGeometry, width: number, height
       addPoly(s.pts, "CUT");
     }
   }
+  if (gh60) for (const poly of gh60.slots) addPoly(poly, "CUT");
 
   w(0); w("ENDSEC"); w(0); w("EOF");
   return lines.join("\r\n");

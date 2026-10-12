@@ -42,6 +42,7 @@ export default function SwitchPadSection({
     () => ({
       config: {
         solderType: pcbConfig.solderType,
+        boardShape: pcbConfig.boardShape,
         needStab: pcbConfig.needStab,
         needLed: pcbConfig.needLed,
         edgeDistance: pcbConfig.edgeDistance,
@@ -51,7 +52,7 @@ export default function SwitchPadSection({
       stabRotations,
       compatKeyIndices: Array.from(compatDimIndices),
     }),
-    [pcbConfig.solderType, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, outerFillet, switchRotations, stabRotations, compatDimIndices],
+    [pcbConfig.solderType, pcbConfig.boardShape, pcbConfig.needStab, pcbConfig.needLed, pcbConfig.edgeDistance, outerFillet, switchRotations, stabRotations, compatDimIndices],
   );
   // 本地同步即时结果（交互式预览），云端仅用于导出。
   const padResult = useMemo((): SwitchPadResult | null => {
@@ -95,7 +96,7 @@ export default function SwitchPadSection({
     setSvgSaving(true);
     setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const cloud = await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
+    const cloud = padParams.config.boardShape === "gh60" ? null : await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
     const path = await saveFile(cloud?.svg ?? padResult.svg, { defaultName: `${name}_switch_pad.svg`, mimeType: "image/svg+xml" });
     setSvgSaving(false);
     if (path === null) return;
@@ -107,7 +108,7 @@ export default function SwitchPadSection({
     setDxfSaving(true);
     setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const cloud = await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
+    const cloud = padParams.config.boardShape === "gh60" ? null : await fetchCloudGeometry<SwitchPadResult>("pad", layout, padParams);
     const path = await saveFile(cloud?.dxf ?? padResult.dxf, { defaultName: `${name}_switch_pad.dxf`, mimeType: "application/dxf" });
     setDxfSaving(false);
     if (path === null) return;

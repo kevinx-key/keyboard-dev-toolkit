@@ -193,8 +193,11 @@ function parsePcbConfig(raw: unknown): PCBConfig {
   const solder = str(p.solderType, DEFAULT_PCB_CONFIG.solderType);
   const solderType: PCBConfig["solderType"] =
     solder === "socket" || solder === "sunken" || solder === "stepped" ? solder : DEFAULT_PCB_CONFIG.solderType;
+  const shape = str(p.boardShape, DEFAULT_PCB_CONFIG.boardShape ?? "auto");
+  const boardShape: PCBConfig["boardShape"] = shape === "gh60" ? "gh60" : "auto";
   return {
     solderType,
+    boardShape,
     needStab: bool(p.needStab, DEFAULT_PCB_CONFIG.needStab),
     needLed: bool(p.needLed, DEFAULT_PCB_CONFIG.needLed),
     edgeDistance: num(p.edgeDistance, DEFAULT_PCB_CONFIG.edgeDistance),

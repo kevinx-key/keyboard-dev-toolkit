@@ -3,7 +3,8 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
 import { generatePCB } from "../lib/pcb-export";
-import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType, InterferenceReport } from "../lib/pcb-export";
+import type { PCBConfig, PCBResult, PCBSwitchRotations, PCBStabRotations, SolderType, BoardShape, InterferenceReport } from "../lib/pcb-export";
+import { GH60_TYPEC } from "../data/gh60";
 import type { KLELayout } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { useI18n } from "../lib/i18n";
@@ -22,6 +23,7 @@ import { isQmkExportEnabled } from "../plugins";
 
 const DEFAULT_PCB_CONFIG: PCBConfig = {
   solderType: "socket",
+  boardShape: "auto",
   needStab: true,
   needLed: false,
   edgeDistance: 5,
@@ -94,6 +96,14 @@ export default function PCBSection({
 
   const update = <K extends keyof PCBConfig>(key: K, value: PCBConfig[K]) =>
     setConfig(c => ({ ...c, [key]: value }));
+
+  // 「板框形状」切换到 GH60：自动勾选 Type-C 并填入固定位置（仍可再微调）；切回自动仅改形状
+  const setBoardShape = useCallback((shape: BoardShape) => {
+    setConfig((c) => shape === "gh60"
+      ? { ...c, boardShape: "gh60", needTypeC: true, typeCX: GH60_TYPEC.x, typeCY: GH60_TYPEC.y, typeCRot: GH60_TYPEC.rot }
+      : { ...c, boardShape: "auto" });
+  }, [setConfig]);
+  const isGh60 = config.boardShape === "gh60";
 
   const [drawn, setDrawn] = useState(false);
 
@@ -437,7 +447,21 @@ export default function PCBSection({
 
       {/* ── PCB Config Bar ── */}
       <div style={{ padding: "10px 12px 4px 12px" }}>
+        {isGh60 && (
+          <div style={{ fontSize: 11, color: "var(--theme-primary)", marginBottom: 6 }}>{t("pcb.gh60Hint")}</div>
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "end", marginBottom: 6 }}>
+          {/* 板框形状 */}
+          <div style={{ display: "inline-flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ fontSize: 11, color: "var(--theme-text-muted)", fontWeight: 500 }}>{t("pcb.boardShape")}</span>
+            <select value={config.boardShape ?? "auto"} title={t("tip.boardShape")}
+              onChange={e => setBoardShape(e.target.value as BoardShape)}
+              style={{ padding: "3px 6px", fontSize: 12, borderRadius: 4, border: "1px solid var(--theme-border-input)", backgroundColor: "var(--theme-input-bg)", color: "var(--theme-text)" }}>
+              <option value="auto">{t("pcb.boardShapeAuto")}</option>
+              <option value="gh60">{t("pcb.boardShapeGh60")}</option>
+            </select>
+          </div>
+
           {/* 轴体焊接方式 */}
           <div style={{ display: "inline-flex", flexDirection: "column", gap: 3 }}>
             <span style={{ fontSize: 11, color: "var(--theme-text-muted)", fontWeight: 500 }}>{t("pcb.solderType")}</span>

@@ -69,7 +69,7 @@ export const DEFAULT_BOTTOM_FOAM_SETTINGS: BottomFoamSettings = {
 };
 
 export const DEFAULT_PCB_CONFIG: PCBConfig = {
-  solderType: "socket", needStab: true, needLed: false, edgeDistance: 5,
+  solderType: "socket", boardShape: "auto", needStab: true, needLed: false, edgeDistance: 5,
   outerFillet: 0,
   needTypeC: false, need4P: false, needMCU: false,
   typeCX: -1.5, typeCY: 16, fourPX: 196, fourPY: 17.5, mcuX: 91, mcuY: 62,

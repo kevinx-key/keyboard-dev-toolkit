@@ -24,6 +24,8 @@ import { getStabOffset } from "./stab-offsets";
 import { rotatePoint, computeLayoutBBoxInUnits } from "./coordinate-system";
 import { TYPEC_ICON, TYPEC_HOLES, MCU_ICON } from "./component-icons";
 import polygonClipping from "polygon-clipping";
+import { offsetPolygonOutward, filletPolygon } from "./plate-export";
+import { GH60_OUTLINE, GH60_SLOTS, GH60_TYPEC } from "../data/gh60";
 
 // ─── Type-C 3D 模型装配常量 ───────────────────────────────
 // 模型为内嵌固定文件 src-tauri/models/type-c-connector-3d.stp；
@@ -101,9 +103,14 @@ function ringPathD(pts: Pt2[]): string {
 
 export type SolderType = "socket" | "sunken" | "stepped";
 
+/** 板框形状：auto=按配列自动计算（默认）；gh60=套用固定 GH60 标准外轮廓 + 螺丝槽 */
+export type BoardShape = "auto" | "gh60";
+
 export interface PCBConfig {
   /** Solder type: socket=热插拔, sunken=沉板(焊接), stepped=梯孔(磁轴) */
   solderType: SolderType;
+  /** 板框形状；缺省 "auto" */
+  boardShape?: BoardShape;
   /** Include stabilizer holes */
   needStab: boolean;
   /** Include switch LED square hole */
@@ -444,6 +451,12 @@ function computePCBBoundsFromExtents(
   config: PCBConfig, edge: number,
   holeMinX: number, holeMinY: number, holeMaxX: number, holeMaxY: number,
 ): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+  // GH60：外框固定，板框尺寸 = 外轮廓包围盒（edge 作为轮廓偏移量、outerFillet 作为轮廓圆角）
+  if (config.boardShape === "gh60") {
+    const { outline } = getGH60Board(edge, config.outerFillet ?? 0);
+    const b = pointsBBox(outline);
+    return { width: b.maxX - b.minX, height: b.maxY - b.minY, minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY };
+  }
   // 旋转感知边界——用于板框大小（扩大板框以覆盖旋转键的角点）
   const bboxKu = computeLayoutBBoxInUnits(keys);
   const boardMinX = Math.min(holeMinX, bboxKu.minX * U - edge);
@@ -472,6 +485,33 @@ export function computePCBBounds(
   if (keys.length === 0) return null;
   const { holeMinX, holeMinY, holeMaxX, holeMaxY } = computePCBKeyPositions(keys, config, U);
   return computePCBBoundsFromExtents(keys, config, config.edgeDistance, holeMinX, holeMinY, holeMaxX, holeMaxY);
+}
+
+// ─── GH60 固定板框（唯一数据源见 src/data/gh60.ts） ─────
+
+/** 一组点的包围盒 */
+function pointsBBox(pts: [number, number][]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x; if (y < minY) minY = y;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * GH60 固定板框几何（编辑器坐标：mm, 原点 = 配列左上角, Y 向下）。
+ * @param edge 外轮廓向外偏移量 (mm)：>0 外扩，<0 内缩，0 原样
+ * @param fillet 外轮廓圆角半径 (mm)
+ */
+export function getGH60Board(edge = 0, fillet = 0): { outline: [number, number][]; slots: [number, number][][] } {
+  let pts: { x: number; y: number }[] = GH60_OUTLINE.map(([x, y]) => ({ x, y }));
+  if (edge) pts = offsetPolygonOutward(pts, edge);
+  if (fillet > 0) pts = filletPolygon(pts, fillet, 6);
+  return {
+    outline: pts.map((p) => [p.x, p.y] as [number, number]),
+    slots: GH60_SLOTS,
+  };
 }
 
 // ─── 轴下垫几何（从 PCB 配置派生，绝对 mm，Y 向下） ─────────
@@ -772,9 +812,11 @@ export function generatePCB(
   } = computePCBBoundsFromExtents(keys, config, edge, holeMinX, holeMinY, holeMaxX, holeMaxY);
   const keyCount = keyInfos.length;
 
-  // 孔位偏移基准：用非旋转边界的 minX/minY（保持键位位置不变）
-  const holeOffX = holeMinX;
-  const holeOffY = holeMinY;
+  // 孔位偏移基准：自动模式用非旋转边界的 minX/minY（保持键位位置不变）；GH60 模式用固定外框左上角
+  const isGh60 = config.boardShape === "gh60";
+  const gh60 = isGh60 ? getGH60Board(edge, config.outerFillet ?? 0) : null;
+  const holeOffX = isGh60 ? boardAbsMinX : holeMinX;
+  const holeOffY = isGh60 ? boardAbsMinY : holeMinY;
 
   // Generate SVG paths
   const pad = 5;
@@ -784,10 +826,13 @@ export function generatePCB(
   let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW.toFixed(1)} ${svgH.toFixed(1)}" width="${svgW.toFixed(1)}mm" height="${svgH.toFixed(1)}mm" style="max-width:100%;height:auto">
   <style>path,circle,rect{vector-effect:non-scaling-stroke}</style>
-  <!-- FR4 base panel -->
+${gh60
+      ? `  <!-- GH60 board outline -->
+  <path d="${gh60.outline.map(([x, y], i) => `${i === 0 ? "M" : "L"}${(x - boardAbsMinX + pad).toFixed(3)},${(y - boardAbsMinY + pad).toFixed(3)}`).join("")}Z" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5"/>`
+      : `  <!-- FR4 base panel -->
   <rect x="${pad}" y="${pad}" width="${boardW}" height="${boardH}" fill="#7ec87a" stroke="#5a9e56" stroke-width="0.5" rx="${config.outerFillet ?? 0}"/>
   <!-- Copper pour area -->
-  <rect x="${pad + 1}" y="${pad + 1}" width="${boardW - 2}" height="${boardH - 2}" fill="none" stroke="#6db86a" stroke-width="0.2"/>
+  <rect x="${pad + 1}" y="${pad + 1}" width="${boardW - 2}" height="${boardH - 2}" fill="none" stroke="#6db86a" stroke-width="0.2"/>`}
   <!-- Holes group: white fill, transparent interior via mask -->
   <g fill="rgba(255,255,255,0.85)" stroke="#aaa" stroke-width="0.15">`;
 
@@ -821,7 +866,11 @@ export function generatePCB(
     }
     dxf(0); dxf("SEQEND");
   }
-  dxfRect(0, 0, boardW, boardH);
+  if (gh60) {
+    dxfPolygon(gh60.outline.map(([x, y]) => [x - boardAbsMinX + pad, y - boardAbsMinY + pad] as [number, number]));
+  } else {
+    dxfRect(0, 0, boardW, boardH);
+  }
 
   /** Add a closed polygon to DXF (viewport coords, Y-down) */
   function dxfPolygon(pts: [number, number][]) {
@@ -1067,6 +1116,16 @@ export function generatePCB(
     }
   }
 
+  // GH60：固定螺丝槽/侧槽作为挖孔（SVG 白孔 + DXF CUT + STP 挖孔）
+  if (gh60) {
+    for (const slot of gh60.slots) {
+      const vp = slot.map(([x, y]) => [x - boardAbsMinX + pad, y - boardAbsMinY + pad] as Pt2);
+      svg += `<path d="${ringPathD(vp)}"/>`;
+      dxfPolygon(vp);
+      stpPolyHoles.push(slot.map(([x, y]) => [x, -y] as [number, number]));
+    }
+  }
+
   svg += `</g>`;
 
   // 兼容层：兼容键的孔/元件以浅灰重绘（仅 SVG 预览，不影响 DXF/STP）
@@ -1128,13 +1187,13 @@ export function generatePCB(
   if (config.needTypeC) {
     const tcW = TYPEC_ICON.viewW * 0.01;   // 9.56 mm
     const tcH = TYPEC_ICON.viewH * 0.01;   // 7.959 mm
-    const tcAbsX = config.typeCX;
-    const tcAbsY = config.typeCY;
+    const tcAbsX = isGh60 ? GH60_TYPEC.x : config.typeCX;
+    const tcAbsY = isGh60 ? GH60_TYPEC.y : config.typeCY;
     const tcVpx = tcAbsX - holeOffX + pad;
     const tcVpy = tcAbsY - holeOffY + pad;
     const tcCx = (tcVpx + tcW / 2);
     const tcCy = (tcVpy + tcH / 2);
-    const tcRot = config.typeCRot || 0;
+    const tcRot = (isGh60 ? GH60_TYPEC.rot : config.typeCRot) || 0;
     const SCALE = 0.01; // 画稿单位 → mm
     const cenX = TYPEC_ICON.viewW / 2;
     const cenY = TYPEC_ICON.viewH / 2;
@@ -1292,10 +1351,12 @@ export function generatePCB(
 
   // ── 构建 STP 3D 挤出几何数据 (绝对 mm) ──
   const stpData: StpExtrudeData = {
-    boundary: [
-      [boardAbsMinX, -boardAbsMinY], [boardAbsMaxX, -boardAbsMinY],
-      [boardAbsMaxX, -boardAbsMaxY], [boardAbsMinX, -boardAbsMaxY],
-    ],
+    boundary: gh60
+      ? gh60.outline.map(([x, y]) => [x, -y] as [number, number])
+      : [
+          [boardAbsMinX, -boardAbsMinY], [boardAbsMaxX, -boardAbsMinY],
+          [boardAbsMaxX, -boardAbsMaxY], [boardAbsMinX, -boardAbsMaxY],
+        ],
     polyHoles: stpPolyHoles,
     circleHoles: stpCircleHoles,
     modelPlacements: modelPlacements.length > 0 ? modelPlacements : undefined,

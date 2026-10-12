@@ -176,7 +176,7 @@ function signedArea(pts: { x: number; y: number }[]): number {
  * 将多边形整体沿外法线偏移 d（正 d = 挖孔扩大，用于 kerf 补偿）。
  * 顶点按两邻边角平分线做 miter 外移；对直角/轴对齐多边形精确。
  */
-function offsetPolygonOutward(
+export function offsetPolygonOutward(
   pts: { x: number; y: number }[], d: number,
 ): { x: number; y: number }[] {
   if (d === 0 || pts.length < 3) return pts;

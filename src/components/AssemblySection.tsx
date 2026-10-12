@@ -74,6 +74,7 @@ function buildFoamConfig(c: FoamSettings): SwitchFoamConfig {
 function buildPadConfig(pcb: PCBConfig, pad: PadSettings): SwitchPadConfig {
   return {
     solderType: pcb.solderType,
+    boardShape: pcb.boardShape,
     needStab: pcb.needStab,
     needLed: pcb.needLed,
     edgeDistance: pcb.edgeDistance,
@@ -84,6 +85,7 @@ function buildPadConfig(pcb: PCBConfig, pad: PadSettings): SwitchPadConfig {
 function buildBottomConfig(pcb: PCBConfig, bf: BottomFoamSettings): BottomFoamConfig {
   return {
     solderType: pcb.solderType,
+    boardShape: pcb.boardShape,
     needLed: pcb.needLed,
     needTypeC: pcb.needTypeC, typeCX: pcb.typeCX, typeCY: pcb.typeCY, typeCRot: pcb.typeCRot,
     need4P: pcb.need4P, fourPX: pcb.fourPX, fourPY: pcb.fourPY, fourPRot: pcb.fourPRot,

@@ -67,6 +67,7 @@ export default function BottomFoamSection({
     () => ({
       config: {
         solderType: pcbConfig.solderType,
+        boardShape: pcbConfig.boardShape,
         needLed: pcbConfig.needLed,
         needTypeC: pcbConfig.needTypeC, typeCX: pcbConfig.typeCX, typeCY: pcbConfig.typeCY, typeCRot: pcbConfig.typeCRot,
         need4P: pcbConfig.need4P, fourPX: pcbConfig.fourPX, fourPY: pcbConfig.fourPY, fourPRot: pcbConfig.fourPRot,
@@ -178,7 +179,7 @@ export default function BottomFoamSection({
     if (!foamResult?.svg) return;
     setSvgSaving(true); setSvgMsg(null);
     const name = layout.meta.name || "keyboard";
-    const cloud = await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
+    const cloud = foamParams.config.boardShape === "gh60" ? null : await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
     const path = await saveFile(cloud?.svg ?? foamResult.svg, { defaultName: `${name}_bottom_foam.svg`, mimeType: "image/svg+xml" });
     setSvgSaving(false);
     if (path === null) return;
@@ -189,7 +190,7 @@ export default function BottomFoamSection({
     if (!foamResult?.dxf) return;
     setDxfSaving(true); setDxfMsg(null);
     const name = layout.meta.name || "keyboard";
-    const cloud = await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
+    const cloud = foamParams.config.boardShape === "gh60" ? null : await fetchCloudGeometry<BottomFoamResult>("foam", layout, foamParams);
     const path = await saveFile(cloud?.dxf ?? foamResult.dxf, { defaultName: `${name}_bottom_foam.dxf`, mimeType: "application/dxf" });
     setDxfSaving(false);
     if (path === null) return;
