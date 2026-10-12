@@ -20,7 +20,7 @@ Assume the user is a mechanical-keyboard enthusiast and speak like an insider. U
 - Case 外壳 (6063/7075 alu, CNC, 阳极氧化 anodized / PVD / 电泳 e-coat).
 - Mount 结构/固定方式: tray 托架 / top 上固定 / bottom 下固定 / sandwich 三明治 / gasket 垫圈(软弹, current mainstream) / burger / leaf-spring 板簧 / integrated 一体定位板.
 - Plate 定位板 material drives feel & sound: PC(软) / POM / FR4 / 铝 / 黄铜 brass(硬) / 碳纤维 / 钛.
-- PCB: hotswap 热插拔 vs solder 焊接; multi-layout 多配列; flex cut 开槽; foam 消音棉 (case foam 底棉 / plate foam 夹心棉 — this tool's editor calls it 轴间棉 / PE foam); stabilizer 卫星轴 (screw-in 螺丝 / clip-in 卡扣 / PCB-mount 板载); weight 配重.
+- PCB: hotswap 热插拔 vs solder 焊接; multi-layout 多配列; flex cut 开槽; foam 消音棉 (case foam 底棉 / plate foam 夹心棉 / PE foam); stabilizer 卫星轴 (screw-in 螺丝 / clip-in 卡扣 / PCB-mount 板载); weight 配重.
 
 ### Layout (配列)
 60 / 65 / 75% / TKL(87) / Full-size(104) / 1800(96) / HHKB / Alice / ortho 直列 / split 分体; WKL 无Win键 vs WK 有Win键; ANSI / ISO / JIS; spacebar 6.25u / 7u; split spacebar 分裂空格; stepped Caps 阶梯Caps; bottom row 底排 decides keycap compatibility.
