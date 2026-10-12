@@ -17,7 +17,8 @@
       "command": "npx",
       "args": ["tsx", "tools/mcp-server.ts"],
       "env": {
-        "KDT_WORKSPACE": "kdt-workspace"
+        "KDT_WORKSPACE": "kdt-workspace",
+        "KDT_GEOMETRY_API_BASE": "https://starthock.com"
       }
     }
   }
