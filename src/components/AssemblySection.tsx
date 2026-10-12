@@ -11,6 +11,7 @@ import type { PCBConfig, PCBSwitchRotations, PCBStabRotations } from "../lib/pcb
 import { generateSwitchPad } from "../lib/switch-pad-export";
 import type { SwitchPadConfig } from "../lib/switch-pad-export";
 import { generateBottomFoam } from "../lib/bottom-foam-export";
+import { useStpConfirm } from "./StpConfirmDialog";
 import type { BottomFoamConfig } from "../lib/bottom-foam-export";
 import type { KLELayout } from "../lib/kle-types";
 import type {
@@ -142,11 +143,14 @@ export default function AssemblySection({
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const { confirmStp, dialog } = useStpConfirm();
+
   const handleExport = useCallback(async () => {
     if (layout.keys.length === 0) {
       setStpMsg({ ok: false, text: t("assembly.noKeys") });
       return;
     }
+    if (!(await confirmStp())) return;
 
     // ── esc 轴心作为装配原点：所有部件施加同一 XY 平移 ──
     const esc = keyCenterInMm(layout.keys[0]!);
@@ -259,7 +263,7 @@ export default function AssemblySection({
   }, [
     layout, plateConfig, rotationOverrides, pcbConfig, switchRotations, stabRotations,
     foamConfig, padConfig, bottomFoamConfig, sel, compatDimIndices, onStpExportingChange,
-    onStpProgress, t,
+    onStpProgress, t, confirmStp,
   ]);
 
   return (
@@ -268,6 +272,7 @@ export default function AssemblySection({
       margin: "8px 12px", backgroundColor: "var(--theme-surface)",
       position: "relative", paddingTop: 6,
     }}>
+      {dialog}
       {/* Region label */}
       <div style={{
         position: "absolute", top: -8, left: 10,

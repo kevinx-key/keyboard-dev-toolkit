@@ -14,6 +14,7 @@ import { saveFile } from "../lib/platform-bridge";
 import { getTurnstileToken } from "../lib/turnstile";
 import { fetchCloudGeometry, analyzeCloud } from "../lib/geometry-api";
 import InteractivePCBPreview from "./InteractivePCBPreview";
+import { useStpConfirm } from "./StpConfirmDialog";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
 
@@ -169,8 +170,11 @@ export default function PCBSection({
     return orphans.size;
   }, [matrixResult]);
 
+  const { confirmStp, dialog } = useStpConfirm();
+
   const handleStpExport = useCallback(async () => {
     if (!pcbResult) return;
+    if (!(await confirmStp())) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
@@ -188,7 +192,7 @@ export default function PCBSection({
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [pcbResult, pcbParams, layout, onStpExportingChange, t]);
+  }, [pcbResult, pcbParams, layout, onStpExportingChange, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!pcbResult?.svg) return;
@@ -420,6 +424,7 @@ export default function PCBSection({
       margin: "8px 12px", backgroundColor: "var(--theme-surface)",
       position: "relative", paddingTop: 6,
     }}>
+      {dialog}
       {/* Region label */}
       <div style={{
         position: "absolute", top: -8, left: 10,

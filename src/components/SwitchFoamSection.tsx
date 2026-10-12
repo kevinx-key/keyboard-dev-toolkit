@@ -12,6 +12,7 @@ import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
+import { useStpConfirm } from "./StpConfirmDialog";
 import type { FoamSettings } from "../lib/editor-settings";
 import InteractivePlatePreview from "./InteractivePlatePreview";
 
@@ -73,8 +74,11 @@ export default function SwitchFoamSection({
     if (layout.keys.length > 0) { setDrawn((d) => !d); }
   }, [layout.keys.length]);
 
+  const { confirmStp, dialog } = useStpConfirm();
+
   const handleStpExport = useCallback(async () => {
     if (!foamResult) return;
+    if (!(await confirmStp())) return;
     setConverting(true); setStpMsg(null); onStpExportingChange?.(true);
     const name = layout.meta.name || "keyboard";
     const result = await exportSTP(
@@ -86,7 +90,7 @@ export default function SwitchFoamSection({
     if (!result.success && result.message === "cancelled") return;
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [foamResult, foamParams, thickness, layout, onStpExportingChange, onStpProgress, t]);
+  }, [foamResult, foamParams, thickness, layout, onStpExportingChange, onStpProgress, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!foamResult?.svg) return;
@@ -121,6 +125,7 @@ export default function SwitchFoamSection({
       border: "1px solid var(--theme-border)", borderRadius: "var(--theme-radius-md)",
       margin: "8px 12px", backgroundColor: "var(--theme-surface)", position: "relative", paddingTop: 6,
     }}>
+      {dialog}
       <div style={{
         position: "absolute", top: -8, left: 10, backgroundColor: "var(--theme-surface)", padding: "0 6px",
         fontSize: 11, fontWeight: 600, color: "var(--theme-text-muted)", letterSpacing: 0.5,

@@ -13,6 +13,7 @@ import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
 import type { PlateSettings } from "../lib/editor-settings";
 import InteractivePlatePreview from "./InteractivePlatePreview";
+import { useStpConfirm } from "./StpConfirmDialog";
 import PlatePricingSection from "./PlatePricingSection";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
 
@@ -103,8 +104,11 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     setSelectedKeyIdx(null);
   }, [setRotationOverrides]);
 
+  const { confirmStp, dialog } = useStpConfirm();
+
   const handleStpExport = useCallback(async () => {
     if (!plateResult) return;
+    if (!(await confirmStp())) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
@@ -122,7 +126,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [plateResult, plateParams, layout, onStpExportingChange, t]);
+  }, [plateResult, plateParams, layout, onStpExportingChange, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!plateResult?.svg) return;
@@ -189,6 +193,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
       margin: "8px 12px", backgroundColor: "var(--theme-surface)",
       position: "relative", paddingTop: 6,
     }}>
+      {dialog}
       {/* Region label */}
       <div style={{
         position: "absolute", top: -8, left: 10,

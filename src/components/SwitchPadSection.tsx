@@ -14,6 +14,7 @@ import { sanitizeSvg } from "../lib/sanitize";
 import { exportSTP, localizeStpMessage } from "../lib/stp-export";
 import type { StpProgressEvent } from "../lib/stp-export";
 import { saveFile } from "../lib/platform-bridge";
+import { useStpConfirm } from "./StpConfirmDialog";
 
 const PAD_THICKNESS = 0.1; // 轴下垫厚度 (mm)，用于 STP 挤出
 
@@ -68,8 +69,11 @@ export default function SwitchPadSection({
   const [dxfSaving, setDxfSaving] = useState(false);
   const [dxfMsg, setDxfMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const { confirmStp, dialog } = useStpConfirm();
+
   const handleStpExport = useCallback(async () => {
     if (!padResult) return;
+    if (!(await confirmStp())) return;
     setConverting(true);
     setStpMsg(null);
     onStpExportingChange?.(true);
@@ -84,7 +88,7 @@ export default function SwitchPadSection({
     if (!result.success && result.message === "cancelled") return;
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [padResult, padParams, layout, onStpExportingChange, onStpProgress, t]);
+  }, [padResult, padParams, layout, onStpExportingChange, onStpProgress, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!padResult?.svg) return;
@@ -116,6 +120,7 @@ export default function SwitchPadSection({
       margin: "8px 12px", backgroundColor: "var(--theme-surface)",
       position: "relative", paddingTop: 6,
     }}>
+      {dialog}
       {/* Region label */}
       <div style={{
         position: "absolute", top: -8, left: 10,
