@@ -97,10 +97,10 @@ export default function PCBSection({
   const update = <K extends keyof PCBConfig>(key: K, value: PCBConfig[K]) =>
     setConfig(c => ({ ...c, [key]: value }));
 
-  // 「板框形状」切换到 GH60：自动勾选 Type-C 并填入固定位置（仍可再微调）；切回自动仅改形状
+  // 「板框形状」切换到 GH60：自动把 Edge Distance 置 0（外框即真实 GH60，不外扩）并填入固定 Type-C；切回自动仅改形状
   const setBoardShape = useCallback((shape: BoardShape) => {
     setConfig((c) => shape === "gh60"
-      ? { ...c, boardShape: "gh60", needTypeC: true, typeCX: GH60_TYPEC.x, typeCY: GH60_TYPEC.y, typeCRot: GH60_TYPEC.rot }
+      ? { ...c, boardShape: "gh60", edgeDistance: 0, needTypeC: true, typeCX: GH60_TYPEC.x, typeCY: GH60_TYPEC.y, typeCRot: GH60_TYPEC.rot }
       : { ...c, boardShape: "auto" });
   }, [setConfig]);
   const isGh60 = config.boardShape === "gh60";
