@@ -7,7 +7,7 @@
  * 最后合并写入**同一个** STEP 文件。
  *
  * S1（§G-B5）：云端只收「快照 + 部件描述（kind/参数/落位）」，由服务端自算
- * 各部件 stpData 再装配；本地 `data` 仅供 Tauri 离线回落。
+ * 各部件 stpData 再装配。**桌面不再本地生成 STP**（§G-A1b）→ 云端是唯一引擎。
  *
  * 对齐约定 (由调用方 AssemblySection 计算)：
  *   原点 = 定位板 esc 轴孔上顶面中心；
@@ -15,7 +15,6 @@
  */
 
 import type { StpExtrudeData, StpProgressEvent } from "./stp-export";
-import { isTauri } from "./stp-export";
 import { geometryCloudEnabled, generateAssemblyStpCloud } from "./geometry-api";
 import type { CloudAssemblyPart, CloudKind } from "./geometry-api";
 import { saveFile } from "./platform-bridge";
@@ -63,81 +62,30 @@ export async function exportAssemblySTP(
     return { success: false, message: "assembly.needSelect" };
   }
 
-  // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
-  // 防复制计划 §G-B9：装配 STP 上云。S1 起只传快照+部件描述，服务端自算 stpData。
-  if (geometryCloudEnabled) {
-    const cloudParts: CloudAssemblyPart[] = parts.map((p) => ({
-      kind: p.kind,
-      params: p.params,
-      thickness: p.thickness,
-      dx: p.dx,
-      dy: p.dy,
-      dz: p.dz,
-    }));
-    const r = await generateAssemblyStpCloud(snapshot, cloudParts, (phase) =>
-      onProgress?.({
-        percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
-        phase: 0,
-        phaseLabel: phase,
-        message: phase,
-      }),
-    );
-    if (r.ok) {
-      await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
-      return { success: true, message: "CLOUD_OK" };
-    }
-    return { success: false, message: `CLOUD_${r.code}` };
+  // 装配 STP 已上云（§G-B9/§G-A1b）：桌面不再本地生成。
+  if (!geometryCloudEnabled) {
+    return { success: false, message: "CLOUD_DISABLED" };
   }
 
-  // ── 1. 平台检测 ──
-  if (!(await isTauri())) {
-    return { success: false, message: "DESKTOP_REQUIRED" };
+  const cloudParts: CloudAssemblyPart[] = parts.map((p) => ({
+    kind: p.kind,
+    params: p.params,
+    thickness: p.thickness,
+    dx: p.dx,
+    dy: p.dy,
+    dz: p.dz,
+  }));
+  const r = await generateAssemblyStpCloud(snapshot, cloudParts, (phase) =>
+    onProgress?.({
+      percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
+      phase: 0,
+      phaseLabel: phase,
+      message: phase,
+    }),
+  );
+  if (r.ok) {
+    await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
+    return { success: true, message: "CLOUD_OK" };
   }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const { listen } = await import("@tauri-apps/api/event");
-
-  // ── 2. 保存对话框 ──
-  const filePath = await save({
-    defaultPath: filename,
-    filters: [{ name: "STEP 3D Model", extensions: ["stp", "step"] }],
-  });
-  if (!filePath) {
-    return { success: false, message: "cancelled" };
-  }
-
-  // ── 3. 实时进度监听 ──
-  const unlisten = onProgress
-    ? await listen<StpProgressEvent>("stp-progress", (event) => {
-        onProgress(event.payload);
-      })
-    : null;
-
-  try {
-    // 大配列 STEP 可达数十 MB，由 Rust 端直接写盘，仅回传成功消息。
-    const localParts = parts
-      .filter((p) => p.data)
-      .map((p) => ({
-        boundary: p.data!.boundary,
-        polyHoles: p.data!.polyHoles,
-        circleHoles: p.data!.circleHoles,
-        thickness: p.thickness,
-        dx: p.dx,
-        dy: p.dy,
-        dz: p.dz,
-        modelPlacements: p.data!.modelPlacements || [],
-      }));
-    const resultMsg: string = await invoke("generate_assembly_stp", {
-      parts: localParts,
-      outputPath: filePath,
-    });
-
-    return { success: true, message: resultMsg };
-  } catch (err) {
-    const msg = typeof err === "string" ? err : String(err);
-    return { success: false, message: msg };
-  } finally {
-    if (unlisten) unlisten();
-  }
+  return { success: false, message: `CLOUD_${r.code}` };
 }

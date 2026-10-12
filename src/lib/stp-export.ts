@@ -75,31 +75,6 @@ export interface StpExportResult {
 // Tauri 环境检测 —— 在调用时评估，而非模块加载时
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * 运行时 Tauri 检测。
- *
- * 在 Tauri v2 中，`window.__TAURI_INTERNALS__` 由 Tauri 运行时
- * 在任何页面脚本执行之前注入。`@tauri-apps/api` 包在初始化时
- * 也会设置 `window.__TAURI__`，但这仅在显式 `import` 之后发生。
- * 检查 `__TAURI_INTERNALS__` 是最可靠的一次性检测方法。
- *
- * 同时检查 `window.__TAURI__` 作为快速路径，
- * 适用于 API 已经被引导的情况 (例如本标签页中首次 import 之后)。
- */
-export async function isTauri(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-
-  const win = window as unknown as Record<string, unknown>;
-
-  // 快速路径: Tauri API 已经引导 (由 @tauri-apps/api 在首次 import 时设置)
-  if (win.__TAURI__) return true;
-
-  // 可靠路径: Tauri v2 向每个 WebView 注入 __TAURI_INTERNALS__
-  if (win.__TAURI_INTERNALS__) return true;
-
-  return false;
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // 主导出函数
 // ═══════════════════════════════════════════════════════════════════
@@ -137,94 +112,39 @@ export async function exportSTP(
   filename: string,
   onProgress?: (evt: StpProgressEvent) => void,
 ): Promise<StpExportResult> {
-  const { data, thickness, kind, snapshot, params } = input;
+  const { thickness, kind, snapshot, params } = input;
 
-  // ── 0. 云端优先（构建期配置了 NEXT_PUBLIC_GEOMETRY_API_BASE 时）──
-  // 防复制计划 §G-B9：STP 上云。S1 起客户端只传快照+参数，服务端自算 stpData（§G-B5）。
-  if (geometryCloudEnabled) {
-    const r = await generateStpCloud(
-      { kind, snapshot, params, thickness },
-      (phase) =>
-        onProgress?.({
-          percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
-          phase: 0,
-          phaseLabel: phase,
-          message: phase,
-        }),
-    );
-    if (r.ok) {
-      await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
-      return { success: true, message: "CLOUD_OK" };
-    }
-    return { success: false, message: `CLOUD_${r.code}` };
+  // STP 已上云（§G-B9/§G-A1b）：**桌面不再本地生成**，云端是唯一引擎。
+  // 未配置云端（构建期无 NEXT_PUBLIC_GEOMETRY_API_BASE）→ STP 不可用。
+  if (!geometryCloudEnabled) {
+    return { success: false, message: "CLOUD_DISABLED" };
   }
 
-  // ── 1. 平台检测 ──
-  if (!(await isTauri())) {
-    // UI 层据此标记用 t("export.requireDesktop") 渲染本地化文案
-    return { success: false, message: "DESKTOP_REQUIRED" };
+  const r = await generateStpCloud(
+    { kind, snapshot, params, thickness },
+    (phase) =>
+      onProgress?.({
+        percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
+        phase: 0,
+        phaseLabel: phase,
+        message: phase,
+      }),
+  );
+  if (r.ok) {
+    await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });
+    return { success: true, message: "CLOUD_OK" };
   }
-  if (!data) {
-    return { success: false, message: "NO_GEOMETRY" };
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const { listen } = await import("@tauri-apps/api/event");
-
-  // ── 2. 保存对话框 —— 用户自行选择导出路径 ──
-  const filePath = await save({
-    defaultPath: filename,
-    filters: [{ name: "STEP 3D Model", extensions: ["stp", "step"] }],
-  });
-  if (!filePath) {
-    return { success: false, message: "cancelled" };
-  }
-
-  // ── 2.5. 设置实时进度监听（Rust 端发射 stp-progress 事件）──
-  const unlisten = onProgress
-    ? await listen<StpProgressEvent>("stp-progress", (event) => {
-        onProgress(event.payload);
-      })
-    : null;
-
-  try {
-    // ── 3. 调用 Rust 后端生成 STP 并直接写入磁盘 ──
-    // 大配列 (104键) 的 STEP 文件可达 50-100MB+，
-    // 通过 IPC 返回字符串会导致 JS 端 RangeError。
-    // 因此将 outputPath 传给 Rust，由 Rust 端直接写盘。
-    const resultMsg: string = await invoke("generate_stp", {
-      data: {
-        boundary: data.boundary,
-        polyHoles: data.polyHoles,
-        circleHoles: data.circleHoles,
-        modelPlacements: data.modelPlacements || [],
-      },
-      thickness: thickness,
-      outputPath: filePath,
-    });
-
-    return {
-      success: true,
-      message: resultMsg,
-    };
-  } catch (err) {
-    const msg = typeof err === "string" ? err : String(err);
-    return { success: false, message: msg };
-  } finally {
-    if (unlisten) unlisten();
-  }
+  return { success: false, message: `CLOUD_${r.code}` };
 }
 
 /**
  * 把 exportSTP 返回的 message 本地化为用户可读文案（各组件统一调用）。
- * - "DESKTOP_REQUIRED" → 提示用桌面版
+ * - "CLOUD_DISABLED"   → 未配置云端（STP 不可用）
  * - "CLOUD_OK"         → 云端成功
  * - "CLOUD_<code>"     → 云端失败（含错误码）
- * - 其它               → 原样返回（本地 Rust 的成功/错误串）
  */
 export function localizeStpMessage(t: (key: string) => string, message: string): string {
-  if (message === "DESKTOP_REQUIRED") return t("export.requireDesktop");
+  if (message === "CLOUD_DISABLED") return t("export.cloudRequired");
   if (message === "CLOUD_OK") return t("export.cloudSuccess");
   if (message.startsWith("CLOUD_")) return t("export.cloudError").replace("{{code}}", message.slice(6));
   return message;
