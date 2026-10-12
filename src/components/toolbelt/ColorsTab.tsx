@@ -7,6 +7,7 @@ import { SectionHeader } from "./shared/SectionHeader";
 import { useI18n } from "../../lib/i18n";
 import { parseColorInput, normalizeHex } from "../../lib/color-convert";
 import { TEXTURES } from "../../data/textures";
+import { DEFAULT_KEY_COLOR, DEFAULT_LABEL_COLOR, DEFAULT_CANVAS_BG, DEFAULT_TEXT_COLOR, WHITE, DARK_GRAY, NEAR_WHITE, WARM_COLORS, COLD_COLORS, NEUTRAL_COLORS, GRAYSCALE_PICKS } from "../../lib/color-constants";
 import ColorPickerPopover from "../ColorPickerPopover";
 
 interface ColorsTabProps {
@@ -19,10 +20,6 @@ interface ColorsTabProps {
 
 type PickerTarget = "key" | "label" | "bg" | "gradStart" | "gradEnd";
 
-const WARM_COLORS = ["#d44040", "#e07030", "#f0c040", "#e8a030", "#c83030"];
-const COLD_COLORS = ["#4080d4", "#40a080", "#6040a0", "#80b0e0", "#50c0b0"];
-const NEUTRAL_COLORS = ["#c8c8c8", "#888888", "#2a2a2a", "#ffffff", "#e0e0d8"];
-
 /** Compact numeric input paired with a slider — allows precise typed values. */
 function NumBox({
   value, min, max, step, onCommit, width = 50,
@@ -32,7 +29,11 @@ function NumBox({
 }) {
   const fmt = (n: number) => (step < 1 ? n.toFixed(2) : String(Math.round(n)));
   const [draft, setDraft] = useState(fmt(value));
-  useEffect(() => { setDraft(fmt(value)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setDraft(fmt(value));
+  }
   const commit = () => {
     const n = parseFloat(draft);
     if (Number.isFinite(n)) {
@@ -62,17 +63,17 @@ export function ColorsTab({ keys, selectedIds, onSetProp, meta, onSetMeta }: Col
   const ids = [...selectedIds];
   const hasSelection = selectedIds.length > 0 && key !== null;
 
-  const curKeyColor = key?.c || "#c8c8c8";
+  const curKeyColor = key?.c || DEFAULT_KEY_COLOR;
   const curKey2 = key?.c2 || "";
   const curAngle = typeof key?.cang === "number" ? key.cang : 135;
-  const curLabelColor = key ? key.t || parseLabelColor(key.labels[4] || "").color || "#1a1a1a" : "#1a1a1a";
-  const curBgColor = meta.backcolor || "#eeeeee";
+  const curLabelColor = key ? key.t || parseLabelColor(key.labels[4] || "").color || DEFAULT_LABEL_COLOR : DEFAULT_LABEL_COLOR;
+  const curBgColor = meta.backcolor || DEFAULT_CANVAS_BG;
   const decal = getDecalConfig(meta);
 
   // ── Local input drafts ──
   const [solidInput, setSolidInput] = useState(curKeyColor);
   const [gradStart, setGradStart] = useState(curKeyColor);
-  const [gradEnd, setGradEnd] = useState(curKey2 || "#ffffff");
+  const [gradEnd, setGradEnd] = useState(curKey2 || WHITE);
   const [gradAngle, setGradAngle] = useState(curAngle);
   const [labelInput, setLabelInput] = useState(curLabelColor);
   const [bgInput, setBgInput] = useState(curBgColor);
@@ -81,7 +82,7 @@ export function ColorsTab({ keys, selectedIds, onSetProp, meta, onSetMeta }: Col
 
   useEffect(() => { setSolidInput(curKeyColor); }, [curKeyColor, selIdx]);
   useEffect(() => { setGradStart(curKeyColor); }, [curKeyColor, selIdx]);
-  useEffect(() => { setGradEnd(curKey2 || "#ffffff"); }, [curKey2, selIdx]);
+  useEffect(() => { setGradEnd(curKey2 || WHITE); }, [curKey2, selIdx]);
   useEffect(() => { setGradAngle(curAngle); }, [curAngle, selIdx]);
   useEffect(() => { setLabelInput(curLabelColor); }, [curLabelColor, selIdx]);
   useEffect(() => { setBgInput(curBgColor); }, [curBgColor]);
@@ -248,9 +249,9 @@ export function ColorsTab({ keys, selectedIds, onSetProp, meta, onSetMeta }: Col
             className="kle-input" style={inputStyle} spellCheck={false} />
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-          {["#000000", "#333333", "#666666", "#ffffff"].map((c) => (
+          {GRAYSCALE_PICKS.map((c) => (
             <span key={c} onClick={() => hasSelection && onSetProp(ids, "t", c)} className="kle-chip"
-              style={{ padding: "2px 8px", fontSize: 10, borderRadius: "var(--theme-radius-sm)", cursor: "pointer", background: c, color: c === "#ffffff" ? "#333" : "#fff" }}>{c}</span>
+              style={{ padding: "2px 8px", fontSize: 10, borderRadius: "var(--theme-radius-sm)", cursor: "pointer", background: c, color: c === WHITE ? DARK_GRAY : NEAR_WHITE }}>{c}</span>
           ))}
           <button className="kle-btn btn-hover-surface" style={smallBtn}
             onClick={() => setPicker({ target: "label", color: curLabelColor })} disabled={!hasSelection}>{t("ct.openPalette")}</button>
@@ -329,7 +330,7 @@ export function ColorsTab({ keys, selectedIds, onSetProp, meta, onSetMeta }: Col
 
       <ColorPickerPopover
         open={picker !== null}
-        color={picker?.color || "#000000"}
+        color={picker?.color || DEFAULT_TEXT_COLOR}
         title={picker?.target === "gradEnd" ? t("ct.end") : picker?.target === "gradStart" ? t("ct.start") : t("cpick.title")}
         onClose={() => setPicker(null)}
         onApply={(hex) => { if (picker) applyColor(picker.target, hex); }}

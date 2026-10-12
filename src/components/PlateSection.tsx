@@ -126,7 +126,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [plateResult, plateParams, layout, onStpExportingChange, t, confirmStp]);
+  }, [plateResult, plateParams, layout, onStpExportingChange, onStpProgress, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!plateResult?.svg) return;
@@ -141,7 +141,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [plateResult, plateParams, layout, layout.meta.name, t]);
+  }, [plateResult, plateParams, layout, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!plateResult?.dxf) return;
@@ -156,7 +156,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [plateResult, plateParams, layout, layout.meta.name, t]);
+  }, [plateResult, plateParams, layout, t]);
 
   // ── Interactive preview handlers ──
   // Issue 3: When selecting in plate, clear canvas selection to prevent dual control
@@ -282,7 +282,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
                   padding: "5px 14px", borderRadius: "var(--theme-radius-sm)",
                   border: "1px solid var(--theme-primary)",
                   backgroundColor: svgSaving ? "var(--theme-primary-soft)" : "var(--theme-primary)",
-                  color: svgSaving ? "var(--theme-primary)" : "#fff", cursor: svgSaving ? "wait" : "pointer",
+                  color: svgSaving ? "var(--theme-primary)" : "var(--theme-on-accent)", cursor: svgSaving ? "wait" : "pointer",
                   fontWeight: 600, fontSize: 12, opacity: svgSaving ? 0.7 : 1,
                   animation: svgSaving ? "stp-pulse 0.8s ease-in-out infinite" : "none",
                 }}>
@@ -295,7 +295,7 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
                   padding: "5px 14px", borderRadius: "var(--theme-radius-sm)",
                   border: "1px solid var(--theme-success)",
                   backgroundColor: dxfSaving ? "var(--theme-success-soft)" : "var(--theme-success)",
-                  color: dxfSaving ? "var(--theme-success)" : "#fff", cursor: dxfSaving ? "wait" : "pointer",
+                  color: dxfSaving ? "var(--theme-success)" : "var(--theme-on-accent)", cursor: dxfSaving ? "wait" : "pointer",
                   fontWeight: 600, fontSize: 12, opacity: dxfSaving ? 0.7 : 1,
                   animation: dxfSaving ? "stp-pulse 0.8s ease-in-out infinite" : "none",
                 }}>

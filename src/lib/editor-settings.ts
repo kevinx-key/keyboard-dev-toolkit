@@ -51,7 +51,7 @@ export interface BottomFoamSettings {
 export const DEFAULT_PLATE_SETTINGS: PlateSettings = {
   switchType: 1, stabType: 1, u1: 19.05, kerf: 0,
   topPad: 0, leftPad: 0, rightPad: 0, bottomPad: 0, xGrow: 0, yGrow: 0,
-  // eslint-disable-next-line no-restricted-syntax -- 数据默认色值（非 UI 内联样式）
+   
   fillet: 0, holeFillet: 0, lineColor: "#000000", lineWeight: 0.05, dmz: 5,
   padEnabled: false, kerfEnabled: false,
   u1Enabled: false, lineColorEnabled: false, lineWeightEnabled: false,

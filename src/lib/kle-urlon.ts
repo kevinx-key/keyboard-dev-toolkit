@@ -127,7 +127,7 @@ export function parse(str: string): unknown {
     // Array
     if (type === '@') {
       const res: unknown[] = [];
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         if (pos >= str.length || str.charAt(pos) === ';') break;
         res.push(parseToken());
@@ -141,7 +141,7 @@ export function parse(str: string): unknown {
     // Object
     if (type === '_') {
       const res: Record<string, unknown> = {};
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         if (pos >= str.length || str.charAt(pos) === ';') break;
         const key = readToken();

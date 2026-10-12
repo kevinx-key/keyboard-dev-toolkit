@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ruler, Tag, Palette, Keyboard, Wrench, FileText, Image, Type, Brush, BarChart3, Grid3x3 } from "lucide-react";
+import { Ruler, Tag, Palette, Keyboard, Wrench, FileText, Image as ImageIcon, Type, Brush, BarChart3, Grid3x3 } from "lucide-react";
 import type { KeyProps, KLEMeta, KLELayout } from "../lib";
 import { useI18n } from "../lib/i18n";
 import { PropertiesTab } from "./toolbelt/PropertiesTab";
@@ -33,7 +33,7 @@ const ALL_TABS: TabDef[] = [
   { key: "keyboard", icon: <Keyboard size={14} strokeWidth={2} />, labelKey: "tb.tab.keyboard" },
   { key: "tools", icon: <Wrench size={14} strokeWidth={2} />, labelKey: "tb.tab.tools" },
   { key: "rawdata", icon: <FileText size={14} strokeWidth={2} />, labelKey: "tb.tab.rawdata" },
-  { key: "svg", icon: <Image size={14} strokeWidth={2} />, labelKey: "SVG" },
+  { key: "svg", icon: <ImageIcon size={14} strokeWidth={2} />, labelKey: "SVG" },
   { key: "chars", icon: <Type size={14} strokeWidth={2} />, labelKey: "tb.tab.chars" },
   { key: "css", icon: <Brush size={14} strokeWidth={2} />, labelKey: "tb.tab.css" },
   { key: "summary", icon: <BarChart3 size={14} strokeWidth={2} />, labelKey: "tb.tab.summary" },

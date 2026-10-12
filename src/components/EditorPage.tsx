@@ -31,6 +31,7 @@ import { useTheme } from "../lib/theme";
 import { useI18n } from "../lib/i18n";
 import type { KLEMeta } from "../lib/kle-types";
 import { DEFAULT_META, getDecalConfig } from "../lib/kle-types";
+import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
 import type { PlateRotationOverrides } from "../lib/plate-export";
 import type { PCBSwitchRotations, PCBStabRotations, PCBConfig } from "../lib/pcb-export";
 import type { PlateSettings, FoamSettings, PadSettings, BottomFoamSettings } from "../lib/editor-settings";
@@ -64,9 +65,9 @@ for (const s of SAMPLES) {
 
 export default function EditorPage() {
   const { t } = useI18n();
-  // step config for keyboard shortcuts
-  const stepRef = useRef<StepConfig>({ move: 0.25, size: 0.25, rotate: 15 });
-  const [, forceUpdate] = useState(0);
+  // step config: state drives the UI, ref lets the shortcut handler read the latest value
+  const [stepConfig, setStepConfig] = useState<StepConfig>({ move: 0.25, size: 0.25, rotate: 15 });
+  const stepRef = useRef<StepConfig>(stepConfig);
 
   const editor = useKeyboardEditor(stepRef);
   const { state, moveSelected } = editor;
@@ -149,7 +150,7 @@ export default function EditorPage() {
     if (state.layout.keys.length === 0 && ALL_PRESETS.length > 0) {
       const defaultPreset = ALL_PRESETS[0]!;
       const keys = parseLayoutJSON(defaultPreset.data);
-      const meta: KLEMeta = { ...DEFAULT_META, name: defaultPreset.name, backcolor: "#eeeeee" };
+      const meta: KLEMeta = { ...DEFAULT_META, name: defaultPreset.name, backcolor: DEFAULT_CANVAS_BG };
       editor.loadLayout({ meta, keys, _sourceCache: defaultPreset.data as unknown[] });
     }
     autoLoadDoneRef.current = true;
@@ -353,9 +354,9 @@ export default function EditorPage() {
               canRedo={state.redoStack.length > 0}
               hasSelection={state.selectedIds.length > 0}
               hasClipboard={state.clipboard !== null}
-              stepConfig={stepRef.current}
+              stepConfig={stepConfig}
               layoutName={state.layout.meta.name}
-              onStepChange={(steps) => { stepRef.current = steps; forceUpdate(n => n + 1); }}
+              onStepChange={(steps) => { stepRef.current = steps; setStepConfig(steps); }}
               onAddKeys={editor.addKeys}
               onAddSpecialKey={handleAddSpecialKey}
               onDelete={editor.deleteSelected}

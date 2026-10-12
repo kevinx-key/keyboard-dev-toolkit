@@ -30,8 +30,38 @@ export default function StpExportOverlay({ visible, progress }: StpExportOverlay
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
-  const lastMsgRef = useRef<string>("");
+  const [lastLogKey, setLastLogKey] = useState("");
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Reset transient state when the overlay hides (adjust state during render)
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (!visible) {
+      setElapsed(0);
+      setLog([]);
+      setLastLogKey("");
+    }
+  }
+
+  // Append log entries when phase/message changes (derive state during render)
+  if (visible && progress) {
+    const msg = `${progress.phaseLabel}: ${progress.message}`;
+    const dedupKey = `${progress.percentage}-${msg}`;
+    if (dedupKey !== lastLogKey) {
+      // Log on every 5% bump, every phase change, and at completion milestones
+      const ts = new Date();
+      const timeStr = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}:${String(ts.getSeconds()).padStart(2, "0")}`;
+      const next = [...log];
+      // Log the previous entry as "done" if it existed
+      if (next.length > 0 && !next[next.length - 1]!.done) {
+        next[next.length - 1] = { ...next[next.length - 1]!, done: true };
+      }
+      next.push({ time: timeStr, text: msg, done: false });
+      setLastLogKey(dedupKey);
+      setLog(next);
+    }
+  }
 
   // Auto-scroll log to bottom
   useEffect(() => {
@@ -43,10 +73,7 @@ export default function StpExportOverlay({ visible, progress }: StpExportOverlay
   // Elapsed time counter
   useEffect(() => {
     if (!visible) {
-      setElapsed(0);
       startRef.current = null;
-      setLog([]);
-      lastMsgRef.current = "";
       return;
     }
     if (startRef.current === null) startRef.current = Date.now();
@@ -58,44 +85,6 @@ export default function StpExportOverlay({ visible, progress }: StpExportOverlay
     }, 200);
 
     return () => clearInterval(interval);
-  }, [visible]);
-
-  // Append log entries when phase/message changes
-  useEffect(() => {
-    if (!progress || !visible) return;
-    const msg = `${progress.phaseLabel}: ${progress.message}`;
-    const dedupKey = `${progress.percentage}-${msg}`;
-    if (dedupKey === lastMsgRef.current) return;
-
-    // Log on every 5% bump, every phase change, and at completion milestones
-    const ts = new Date();
-    const timeStr = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}:${String(ts.getSeconds()).padStart(2, "0")}`;
-
-    // Log the previous entry as "done" if it existed
-    setLog(prev => {
-      const next = [...prev];
-      if (next.length > 0 && !next[next.length - 1]!.done) {
-        next[next.length - 1] = { ...next[next.length - 1]!, done: true };
-      }
-      next.push({ time: timeStr, text: msg, done: false });
-      return next;
-    });
-
-    lastMsgRef.current = dedupKey;
-  }, [progress, visible]);
-
-  // Mark last entry as done when overlay hides
-  useEffect(() => {
-    if (!visible) {
-      setLog(prev => {
-        if (prev.length === 0) return prev;
-        const next = [...prev];
-        if (!next[next.length - 1]!.done) {
-          next[next.length - 1] = { ...next[next.length - 1]!, done: true };
-        }
-        return next;
-      });
-    }
   }, [visible]);
 
   if (!visible) return null;

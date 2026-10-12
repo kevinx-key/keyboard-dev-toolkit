@@ -107,6 +107,7 @@
   --theme-text-muted: #6e6e73;
   --theme-text-dim: #a1a1a6;
   --theme-text-inverse: #ffffff;
+  --theme-on-accent: #ffffff;
 
   /* Borders — Apple 发丝线 */
   --theme-border: #d2d2d7;
@@ -306,6 +307,7 @@
   --theme-text-muted: #8b949e;
   --theme-text-dim: #484f58;
   --theme-text-inverse: #0d1117;
+  --theme-on-accent: #ffffff;
 
   --theme-border: #30363d;
   --theme-border-light: #21262d;

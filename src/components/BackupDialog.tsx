@@ -17,20 +17,32 @@ interface BackupDialogProps {
 export default function BackupDialog({ open, onClose, onRestore }: BackupDialogProps) {
   const { t } = useI18n();
   const [backups, setBackups] = useState<BackupEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
+  // 事件处理器中调用：显示 loading 并刷新列表（不在 effect 内同步 setState）
+  const refresh = useCallback(() => {
     setLoading(true);
-    try {
-      const list = await getBackups();
-      setBackups(list);
-    } catch { logger.error("getBackups failed"); }
-    setLoading(false);
+    getBackups()
+      .then(setBackups)
+      .catch(() => { logger.error("getBackups failed"); })
+      .finally(() => { setLoading(false); });
   }, []);
 
+  // 关闭时复位 loading，保证下次打开重新显示加载态
+  const close = useCallback(() => {
+    setLoading(true);
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
-    if (open) refresh();
-  }, [open, refresh]);
+    if (!open) return;
+    let cancelled = false;
+    getBackups()
+      .then((list) => { if (!cancelled) setBackups(list); })
+      .catch(() => { if (!cancelled) logger.error("getBackups failed"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const handleDelete = async (id: number) => {
     await deleteBackup(id);
@@ -46,7 +58,7 @@ export default function BackupDialog({ open, onClose, onRestore }: BackupDialogP
   const handleRestore = (entry: BackupEntry) => {
     if (window.confirm(t("backup.confirmRestore") || "Restore this backup? Current data will be replaced.")) {
       onRestore(entry.rawData);
-      onClose();
+      close();
     }
   };
 
@@ -62,7 +74,7 @@ export default function BackupDialog({ open, onClose, onRestore }: BackupDialogP
         backdropFilter: "blur(3px)",
         WebkitBackdropFilter: "blur(3px)",
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
     >
       <div
         className={`kle-dialog${visible ? "" : " kle-dialog-exit"}`}
@@ -79,7 +91,7 @@ export default function BackupDialog({ open, onClose, onRestore }: BackupDialogP
           <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--theme-text, #333)" }}>
             {t("backup.title")}
           </h2>
-          <button onClick={onClose} style={{
+          <button onClick={close} style={{
             padding: "4px 10px", fontSize: 13, border: "1px solid var(--theme-border, #ccc)",
             borderRadius: 6, background: "transparent", cursor: "pointer",
             color: "var(--theme-text, #333)",
@@ -121,7 +133,7 @@ export default function BackupDialog({ open, onClose, onRestore }: BackupDialogP
                     style={{
                       padding: "3px 8px", fontSize: 11, fontWeight: 600,
                       border: "1px solid var(--theme-primary, #337ab7)", borderRadius: 3,
-                      background: "var(--theme-primary, #337ab7)", color: "#fff", cursor: "pointer",
+                      background: "var(--theme-primary, #337ab7)", color: "var(--theme-on-accent)", cursor: "pointer",
                     }}
                   >
                     {t("backup.restore")}

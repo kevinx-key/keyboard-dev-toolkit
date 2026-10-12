@@ -9,6 +9,7 @@ import {
 import type { KLELayout } from "../lib";
 import { parseLayoutJSON } from "../lib/kle-serial";
 import { DEFAULT_META } from "../lib/kle-types";
+import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
 import { ALL_PRESETS, PRESET_NAMES } from "../data/presets";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
@@ -86,7 +87,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
     const found = ALL_PRESETS.find((p) => p.name === name);
     if (!found) return;
     const keys = parseLayoutJSON(found.data);
-    const meta = { ...DEFAULT_META, name: found.name, backcolor: "#eeeeee" };
+    const meta = { ...DEFAULT_META, name: found.name, backcolor: DEFAULT_CANVAS_BG };
     props.onLoadLayout({ meta, keys, _sourceCache: found.data as unknown[] });
   };
 
@@ -304,8 +305,15 @@ function StepOptionsDialog({ open, steps, onClose, onConfirm, onCancel }: StepOp
   const { mounted, visible } = usePresence(open, 160);
   const { t } = useI18n();
   const [local, setLocal] = useState(steps);
-
-  useEffect(() => { if (open) setLocal(steps); }, [open, steps]);
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevSteps, setPrevSteps] = useState(steps);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) { setLocal(steps); setPrevSteps(steps); }
+  } else if (open && steps !== prevSteps) {
+    setPrevSteps(steps);
+    setLocal(steps);
+  }
 
   if (!mounted) return null;
 

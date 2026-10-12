@@ -53,6 +53,14 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // 颜色字面量=数据/默认色/导出渲染结果，无法用 CSS 变量替代 —— 对数据与渲染层放行。
+  // （UI 组件不在此列，仍须用 var(--theme-*, 回退值) 或默认色常量。）
+  {
+    files: ["src/data/**", "scripts/**", "src/lib/**", "src/components/canvas/**"],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
   // Test file overrides: allow inline colors (they are expected test values)
   // — placed AFTER custom rules so they take precedence in flat config
   {

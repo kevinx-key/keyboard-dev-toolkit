@@ -137,15 +137,15 @@ export default function BottomFoamSection({
   const addRect = useCallback(() => {
     setCustomRects((rs) => [...rs, { cx: defaultCenter.x, cy: defaultCenter.y, w: 10, h: 10, r: 1, rot: 0 }]);
     setSelectedIdx(customRects.length);
-  }, [defaultCenter, customRects.length]);
+  }, [defaultCenter, customRects.length, setCustomRects]);
   const deleteRect = useCallback((i: number) => {
     setCustomRects((rs) => rs.filter((_, k) => k !== i));
     setSelectedIdx(null);
-  }, []);
+  }, [setCustomRects]);
   const updateRect = useCallback((patch: Partial<CustomRect>) => {
     if (selectedIdx === null) return;
     setCustomRects((rs) => rs.map((r, k) => (k === selectedIdx ? { ...r, ...patch } : r)));
-  }, [selectedIdx]);
+  }, [selectedIdx, setCustomRects]);
 
   // ── 导出 ──
   const [converting, setConverting] = useState(false);
@@ -183,7 +183,7 @@ export default function BottomFoamSection({
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [foamResult, foamParams, layout, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!foamResult?.dxf) return;
@@ -194,7 +194,7 @@ export default function BottomFoamSection({
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [foamResult, foamParams, layout, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, t]);
 
   const numInput: React.CSSProperties = {
     width: 58, padding: "2px 4px", fontSize: 12, borderRadius: 4,

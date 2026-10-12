@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { COLOR_SWATCHES } from "../data/color-swatches";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
+import { WHITE } from "../lib/color-constants";
 
 interface ColorSwatchPickerProps {
   open: boolean;
@@ -100,7 +101,7 @@ export default function ColorSwatchPicker({
                     width: 28,
                     height: 28,
                     backgroundColor: swatch.hex,
-                    border: swatch.hex.toLowerCase() === "#ffffff"
+                    border: swatch.hex.toLowerCase() === WHITE
                       ? "1px solid var(--theme-border-input)"
                       : "1px solid rgba(0,0,0,0.15)",
                     borderRadius: 4,

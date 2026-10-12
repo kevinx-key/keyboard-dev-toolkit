@@ -24,8 +24,8 @@ if (!process.env.KDT_GEOMETRY_API_BASE && !process.env.NEXT_PUBLIC_GEOMETRY_API_
   try {
     const envPath = fileURLToPath(new URL("../.env.local", import.meta.url));
     (process as unknown as { loadEnvFile?: (p: string) => void }).loadEnvFile?.(envPath);
-  } catch {
-    /* 无 .env.local / Node 不支持 → 保持关闭 */
+  } catch (e) {
+    void e; // 无 .env.local / Node 不支持 → 保持云端关闭
   }
 }
 

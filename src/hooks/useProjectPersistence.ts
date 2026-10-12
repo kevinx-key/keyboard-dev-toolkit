@@ -353,7 +353,7 @@ export function useProjectPersistence(params: UseProjectPersistenceParams) {
       applyParsedState(parsed);
       setProjectBkDialogOpen(false);
     },
-    [loadLayout, applyParsedState]
+    [loadLayout, applyParsedState, t]
   );
 
   return {

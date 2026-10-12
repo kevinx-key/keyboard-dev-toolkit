@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolve } from "node:path";
 import {
   applyOps,
   exportFree,
@@ -137,7 +138,7 @@ describe("workspace guard", () => {
   it("拒绝路径穿越", () => {
     expect(() => resolveSafe("/tmp/ws", "../evil.json")).toThrow(/越界/);
     expect(() => resolveSafe("/tmp/ws", "a/../../evil.json")).toThrow(/越界/);
-    expect(resolveSafe("/tmp/ws", "sub/dir/a.json")).toBe(require("node:path").resolve("/tmp/ws/sub/dir/a.json"));
+    expect(resolveSafe("/tmp/ws", "sub/dir/a.json")).toBe(resolve("/tmp/ws/sub/dir/a.json"));
   });
 });
 

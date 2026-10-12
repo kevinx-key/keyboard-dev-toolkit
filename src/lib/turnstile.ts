@@ -79,8 +79,8 @@ export async function getTurnstileToken(): Promise<string | null> {
       settled = true;
       try {
         if (widgetId) api.remove(widgetId);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        void e; // 组件可能已随页面移除，忽略
       }
       box.remove();
       resolve(token);

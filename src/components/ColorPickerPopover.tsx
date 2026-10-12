@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { useI18n } from "../lib/i18n";
+import { DEFAULT_TEXT_COLOR } from "../lib/color-constants";
 import { usePresence } from "./ui/usePresence";
 import {
   hexToRgb,
@@ -39,19 +40,19 @@ export default function ColorPickerPopover({
 }: ColorPickerPopoverProps) {
   const { t } = useI18n();
   const { mounted, visible } = usePresence(open, 160);
-  const [hex, setHex] = useState<string>(() => normalizeHex(color) || "#000000");
+  const [hex, setHex] = useState<string>(() => normalizeHex(color) || DEFAULT_TEXT_COLOR);
   const [draft, setDraft] = useState<string>(hex);
-  const lastOpen = useRef(false);
+  const [prevOpen, setPrevOpen] = useState(open);
 
-  // Sync incoming color when the popover opens
-  useEffect(() => {
-    if (open && !lastOpen.current) {
-      const n = normalizeHex(color) || "#000000";
+  // Sync incoming color when the popover opens (adjust state during render)
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      const n = normalizeHex(color) || DEFAULT_TEXT_COLOR;
       setHex(n);
       setDraft(n);
     }
-    lastOpen.current = open;
-  }, [open, color]);
+  }
 
   if (!mounted) return null;
 

@@ -1253,7 +1253,7 @@ function detectLang(): Lang {
   try {
     const saved = localStorage.getItem("kdt-lang");
     if (saved && saved in LANG_LABELS) return saved as Lang;
-  } catch { /* ignore */ }
+  } catch (e) { void e; /* localStorage 不可用 */ }
   if (typeof navigator === "undefined") return "en";
   const nav = (navigator.languages?.[0] || navigator.language || "en").toLowerCase();
   if (nav.startsWith("zh")) return /hant|tw|hk|mo/.test(nav) ? "zh-HK" : "zh";
@@ -1271,12 +1271,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Lang>("en");
 
   useEffect(() => {
+    // SSR/静态导出首帧固定 "en"（避免水合不一致），仅能在挂载后的 effect 内同步切换语言
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe 语言探测，无法在渲染期派生
     setLang((cur) => (cur === "en" ? detectLang() : cur));
   }, []);
 
   // 持久化 + 同步 <html lang>：语言一致 → Chrome 不再自动翻译
   useEffect(() => {
-    try { localStorage.setItem("kdt-lang", lang); } catch { /* ignore */ }
+    try { localStorage.setItem("kdt-lang", lang); } catch (e) { void e; /* localStorage 不可用 */ }
     if (typeof document !== "undefined") document.documentElement.lang = lang;
   }, [lang]);
 

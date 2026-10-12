@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useMemo, useEffect, useId } from "react";
+import { useCallback, useRef, useState, useMemo, useEffect, useId, useSyncExternalStore } from "react";
 import { KEY_UNIT } from "../lib";
 import type { KeyProps } from "../lib";
 import type { DecalConfig } from "../lib/kle-types";
@@ -10,6 +10,7 @@ import { computeLayoutBBoxInUnits } from "../lib/coordinate-system";
 import KeyRenderer from "./canvas/KeyRenderer";
 import ContextMenu from "./canvas/ContextMenu";
 import { getKeyCategory, hitTestKey, getKeysInArea } from "./canvas/CanvasInteraction";
+import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
 
 interface KeyboardCanvasProps {
   keys: KeyProps[]; selectedIds: string[];
@@ -31,6 +32,10 @@ interface KeyboardCanvasProps {
 
 const INFO_BAR_HEIGHT = 24;
 
+const subscribeNoop = () => () => {};
+const getClientMounted = () => true;
+const getServerMounted = () => false;
+
 export default function KeyboardCanvas({
   keys, selectedIds, onSelectKey, onSelectArea, onClearSelection, onMoveKeys,
   backgroundColor, texture, radii, css, categoryFilter = "All", preview = false,
@@ -41,8 +46,7 @@ export default function KeyboardCanvas({
   const compatLayer = useCompatLayer();
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const mounted = useSyncExternalStore(subscribeNoop, getClientMounted, getServerMounted);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -176,13 +180,13 @@ export default function KeyboardCanvas({
   }, [applyFit]);
 
   // ── Mouse handlers ──
-  const getCanvasPos = (e: React.MouseEvent): { x: number; y: number } | null => {
+  const getCanvasPos = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
     const rect = contentRef.current?.getBoundingClientRect();
     if (!rect) return null;
     // rect 已含 flex 居中偏移与 pan/zoom 变换后的视觉位置，直接逆缩放即可
     // （旧实现额外减 panX，在自适应居中设置非零 pan 后会导致命中测试错位）
     return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
-  };
+  }, [scale]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (document.activeElement && document.activeElement !== canvasWrapperRef.current) {
@@ -218,7 +222,7 @@ export default function KeyboardCanvas({
       && pos.y >= bgBounds.top && pos.y <= bgBounds.top + bgBounds.height;
     if (!inBg) return;
     pendingSelectRef.current = { x: pos.x, y: pos.y };
-  }, [readOnly, preview, selectedIds, panX, panY, keys, onSelectKey, bgBounds, compatDimSet]);
+  }, [readOnly, preview, selectedSet, panX, panY, keys, onSelectKey, bgBounds, compatDimSet, getCanvasPos]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -241,7 +245,7 @@ export default function KeyboardCanvas({
     }
     if (!dragState) return;
     setDragState({ ...dragState, currentX: pos.x, currentY: pos.y });
-  }, [dragState, isPanning]);
+  }, [dragState, isPanning, getCanvasPos]);
 
   const handleMouseUp = useCallback((_e: React.MouseEvent) => {
     if (isPanning) { setIsPanning(false); return; }
@@ -303,7 +307,7 @@ export default function KeyboardCanvas({
             onMouseLeave={() => { if (isPanning) setIsPanning(false); setDragState(null); pendingSelectRef.current = null; }}
             style={{ position: "relative", transform: `translate(${bgBounds.offsetX}px,${bgBounds.offsetY}px) scale(${scale}) translate(${panX / scale}px,${panY / scale}px)`, transformOrigin: "0 0", width: bgBounds.width, height: bgBounds.height, flexShrink: 0, userSelect: "none" }}>
           {/* Background */}
-          <div style={{ position: "absolute", left: bgBounds.left, top: bgBounds.top, width: bgBounds.width, height: bgBounds.height, backgroundColor: backgroundColor || "#eeeeee", backgroundImage: texture ? `url(${texture})` : undefined, backgroundSize: "cover", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderRadius: radii || 6, pointerEvents: "none" }} />
+          <div style={{ position: "absolute", left: bgBounds.left, top: bgBounds.top, width: bgBounds.width, height: bgBounds.height, backgroundColor: backgroundColor || DEFAULT_CANVAS_BG, backgroundImage: texture ? `url(${texture})` : undefined, backgroundSize: "cover", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderRadius: radii || 6, pointerEvents: "none" }} />
 
           {/* Keys */}
           {keys.map((key, i) => {

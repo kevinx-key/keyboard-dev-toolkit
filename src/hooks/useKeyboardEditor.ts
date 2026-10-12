@@ -31,14 +31,14 @@ function migrateOldFormat(layout: KLELayout): KLELayout {
   let changed = false;
   const migratedKeys = layout.keys.map((k) => {
     // If key lacks the `labels` array, it's old format
-    if (!Array.isArray((k as any).labels)) {
+    const legacy = k as unknown as { labels?: unknown; label?: unknown; labelBottom?: unknown; labelFront?: unknown };
+    if (!Array.isArray(legacy.labels)) {
       changed = true;
-      const old = k as any;
       const labels = Array(12).fill("");
       // Old fields: label→center-center(4), labelBottom→bottom-center(7), labelFront→front-center(9)
-      if (old.label) labels[4] = String(old.label);
-      if (old.labelBottom) labels[7] = String(old.labelBottom);
-      if (old.labelFront) labels[9] = String(old.labelFront);
+      if (legacy.label) labels[4] = String(legacy.label);
+      if (legacy.labelBottom) labels[7] = String(legacy.labelBottom);
+      if (legacy.labelFront) labels[9] = String(legacy.labelFront);
       return { ...DEFAULT_PROPS, ...k, labels };
     }
     return k;
@@ -53,6 +53,9 @@ export interface StepConfig {
 }
 
 const DEFAULT_STEPS: StepConfig = { move: 0.25, size: 0.25, rotate: 15 };
+
+// M15 修复：数字属性校验 — 防止 NaN/Infinity/null 穿透到 reducer
+const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth", "compatOption"]);
 
 export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
   const [state, dispatch] = useReducer(editorReducer, null, () => {
@@ -212,7 +215,7 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [stepRef]);
 
   const loadLayout = useCallback((layout: KLELayout) => {
     dispatch({ type: "LOAD_LAYOUT", layout });
@@ -241,7 +244,6 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
   }, []);
 
   // M15 修复：数字属性校验 — 防止 NaN/Infinity/null 穿透到 reducer
-  const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth", "compatOption"]);
   const setProp = useCallback((ids: string[], prop: keyof KeyProps, value: unknown) => {
     if (NUMERIC_PROPS.has(prop) && (typeof value !== "number" || !isFinite(value))) {
       logger.error(`setProp: invalid numeric value for ${String(prop)}: ${String(value)}`);

@@ -152,7 +152,7 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
   }
 
   // Track sticky state
-  let sticky = createDefaultSticky();
+  const sticky = createDefaultSticky();
   let cluster = { r: 0, rx: 0, ry: 0 };
   let stickyY = sticky.y;
   // Accumulated y position — tracks the default y for the NEXT row.
@@ -273,7 +273,7 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
       } else if (key.compatOption !== undefined && serialLabels.length > VIA_OPTION_LABEL_SLOT) {
         if (isViaTag(serialLabels[VIA_OPTION_LABEL_SLOT])) serialLabels[VIA_OPTION_LABEL_SLOT] = "";
       }
-      let labelStr = serialLabels.join("\n");
+      const labelStr = serialLabels.join("\n");
 
       // Emit props object if non-empty
       if (Object.keys(props).length > 0) {
@@ -335,11 +335,11 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
  * Convert intermediate array-of-rows format to KeyProps[].
  */
 function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
-  let current = createDefaultSticky();
+  const current = createDefaultSticky();
   const meta: Partial<KLEMeta> = {};
   let metaExtracted = false;
   const keys: KeyProps[] = [];
-  let cluster = { x: 0, y: 0 };
+  const cluster = { x: 0, y: 0 };
   let align = DEFAULT_PROPS.align;
 
   for (let r = 0; r < intermediate.length; r++) {

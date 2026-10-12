@@ -100,7 +100,7 @@ export default function SwitchPadSection({
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [padResult, padParams, layout, layout.meta.name, t]);
+  }, [padResult, padParams, layout, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!padResult?.dxf) return;
@@ -112,7 +112,7 @@ export default function SwitchPadSection({
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [padResult, padParams, layout, layout.meta.name, t]);
+  }, [padResult, padParams, layout, t]);
 
   return (
     <div className="kle-panel" style={{

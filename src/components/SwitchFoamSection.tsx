@@ -101,7 +101,7 @@ export default function SwitchFoamSection({
     setSvgSaving(false);
     if (path === null) return;
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [foamResult, foamParams, layout, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, t]);
 
   const handleDxfExport = useCallback(async () => {
     if (!foamResult?.dxf) return;
@@ -112,7 +112,7 @@ export default function SwitchFoamSection({
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [foamResult, foamParams, layout, layout.meta.name, t]);
+  }, [foamResult, foamParams, layout, t]);
 
   const numInput: React.CSSProperties = {
     width: 60, padding: "2px 4px", fontSize: 12, borderRadius: 4,

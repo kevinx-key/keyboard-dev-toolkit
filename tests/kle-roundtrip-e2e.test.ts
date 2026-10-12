@@ -279,7 +279,7 @@ describe("reducer mutations and _sourceCache", () => {
 
   describe("SET_PROP", () => {
     it("clears _sourceCache", () => {
-      const state: any = createLoadedState();
+      const state = createLoadedState();
       const next = editorReducer(state, { type: "SET_PROP", ids: ["0"], prop: "c", value: "#ff0000" });
       expect(next.layout._sourceCache).toBeUndefined();
     });
@@ -630,7 +630,7 @@ describe("exportJSON round-trip", () => {
   });
 
   it("exportJSON handles empty layout", () => {
-    const empty: KLELayout = { meta: {} as any, keys: [] };
+    const empty: KLELayout = { meta: {} as KLELayout["meta"], keys: [] };
     expect(exportJSON(empty)).toBe("[]");
   });
 });

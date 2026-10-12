@@ -192,7 +192,7 @@ export default function PCBSection({
     }
     const stpText = localizeStpMessage(t, result.message);
     setStpMsg({ ok: result.success, text: stpText });
-  }, [pcbResult, pcbParams, layout, onStpExportingChange, t, confirmStp]);
+  }, [pcbResult, pcbParams, layout, onStpExportingChange, onStpProgress, t, confirmStp]);
 
   const handleSvgExport = useCallback(async () => {
     if (!pcbResult?.svg) return;
@@ -207,7 +207,7 @@ export default function PCBSection({
     setSvgSaving(false);
     if (path === null) return; // cancelled or web fallback
     setSvgMsg({ ok: true, text: t("export.svgSuccess").replace("{{path}}", path) });
-  }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
+  }, [pcbResult, pcbParams, layout, t]);
 
   const [kicadSaving, setKicadSaving] = useState(false);
   const [kicadMsg, setKicadMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -258,7 +258,7 @@ export default function PCBSection({
     setDxfSaving(false);
     if (path === null) return;
     setDxfMsg({ ok: true, text: t("export.dxfSuccess").replace("{{path}}", path) });
-  }, [pcbResult, pcbParams, layout, layout.meta.name, t]);
+  }, [pcbResult, pcbParams, layout, t]);
 
   // 干涉检测本地已移除（§G-B4）——云端 /analyze（kind=pcb）取真实 pairs/marks。
   // 自动校验：板子/配置变化 → 先清旧值 → 防抖后重算（#1 默认开、#2 解除即清）。
@@ -671,7 +671,7 @@ export default function PCBSection({
               padding: "6px 18px", fontSize: 12, fontWeight: 600,
               border: "none", borderRadius: "var(--theme-radius-sm)",
               backgroundColor: matrixMode ? "var(--theme-accent)" : "var(--theme-accent-soft)",
-              color: matrixMode ? "#fff" : "var(--theme-accent)",
+              color: matrixMode ? "var(--theme-on-accent)" : "var(--theme-accent)",
               cursor: "pointer",
             }}
           >
@@ -767,7 +767,7 @@ export default function PCBSection({
                   padding: "5px 14px", borderRadius: "var(--theme-radius-sm)",
                   border: "1px solid var(--theme-primary)",
                   backgroundColor: svgSaving ? "var(--theme-primary-soft)" : "var(--theme-primary)",
-                  color: svgSaving ? "var(--theme-primary)" : "#fff", cursor: svgSaving ? "wait" : "pointer",
+                  color: svgSaving ? "var(--theme-primary)" : "var(--theme-on-accent)", cursor: svgSaving ? "wait" : "pointer",
                   fontWeight: 600, fontSize: 12, opacity: svgSaving ? 0.7 : 1,
                   animation: svgSaving ? "stp-pulse 0.8s ease-in-out infinite" : "none",
                 }}>
@@ -780,7 +780,7 @@ export default function PCBSection({
                   padding: "5px 14px", borderRadius: "var(--theme-radius-sm)",
                   border: "1px solid var(--theme-success)",
                   backgroundColor: dxfSaving ? "var(--theme-success-soft)" : "var(--theme-success)",
-                  color: dxfSaving ? "var(--theme-success)" : "#fff", cursor: dxfSaving ? "wait" : "pointer",
+                  color: dxfSaving ? "var(--theme-success)" : "var(--theme-on-accent)", cursor: dxfSaving ? "wait" : "pointer",
                   fontWeight: 600, fontSize: 12, opacity: dxfSaving ? 0.7 : 1,
                   animation: dxfSaving ? "stp-pulse 0.8s ease-in-out infinite" : "none",
                 }}>

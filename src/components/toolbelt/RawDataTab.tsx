@@ -90,11 +90,11 @@ export function RawDataTab({ layout, onLoadLayout, onOpenBackup }: RawDataTabPro
       />
       <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
         {hasChanges && (
-          <button onClick={applyChanges} title={t("tip.rawApply")} className="kle-btn" style={{ color: "#fff", background: "var(--theme-warning)", borderColor: "var(--theme-warning)", cursor: "pointer", fontWeight: 600 }}>
+          <button onClick={applyChanges} title={t("tip.rawApply")} className="kle-btn" style={{ color: "var(--theme-on-accent)", background: "var(--theme-warning)", borderColor: "var(--theme-warning)", cursor: "pointer", fontWeight: 600 }}>
             <RefreshCw {...ic} /> {t("rawdata.updateBtn")}
           </button>
         )}
-        <button onClick={async () => { try { await navigator.clipboard.writeText(text); } catch {} }} title={t("tip.rawCopy")} className="kle-btn" style={{ cursor: "pointer" }}>
+        <button onClick={async () => { try { await navigator.clipboard.writeText(text); } catch (e) { void e; } }} title={t("tip.rawCopy")} className="kle-btn" style={{ cursor: "pointer" }}>
           <ClipboardCopy {...ic} /> {t("rd.copyClip")}
         </button>
         <button onClick={() => downloadJSON(layout)} title={t("tip.rawDownload")} className="kle-btn" style={{ cursor: "pointer" }}>

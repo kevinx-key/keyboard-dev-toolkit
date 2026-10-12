@@ -380,7 +380,7 @@ describe('KLE Round-Trip', () => {
       expect(layout0.keys).toHaveLength(6);
 
       const raw0 = serializeKLE(layout0);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       const { layoutA: _layoutA, layoutB } = rawRoundTrip(raw0);
 
       // Key count is stable

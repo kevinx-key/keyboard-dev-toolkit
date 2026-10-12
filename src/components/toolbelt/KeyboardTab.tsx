@@ -3,6 +3,7 @@
 import type { KLEMeta, KLELayout } from "../../lib";
 import { SectionHeader } from "./shared/SectionHeader";
 import { useI18n } from "../../lib/i18n";
+import { DEFAULT_CANVAS_BG } from "../../lib/color-constants";
 
 interface KeyboardTabProps {
   meta: KLEMeta;
@@ -53,7 +54,7 @@ export function KeyboardTab({ meta, onSetMeta }: KeyboardTabProps) {
           <div className="lbl-row" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={lbl}>{t("kp.background")}</span>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--theme-border-input)", display: "inline-block", background: meta.backcolor || "#eeeeee" }}></span>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--theme-border-input)", display: "inline-block", background: meta.backcolor || DEFAULT_CANVAS_BG }}></span>
               <input value={meta.backcolor || ""} onChange={(e) => onSetMeta({ backcolor: e.target.value })}
                 title={t("tip.kbBackcolor")}
                 className="kle-input" style={{ flex: "0 0 74px", padding: "2px 6px", fontSize: 11.5, minHeight: 24, fontFamily: "var(--theme-font-mono)" }} />
