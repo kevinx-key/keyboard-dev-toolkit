@@ -54,6 +54,21 @@ export interface CloudKeycapPlacement {
   rotation: number;
 }
 
+/**
+ * 装配图里的单颗轴体（模型 `assets/switches/switch_asm_MIT.stp`）。
+ *
+ * `(x, y, z)` = 该键 **PCB 轴孔上顶面圆心**（装配坐标系，PCB 顶面 = −5.0）；
+ * 服务端把轴体的「轴心点」（Ø3.85 轴心柱轴线 × 底面交点）搬到该点，
+ * 并以 Ø1.45 定位柱对齐 PCB 的 ±5.08 定位孔。
+ */
+export interface CloudSwitchPlacement {
+  x: number;
+  y: number;
+  z: number;
+  /** 绕轴体自身轴线的旋转 (deg)。SVG/KLE 约定：正 = 屏幕上顺时针 */
+  rotation: number;
+}
+
 export type CloudStpResult =
   | { ok: true; blob: Blob }
   | { ok: false; code: string };
@@ -120,17 +135,19 @@ export function generateStpCloud(
 }
 
 /**
- * 生成装配图 STEP（云端）：共享 snapshot + 部件描述（+ 可选键帽落位），
- * 服务端逐部件自算 stpData、再装配键帽。
+ * 生成装配图 STEP（云端）：共享 snapshot + 部件描述（+ 可选键帽 / 轴体落位），
+ * 服务端逐部件自算 stpData、再装配键帽与轴体。
  */
 export function generateAssemblyStpCloud(
   snapshot: unknown,
   parts: CloudAssemblyPart[],
   keycaps: CloudKeycapPlacement[] = [],
+  switches: CloudSwitchPlacement[] = [],
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
   const body: Record<string, unknown> = { snapshot, parts };
   if (keycaps.length > 0) body.keycaps = keycaps;
+  if (switches.length > 0) body.switches = switches;
   return enqueueAndPoll("/api/v1/geometry/assembly", body, onProgress);
 }
 

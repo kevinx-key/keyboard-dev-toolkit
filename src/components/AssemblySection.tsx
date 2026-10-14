@@ -27,6 +27,7 @@ import { exportAssemblySTP } from "../lib/assembly-export";
 import type { AssemblyPart } from "../lib/assembly-export";
 import { buildKeycapPlacements } from "../lib/keycap-models";
 import type { KeycapPlan } from "../lib/keycap-models";
+import { buildSwitchPlacements } from "../lib/switch-model";
 import type { StpExtrudeData, StpProgressEvent } from "../lib/stp-export";
 import { localizeStpMessage } from "../lib/stp-export";
 
@@ -35,6 +36,9 @@ const PLATE_THICKNESS = 1.5; // 定位板
 const PCB_THICKNESS = 1.6; // PCB 板
 const PAD_THICKNESS = 0.1; // 轴下垫
 const PLATE_PCB_GAP = 3.5; // 定位板与 PCB 之间的间隙
+
+/** PCB 顶面 Z（装配坐标系；定位板顶面 = 0）—— 轴体「轴心点」的目标高度 */
+const PCB_TOP_Z = -(PLATE_THICKNESS + PLATE_PCB_GAP); // = -5.0
 
 // ── 与各编辑器 Section 保持同源的入参构造（纯函数，无 hook 依赖） ──
 
@@ -115,7 +119,7 @@ interface AssemblySectionProps {
   onStpProgress?: (data: StpProgressEvent) => void;
 }
 
-type SelectablePart = "caps" | "plate" | "pcb" | "foam" | "pad" | "bottom";
+type SelectablePart = "caps" | "plate" | "switches" | "pcb" | "foam" | "pad" | "bottom";
 
 export default function AssemblySection({
   layout,
@@ -136,6 +140,7 @@ export default function AssemblySection({
   const [sel, setSel] = useState<Record<SelectablePart, boolean>>({
     caps: false,
     plate: true,
+    switches: false,
     pcb: true,
     foam: true,
     pad: true,
@@ -155,6 +160,15 @@ export default function AssemblySection({
     return buildKeycapPlacements(layout, esc, plateConfig.u1Enabled ? plateConfig.u1 : 19.05);
   }, [sel.caps, layout, plateConfig.u1Enabled, plateConfig.u1]);
 
+  // 勾选轴体时实时预览（逐键一颗，落位 = PCB 轴孔上顶面圆心）
+  const switchCount = useMemo(
+    () =>
+      sel.switches
+        ? buildSwitchPlacements(layout, { x: 0, y: 0 }, PCB_TOP_Z, switchRotations).total
+        : 0,
+    [sel.switches, layout, switchRotations],
+  );
+
   const { confirmStp, dialog } = useStpConfirm();
 
   const handleExport = useCallback(async () => {
@@ -170,7 +184,7 @@ export default function AssemblySection({
     const dy = esc.y;
 
     // ── 各板 Z 向落位（定位板顶面 = 0） ──
-    const pcbTop = -(PLATE_THICKNESS + PLATE_PCB_GAP); // = -5.0
+    const pcbTop = PCB_TOP_Z; // = -5.0
 
     const compat = Array.from(compatDimIndices);
     const parts: AssemblyPart[] = [];
@@ -256,7 +270,12 @@ export default function AssemblySection({
       ? buildKeycapPlacements(layout, esc, plateConfig.u1Enabled ? plateConfig.u1 : 19.05)
       : null;
 
-    if (parts.length === 0 && !caps?.placements.length) {
+    // 轴体：逐键一颗，轴心点对齐 PCB 轴孔上顶面圆心（含高键 90° 与逐键开关旋转覆盖）
+    const switches = sel.switches
+      ? buildSwitchPlacements(layout, esc, pcbTop, switchRotations)
+      : null;
+
+    if (parts.length === 0 && !caps?.placements.length && !switches?.placements.length) {
       setStpMsg({ ok: false, text: t("assembly.needSelect") });
       return;
     }
@@ -272,6 +291,7 @@ export default function AssemblySection({
       `${name}_assembly.stp`,
       onStpProgress,
       caps?.placements ?? [],
+      switches?.placements ?? [],
     );
 
     onStpExportingChange?.(false);
@@ -315,7 +335,12 @@ export default function AssemblySection({
           hint={t("assembly.capsHint")}
         />
         <PartCheck label={t("assembly.plate")} checked={sel.plate} onChange={() => toggle("plate")} />
-        <PartCheck label={t("assembly.switches")} checked={false} disabled hint={t("assembly.comingSoon")} />
+        <PartCheck
+          label={t("assembly.switches")}
+          checked={sel.switches}
+          onChange={() => toggle("switches")}
+          hint={t("assembly.switchesHint")}
+        />
         <PartCheck label={t("assembly.stabs")} checked={false} disabled hint={t("assembly.comingSoon")} />
         <PartCheck label={t("assembly.pcb")} checked={sel.pcb} onChange={() => toggle("pcb")} />
         <PartCheck label={t("assembly.foam")} checked={sel.foam} onChange={() => toggle("foam")} />
@@ -345,6 +370,18 @@ export default function AssemblySection({
           {keycapPlan.rowSource === "position" && (
             <div style={{ color: "var(--theme-warning)" }}>{t("assembly.capsRowByPosition")}</div>
           )}
+        </div>
+      )}
+
+      {/* 轴体预览（勾选后显示：逐键一颗 / 落位 = PCB 轴孔上顶面圆心） */}
+      {sel.switches && (
+        <div style={{
+          padding: "0 12px 4px 12px", fontSize: 11, lineHeight: 1.6,
+          color: "var(--theme-text-dim)",
+        }}>
+          <div>
+            {t("assembly.switchesMatched").replace("{{total}}", String(switchCount))}
+          </div>
         </div>
       )}
 
