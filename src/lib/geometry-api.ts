@@ -39,6 +39,21 @@ export interface CloudAssemblyPart {
   dz: number;
 }
 
+/**
+ * 装配图里的单颗键帽（键帽模型库 `assets/keycaps/{name}.stp`）。
+ *
+ * `(x, y)` = 该键**定位板开孔顶面中心**在装配坐标系中的位置；
+ * 服务端把键帽的「内部圆柱底面轴心」搬到 `(x, y, +6.6)`（定位板顶面 = 0）。
+ */
+export interface CloudKeycapPlacement {
+  /** 模型名（不含扩展名），如 `r1-1u` / `r4-625u` */
+  name: string;
+  x: number;
+  y: number;
+  /** 绕键帽自身轴心的 Z 轴旋转 (deg) */
+  rotation: number;
+}
+
 export type CloudStpResult =
   | { ok: true; blob: Blob }
   | { ok: false; code: string };
@@ -104,13 +119,19 @@ export function generateStpCloud(
   return enqueueAndPoll("/api/v1/geometry/stp", { ...req, engine: CLOUD_ENGINES[req.kind] }, onProgress);
 }
 
-/** 生成装配图 STEP（云端）：共享 snapshot + 部件描述，服务端逐部件自算 stpData 再装配。 */
+/**
+ * 生成装配图 STEP（云端）：共享 snapshot + 部件描述（+ 可选键帽落位），
+ * 服务端逐部件自算 stpData、再装配键帽。
+ */
 export function generateAssemblyStpCloud(
   snapshot: unknown,
   parts: CloudAssemblyPart[],
+  keycaps: CloudKeycapPlacement[] = [],
   onProgress?: (phase: string) => void,
 ): Promise<CloudStpResult> {
-  return enqueueAndPoll("/api/v1/geometry/assembly", { snapshot, parts }, onProgress);
+  const body: Record<string, unknown> = { snapshot, parts };
+  if (keycaps.length > 0) body.keycaps = keycaps;
+  return enqueueAndPoll("/api/v1/geometry/assembly", body, onProgress);
 }
 
 // ── 高级 2D 几何：PCB / 定位板 / 轴下垫 / 底棉 / 轴间棉 云端生成（§G-B3 / M1·M2a）──

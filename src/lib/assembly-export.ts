@@ -16,7 +16,7 @@
 
 import type { StpExtrudeData, StpProgressEvent } from "./stp-export";
 import { geometryCloudEnabled, generateAssemblyStpCloud } from "./geometry-api";
-import type { CloudAssemblyPart, CloudKind } from "./geometry-api";
+import type { CloudAssemblyPart, CloudKeycapPlacement, CloudKind } from "./geometry-api";
 import { saveFile } from "./platform-bridge";
 
 /** 装配图中的一个部件（S1：kind + 参数 + 落位；snapshot 由调用方共享传入）。 */
@@ -51,14 +51,17 @@ export interface AssemblyExportResult {
  * @param parts      - 各部件描述 + 落位 + 本地回落几何
  * @param filename   - 下载文件名，例如 "my-keyboard_assembly.stp"
  * @param onProgress - 可选的进度回调
+ * @param keycaps    - 键帽落位（各键的定位板开孔顶面中心 + 旋转；落位规则见
+ *                     `lib/keycap-models.ts`）。空数组 = 不含键帽。
  */
 export async function exportAssemblySTP(
   snapshot: unknown,
   parts: AssemblyPart[],
   filename: string,
   onProgress?: (evt: StpProgressEvent) => void,
+  keycaps: CloudKeycapPlacement[] = [],
 ): Promise<AssemblyExportResult> {
-  if (parts.length === 0) {
+  if (parts.length === 0 && keycaps.length === 0) {
     return { success: false, message: "assembly.needSelect" };
   }
 
@@ -75,13 +78,17 @@ export async function exportAssemblySTP(
     dy: p.dy,
     dz: p.dz,
   }));
-  const r = await generateAssemblyStpCloud(snapshot, cloudParts, (phase) =>
-    onProgress?.({
-      percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
-      phase: 0,
-      phaseLabel: phase,
-      message: phase,
-    }),
+  const r = await generateAssemblyStpCloud(
+    snapshot,
+    cloudParts,
+    keycaps,
+    (phase) =>
+      onProgress?.({
+        percentage: phase === "done" ? 100 : phase === "running" ? 50 : 0,
+        phase: 0,
+        phaseLabel: phase,
+        message: phase,
+      }),
   );
   if (r.ok) {
     await saveFile(r.blob, { defaultName: filename, mimeType: "application/step" });

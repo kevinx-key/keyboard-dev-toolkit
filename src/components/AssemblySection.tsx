@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Loader2, Boxes, Package } from "lucide-react";
 import { generatePlate } from "../lib/plate-export";
 import type { PlateConfig, PlateRotationOverrides } from "../lib/plate-export";
@@ -25,6 +25,8 @@ import { useCompatMarkedIndices } from "../lib/compat-layer";
 import { keyCenterInMm } from "../lib/coordinate-system";
 import { exportAssemblySTP } from "../lib/assembly-export";
 import type { AssemblyPart } from "../lib/assembly-export";
+import { buildKeycapPlacements } from "../lib/keycap-models";
+import type { KeycapPlan } from "../lib/keycap-models";
 import type { StpExtrudeData, StpProgressEvent } from "../lib/stp-export";
 import { localizeStpMessage } from "../lib/stp-export";
 
@@ -113,7 +115,7 @@ interface AssemblySectionProps {
   onStpProgress?: (data: StpProgressEvent) => void;
 }
 
-type SelectablePart = "plate" | "pcb" | "foam" | "pad" | "bottom";
+type SelectablePart = "caps" | "plate" | "pcb" | "foam" | "pad" | "bottom";
 
 export default function AssemblySection({
   layout,
@@ -132,6 +134,7 @@ export default function AssemblySection({
   const { markedIndices: compatDimIndices } = useCompatMarkedIndices(layout.keys);
 
   const [sel, setSel] = useState<Record<SelectablePart, boolean>>({
+    caps: false,
     plate: true,
     pcb: true,
     foam: true,
@@ -144,6 +147,13 @@ export default function AssemblySection({
 
   const [converting, setConverting] = useState(false);
   const [stpMsg, setStpMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // 勾选键帽时实时预览匹配结果（行高判定 + 宽度回落计数）
+  const keycapPlan: KeycapPlan | null = useMemo(() => {
+    if (!sel.caps || layout.keys.length === 0) return null;
+    const esc = keyCenterInMm(layout.keys[0]!);
+    return buildKeycapPlacements(layout, esc, plateConfig.u1Enabled ? plateConfig.u1 : 19.05);
+  }, [sel.caps, layout, plateConfig.u1Enabled, plateConfig.u1]);
 
   const { confirmStp, dialog } = useStpConfirm();
 
@@ -241,7 +251,12 @@ export default function AssemblySection({
       );
     }
 
-    if (parts.length === 0) {
+    // 键帽：按画布宽度匹配 r{行}-{宽}u 模型（行高 QWER=R2 / ASD=R3 / ZXC 与底排=R4 / 其余=R1）
+    const caps = sel.caps
+      ? buildKeycapPlacements(layout, esc, plateConfig.u1Enabled ? plateConfig.u1 : 19.05)
+      : null;
+
+    if (parts.length === 0 && !caps?.placements.length) {
       setStpMsg({ ok: false, text: t("assembly.needSelect") });
       return;
     }
@@ -251,7 +266,13 @@ export default function AssemblySection({
     onStpExportingChange?.(true);
 
     const name = layout.meta.name || "keyboard";
-    const result = await exportAssemblySTP(layout, parts, `${name}_assembly.stp`, onStpProgress);
+    const result = await exportAssemblySTP(
+      layout,
+      parts,
+      `${name}_assembly.stp`,
+      onStpProgress,
+      caps?.placements ?? [],
+    );
 
     onStpExportingChange?.(false);
     setConverting(false);
@@ -287,7 +308,12 @@ export default function AssemblySection({
 
       {/* 部件选择（顺序：键帽 / 定位板 / 轴体 / 卫星轴 / PCB板 / 轴间棉 / 轴下垫 / 底棉） */}
       <div style={{ padding: "10px 12px 4px 12px", display: "flex", flexWrap: "wrap", gap: "6px 18px" }}>
-        <PartCheck label={t("assembly.caps")} checked={false} disabled hint={t("assembly.comingSoon")} />
+        <PartCheck
+          label={t("assembly.caps")}
+          checked={sel.caps}
+          onChange={() => toggle("caps")}
+          hint={t("assembly.capsHint")}
+        />
         <PartCheck label={t("assembly.plate")} checked={sel.plate} onChange={() => toggle("plate")} />
         <PartCheck label={t("assembly.switches")} checked={false} disabled hint={t("assembly.comingSoon")} />
         <PartCheck label={t("assembly.stabs")} checked={false} disabled hint={t("assembly.comingSoon")} />
@@ -296,6 +322,31 @@ export default function AssemblySection({
         <PartCheck label={t("assembly.pad")} checked={sel.pad} onChange={() => toggle("pad")} />
         <PartCheck label={t("assembly.bottom")} checked={sel.bottom} onChange={() => toggle("bottom")} />
       </div>
+
+      {/* 键帽匹配预览（勾选后显示：行高判定依据 + 宽度回落计数） */}
+      {keycapPlan && (
+        <div style={{
+          padding: "0 12px 4px 12px", fontSize: 11, lineHeight: 1.6,
+          color: "var(--theme-text-dim)",
+        }}>
+          <div>
+            {t("assembly.capsMatched")
+              .replace("{{total}}", String(keycapPlan.total))
+              .replace("{{r1}}", String(keycapPlan.rowCounts[1]))
+              .replace("{{r2}}", String(keycapPlan.rowCounts[2]))
+              .replace("{{r3}}", String(keycapPlan.rowCounts[3]))
+              .replace("{{r4}}", String(keycapPlan.rowCounts[4]))}
+          </div>
+          {keycapPlan.fallbackCount > 0 && (
+            <div style={{ color: "var(--theme-warning)" }}>
+              {t("assembly.capsFallback").replace("{{count}}", String(keycapPlan.fallbackCount))}
+            </div>
+          )}
+          {keycapPlan.rowSource === "position" && (
+            <div style={{ color: "var(--theme-warning)" }}>{t("assembly.capsRowByPosition")}</div>
+          )}
+        </div>
+      )}
 
       {/* 导出按钮 */}
       <div style={{ padding: "6px 12px 12px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
