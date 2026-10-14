@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Copy, Ruler, AlertTriangle, MessageCircle, Mail, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import PricingTrustNote from "./PricingTrustNote";
+import OnlineQuoteLimitNotice from "./OnlineQuoteLimitNotice";
 import { LANG_CURRENCY, formatMoney } from "../lib/currency";
 import { useFxRates } from "../lib/use-fx-rates";
 import { requestQuote, quoteUnavailable, QuoteServiceError, type QuoteRequest, type QuoteResponse, type MetaResponse, getMeta } from "../lib/quote-api";
 import { tOption, tServerText, tQuoteReason, fill, LANG_LOCALE } from "../lib/pricing-i18n";
+import { isOnlineQuoteQtyAllowed } from "../lib/pricing-limits";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
 
 type PlateQuoteResp = NonNullable<Extract<QuoteResponse, { ok: true }>["plate"]> & { version?: string };
@@ -72,10 +74,15 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
 
   const qtyInvalid = quantity > 0 && quantity < 5;
 
+  // 超过在线报价数量上限（默认 >80 PCS）：不发报价请求、不显示价格，只引导人工报价。
+  // 计价 / 下单代码全部保留，开关见 lib/pricing-limits.ts
+  const onlineQuoteAllowed = isOnlineQuoteQtyAllowed(quantity);
+
   // 防抖 500ms 请求 plate 报价（API 需主字段合法；用最小合法主参数，仅展示 plate 段）
   const serviceDownMsg = t("pricing.quoteServiceDown");
   useEffect(() => {
     if (!open || !plateSize) return;
+    if (!onlineQuoteAllowed) return;
     if (quantity < 5) return;
     const base: QuoteRequest = {
       lengthMm: 10, widthMm: 10, quantity: 5, material: "fr4", thicknessMm: 1.6,
@@ -103,13 +110,14 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
         );
     }, 500);
     return () => clearTimeout(timer);
-  }, [open, plateSize, quantity, material, resolvedL, resolvedW, serviceDownMsg]);
+  }, [open, plateSize, quantity, material, resolvedL, resolvedW, serviceDownMsg, onlineQuoteAllowed]);
 
   // 上报定位板报价（供 PCBA 一键下单合并）；内容不变时不重复上报，避免父级重渲染循环
+  // 超量时上报 null：定位板不并入在线订单（合并下单会丢掉它，必须显式排除）
   const lastInfoKeyRef = useRef("");
   useEffect(() => {
     if (!onOrderInfoChange) return;
-    const resp = plateQuote.resp;
+    const resp = onlineQuoteAllowed ? plateQuote.resp : null;
     let info: PlateOrderInfo | null = null;
     if (resp && resp.ok && quantity >= 5 && plateSize && resolvedL > 0 && resolvedW > 0) {
       info = {
@@ -128,7 +136,7 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
     if (key === lastInfoKeyRef.current) return;
     lastInfoKeyRef.current = key;
     onOrderInfoChange(info);
-  }, [onOrderInfoChange, plateQuote, quantity, material, resolvedL, resolvedW, plateSize, manualL, manualW]);
+  }, [onOrderInfoChange, plateQuote, quantity, material, resolvedL, resolvedW, plateSize, manualL, manualW, onlineQuoteAllowed]);
 
   const fmtMoney = (cny: number) => formatMoney(cny, currency, fx.rates.rates);
 
@@ -154,6 +162,12 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
       console.debug("clipboard write failed", e);
     }
   };
+
+  // 超量时视为无报价：错误 / 价格 / 复制报价 全部不渲染（plateQuote 状态仍保留，数量回落即可复用）
+  const quoteResp = onlineQuoteAllowed ? plateQuote.resp : null;
+  const quoteError = onlineQuoteAllowed ? plateQuote.error : null;
+  const quoteErrorCode = onlineQuoteAllowed ? plateQuote.errorCode : undefined;
+  const quoteQuoting = onlineQuoteAllowed && plateQuote.quoting;
 
   return (
     <div className="psec" style={{ ...psec, marginTop: 10 }}>
@@ -259,32 +273,38 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
           {qtyInvalid && (
             <div style={{ fontSize: 11, color: "var(--theme-danger)", marginTop: 8 }}>⚠ {t("pricing.plateQtyMin")}</div>
           )}
-          {plateQuote.error && (
-            <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)", marginTop: 8 }}>
-              <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <div>{tQuoteReason(t, plateQuote.errorCode, plateQuote.error ?? "")}</div>
+          {/* 超过在线报价数量上限：不出在线价格，只引导人工报价 */}
+          {!onlineQuoteAllowed && (
+            <div style={{ marginTop: 10 }}>
+              <OnlineQuoteLimitNotice contacts={meta?.contacts} />
             </div>
           )}
-          {plateQuote.resp && !plateQuote.resp.ok && (
+          {quoteError && (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)", marginTop: 8 }}>
               <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <div>{tServerText(t, plateQuote.resp.reason ?? "")}</div>
+              <div>{tQuoteReason(t, quoteErrorCode, quoteError ?? "")}</div>
             </div>
           )}
-          {plateQuote.resp && plateQuote.resp.ok && (
+          {quoteResp && !quoteResp.ok && (
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 11.5, color: "var(--theme-warning)", marginTop: 8 }}>
+              <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div>{tServerText(t, quoteResp.reason ?? "")}</div>
+            </div>
+          )}
+          {quoteResp && quoteResp.ok && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 8 }}>
               <div style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>
-                {t("pricing.deliveryQty")}: {plateQuote.resp.deliveryQty ?? 0} PCS · {t("pricing.sheets")}: {plateQuote.resp.sheets ?? 0} {t("pricing.sheetUnit")}
+                {t("pricing.deliveryQty")}: {quoteResp.deliveryQty ?? 0} PCS · {t("pricing.sheets")}: {quoteResp.sheets ?? 0} {t("pricing.sheetUnit")}
               </div>
               <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 24, fontWeight: 800, color: "var(--theme-primary)", lineHeight: 1.2 }}>
-                {fmtMoney(plateQuote.resp.unitPrice ?? 0)} <span style={{ fontSize: 12, fontWeight: 400, color: "var(--theme-text-muted)" }}>/ PCS</span>
+                {fmtMoney(quoteResp.unitPrice ?? 0)} <span style={{ fontSize: 12, fontWeight: 400, color: "var(--theme-text-muted)" }}>/ PCS</span>
               </div>
               <div style={{ fontSize: 10, color: "var(--theme-text-muted)", marginTop: 1 }}>
-                {t("pricing.unitPriceNote").replace("{deliveryQty}", String(plateQuote.resp.deliveryQty ?? 0))}
+                {t("pricing.unitPriceNote").replace("{deliveryQty}", String(quoteResp.deliveryQty ?? 0))}
               </div>
               <div style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>
-                {t("pricing.total")}: {fmtMoney(plateQuote.resp.totalPrice ?? 0)}
+                {t("pricing.total")}: {fmtMoney(quoteResp.totalPrice ?? 0)}
               </div>
               </div>
               <button
@@ -296,33 +316,35 @@ export default function PlatePricingSection({ plateSize = null, onOrderInfoChang
               </button>
             </div>
           )}
-          {plateQuote.quoting && (
+          {quoteQuoting && (
             <div style={{ fontSize: 11, color: "var(--theme-text-dim)", marginTop: 8 }}>{t("pricing.quoting")}</div>
           )}
-          {/* v2.7.0 人工报价按钮 */}
-          <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>{t("pricing.manualQuoteContact")}</span>
-            {meta?.contacts.discord && (
-              <a
-                className="kle-btn"
-                href={meta.contacts.discord}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ padding: "4px 12px", fontSize: 11, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
-              >
-                <MessageCircle size={12} /> Discord
-              </a>
-            )}
-            {meta?.contacts.email && (
-              <a
-                className="kle-btn"
-                href={`mailto:${meta.contacts.email}`}
-                style={{ padding: "4px 12px", fontSize: 11, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
-              >
-                <Mail size={12} /> Email
-              </a>
-            )}
-          </div>
+          {/* v2.7.0 人工报价按钮（超量时由上方 OnlineQuoteLimitNotice 承担，避免重复） */}
+          {onlineQuoteAllowed && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, color: "var(--theme-text-muted)" }}>{t("pricing.manualQuoteContact")}</span>
+              {meta?.contacts.discord && (
+                <a
+                  className="kle-btn"
+                  href={meta.contacts.discord}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: "4px 12px", fontSize: 11, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <MessageCircle size={12} /> Discord
+                </a>
+              )}
+              {meta?.contacts.email && (
+                <a
+                  className="kle-btn"
+                  href={`mailto:${meta.contacts.email}`}
+                  style={{ padding: "4px 12px", fontSize: 11, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <Mail size={12} /> Email
+                </a>
+              )}
+            </div>
+          )}
           {/* 报价结果区：默认隐藏的信任说明，点击才展开 */}
           <PricingTrustNote />
         </>

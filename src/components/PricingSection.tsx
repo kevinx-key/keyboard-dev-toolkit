@@ -5,6 +5,8 @@ import { Calculator, RefreshCw, Copy, Ruler, AlertTriangle, ChevronDown, Chevron
 import type { KLELayout } from "../lib";
 import { SectionHeader } from "./toolbelt/shared/SectionHeader";
 import PricingTrustNote from "./PricingTrustNote";
+import OnlineQuoteLimitNotice from "./OnlineQuoteLimitNotice";
+import { isOnlineQuoteQtyAllowed } from "../lib/pricing-limits";
 import { useI18n, type Lang } from "../lib/i18n";
 import { LANG_CURRENCY, formatMoney, type CurrencyCode } from "../lib/currency";
 import { useFxRates } from "../lib/use-fx-rates";
@@ -137,9 +139,13 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
   const resolvedW = form.widthMm > 0 ? form.widthMm : (pcbSize ? Math.round(pcbSize.height) : 0);
 
   // 防抖 500ms 请求报价（API 端校验；未就绪返回不可用状态）
+  // ⚠️ 超过在线报价数量上限（默认 >80 PCS）时不发请求、不显示在线价格，只引导人工报价；
+  //    计价 / 下单代码全部保留，开关见 lib/pricing-limits.ts
+  const onlineQuoteAllowed = isOnlineQuoteQtyAllowed(form.quantity);
   const serviceDownMsg = t("pricing.quoteServiceDown");
   useEffect(() => {
     if (!open) return;
+    if (!onlineQuoteAllowed) return;
     if (!form.lengthMm && !form.widthMm && !pcbSize) return;
     if (!form.quantity || form.quantity < 5) return;
     const timer = setTimeout(() => {
@@ -155,7 +161,7 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
         );
     }, 500);
     return () => clearTimeout(timer);
-  }, [form, rgbEnabled, resolvedL, resolvedW, keyCount, open, pcbSize, serviceDownMsg]);
+  }, [form, rgbEnabled, resolvedL, resolvedW, keyCount, open, pcbSize, serviceDownMsg, onlineQuoteAllowed]);
 
   // v2.6.0：未选小板或板载 USB（自带 USB 无需排线）时，线长/排线类型禁用
   const subBoardDisabled = form.subBoard === "none" || form.subBoard === "onboardUsb";
@@ -252,6 +258,8 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
   };
 
   const handleOrderNow = () => {
+    // 超量订单不出在线报价，也就没有可下单的报价（按钮此时也不渲染；双保险）
+    if (!onlineQuoteAllowed) return;
     const q = quoteState.resp;
     if (!q || !q.ok || !pcbSize) return;
     // 同一意图（报价+定位板未变）重试复用幂等键；意图变化则生成新键（新订单）
@@ -301,7 +309,8 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
   };
 
   const commOpts = meta ? Object.entries(meta.options.communication).sort((a, b) => (a[1].sortOrder ?? 99) - (b[1].sortOrder ?? 99)) : [];
-  const quote = quoteState.resp;
+  // 超量时视为无报价：价格 / 复制报价 / 一键下单 全部不渲染（quoteState 仍保留，数量回落即可复用）
+  const quote = onlineQuoteAllowed ? quoteState.resp : null;
   const quoteError = !meta ? (metaError ? t("pricing.quoteServiceDown") : null) : null;
   const canCheckout = !!(quote && quote.ok && pcbSize && checkoutView.kind !== "busy");
   const combinedTotalCny = quote && quote.ok ? quote.totalPrice + (plateIncluded && plateOrder ? plateOrder.totalPrice : 0) : 0;
@@ -644,7 +653,10 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
                   <RefreshCw size={11} /> {fx.status === "loading" ? t("pricing.fxLoading") : t("pricing.fxRefresh")}
                 </button>
               </div>
-              {!quote ? (
+              {!onlineQuoteAllowed ? (
+                /* 超过在线报价数量上限：不出在线价格，只引导人工报价 */
+                <OnlineQuoteLimitNotice contacts={meta?.contacts} />
+              ) : !quote ? (
                 <div style={{ fontSize: 11, color: "var(--theme-text-muted)", padding: "8px 0" }}>
                   {quoteState.quoting ? t("pricing.quoting") : quoteError ?? t("pricing.invalid")}
                 </div>
