@@ -19,9 +19,12 @@ import {
   KEYCAP_WIDTHS,
   buildKeycapPlacements,
   hasKeycapModel,
+  isIsoEnterKey,
+  keycapModelFor,
   keycapModelName,
   keycapWidthSlug,
   resolveKeycapRows,
+  specialKeycap,
   switchHoleCenterMm,
 } from "../src/lib/keycap-models";
 import type { KeycapRow } from "../src/lib/keycap-models";
@@ -85,6 +88,86 @@ describe("键帽模型名（r{行}-{宽}u）", () => {
       expect(keycapModelName(2, odd), `${odd}u 应回落 1u`).toBe("r2-1u");
       expect(hasKeycapModel(2, odd)).toBe(false);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 1b. 特殊模型（阶梯 / home F·J·5 / ISO Enter）
+// ═══════════════════════════════════════════════════════════════════
+
+describe("特殊模型匹配（R3-175stepped / R3-home / R3-iso）", () => {
+  /** 阶梯 Caps Lock：KLE `l` */
+  const steppedCaps = mkKey({ x: 0, y: 0, w: 1.75, h: 1, l: true });
+  /** 普通 1.75u Caps Lock（不阶梯） */
+  const plainCaps = mkKey({ x: 0, y: 0, w: 1.75, h: 1 });
+  /** ISO Enter：高键 + L 形 + 底部 1.5u（与 presets 里的编码一致） */
+  const isoEnter = mkKey({ x: 0, y: 0, w: 1.25, h: 2, w2: 1.5, h2: 1, x2: -0.25 });
+  /** big-ass enter：底部 2.25u —— 不是 ISO，不该命中 R3-iso */
+  const bigAss = mkKey({ x: 0, y: 0, w: 1.5, h: 2, w2: 2.25, h2: 1, x2: -0.75 });
+
+  it("阶梯键（KLE l）→ R3-175stepped；不阶梯的同宽键仍走常规", () => {
+    expect(specialKeycap(steppedCaps, 3)).toBe("stepped");
+    expect(keycapModelFor(steppedCaps, 3)).toBe("R3-175stepped");
+    expect(specialKeycap(plainCaps, 3)).toBeNull();
+    expect(keycapModelFor(plainCaps, 3)).toBe("r3-175u");
+  });
+
+  it("ISO Enter → R3-iso；big-ass enter（底部 2.25u）不误判", () => {
+    expect(isIsoEnterKey(isoEnter)).toBe(true);
+    expect(keycapModelFor(isoEnter, 3)).toBe("R3-iso");
+    expect(isIsoEnterKey(bigAss)).toBe(false);
+    expect(keycapModelFor(bigAss, 3)).not.toBe("R3-iso");
+  });
+
+  it("R3 行的 F / J / 5 → R3-home", () => {
+    for (const legend of ["F", "J", "5"]) {
+      const k = legendKey(0, 0, legend);
+      expect(specialKeycap(k, 3), `${legend} 应命中 home`).toBe("home");
+      expect(keycapModelFor(k, 3)).toBe("R3-home");
+    }
+  });
+
+  it("只有 R3 行才判 home：其它行的 F / J / 5 不命中", () => {
+    for (const row of [1, 2, 4] as const) {
+      expect(specialKeycap(legendKey(0, 0, "F"), row)).toBeNull();
+      expect(specialKeycap(legendKey(0, 0, "J"), row)).toBeNull();
+      expect(specialKeycap(legendKey(0, 0, "5"), row)).toBeNull();
+    }
+  });
+
+  it("数字行的「5」（图例为 %/5 两行）不算 home；键盘区其它键也不受影响", () => {
+    const numberRow5 = mkKey({
+      x: 0, y: 0, w: 1, h: 1,
+      labels: ["%\n5", ...Array(11).fill("")],
+    });
+    expect(specialKeycap(numberRow5, 3)).toBeNull();
+    // A / S / D / G / H 等普通 home 行键不带凸点
+    for (const legend of ["A", "S", "D", "G", "H", "K", "L"]) {
+      expect(specialKeycap(legendKey(0, 0, legend), 3)).toBeNull();
+    }
+  });
+
+  it("带色号前缀 / 多行图例也能识别（#ff0000:F）", () => {
+    const colored = mkKey({ x: 0, y: 0, w: 1, h: 1, labels: ["#ff0000:F", ...Array(11).fill("")] });
+    expect(specialKeycap(colored, 3)).toBe("home");
+  });
+
+  it("buildKeycapPlacements：特殊模型计数 + 名称正确", () => {
+    const layout = makeLayout([
+      legendKey(0, 0, "1"), legendKey(1, 0, "2"),
+      legendKey(0, 1, "Q"), legendKey(1, 1, "W"),
+      legendKey(0, 2, "A"), mkKey({ x: 1, y: 2, w: 1, h: 1, l: true, labels: Array(12).fill("") }),
+      legendKey(2, 2, "F"), legendKey(3, 2, "J"), legendKey(4, 2, "5"),
+      mkKey({ x: 5, y: 2, w: 1.25, h: 2, w2: 1.5, h2: 1, x2: -0.25, labels: Array(12).fill("") }),
+      legendKey(0, 3, "Z"), legendKey(1, 3, "X"),
+    ]);
+    const plan = buildKeycapPlacements(layout, { x: 0, y: 0 });
+    const names = plan.placements.map((p) => p.name);
+    expect(names).toContain("R3-175stepped");
+    expect(names.filter((n) => n === "R3-home")).toHaveLength(3); // F / J / 5
+    expect(names).toContain("R3-iso");
+    expect(plan.specialCount).toBe(5);
+    expect(plan.fallbackCount).toBe(0);
   });
 });
 

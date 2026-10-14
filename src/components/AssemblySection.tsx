@@ -362,6 +362,9 @@ export default function AssemblySection({
               .replace("{{r3}}", String(keycapPlan.rowCounts[3]))
               .replace("{{r4}}", String(keycapPlan.rowCounts[4]))}
           </div>
+          {keycapPlan.specialCount > 0 && (
+            <div>{t("assembly.capsSpecial").replace("{{count}}", String(keycapPlan.specialCount))}</div>
+          )}
           {keycapPlan.fallbackCount > 0 && (
             <div style={{ color: "var(--theme-warning)" }}>
               {t("assembly.capsFallback").replace("{{count}}", String(keycapPlan.fallbackCount))}

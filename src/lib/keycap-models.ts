@@ -6,6 +6,9 @@
  * 文件名即契约：`r{行}-{宽}u.stp`，例 `r1-1u.stp` / `r4-625u.stp`
  *   - `r{行}` = 行高（R1–R4）；`-` 只是分隔符；`{宽}u` = 键帽宽度（小数点省略：1.25u → `125u`）
  *   - 宽度按**画布键帽宽度**（KLE `w`）匹配；库里没有的宽度一律回落该行的 1u 键帽
+ *   - 另有三个**特殊模型**（R 大写命名，见 `SPECIAL_MODELS`）：
+ *     `R3-175stepped` = 阶梯键（KLE `l`）｜`R3-home` = R3 行的 F / J / 键值 5（带定位凸点）
+ *     ｜`R3-iso` = ISO Enter（高键 + L 形、底部 1.5u）
  *
  * 行高判定（机主 2026-10 定稿的强制规则，非标准配列也照此执行）：
  *   R1 = F 区 + 数字行 ｜ R2 = QWER 行 ｜ R3 = ASD 行 ｜ R4 = ZXC 行 + Ctrl/空格行
@@ -38,6 +41,20 @@ export const KEYCAP_EXTRA_WIDTHS: Readonly<Record<KeycapRow, readonly number[]>>
   4: [6.25],
 };
 
+/**
+ * 特殊模型（不按「行 + 宽度」规则走；文件名 R 大写，与常规 `r{行}-{宽}u` 区分）：
+ *   - `R3-175stepped` —— 阶梯键（KLE `l`，如阶梯 Caps Lock）
+ *   - `R3-home`       —— 带定位凸点（home bump）的键：R3 行的 **F / J**，以及 R3 行里键值为 **5** 的键
+ *   - `R3-iso`        —— ISO Enter（高键 + L 形、底部 1.5u 的那块）
+ */
+export const SPECIAL_MODELS = {
+  stepped: "R3-175stepped",
+  home: "R3-home",
+  iso: "R3-iso",
+} as const;
+
+export type KeycapSpecial = keyof typeof SPECIAL_MODELS;
+
 export type KeycapRow = 1 | 2 | 3 | 4;
 
 export const KEYCAP_ROWS: readonly KeycapRow[] = [1, 2, 3, 4];
@@ -58,10 +75,71 @@ export function hasKeycapModel(row: KeycapRow, width: number): boolean {
 
 /**
  * 画布键帽宽度 → 模型名（`r{行}-{宽}u`）；库里没有的宽度回落该行的 1u。
+ *
+ * ⚠️ 只走「行 + 宽度」常规规则；阶梯键 / F·J·5 / ISO Enter 走 `keycapModelFor`。
  */
 export function keycapModelName(row: KeycapRow, width: number): string {
   const w = hasKeycapModel(row, width) ? Number(width.toFixed(4)) : 1;
   return `r${row}-${keycapWidthSlug(w)}u`;
+}
+
+/** 取键的**首个**图例行（去掉色号前缀、取第一行、转大写）—— 用于 F / J / 5 判定 */
+function primaryLegendLine(key: KeyProps): string {
+  for (const raw of key.labels || []) {
+    if (!raw) continue;
+    let text = raw;
+    if (text.startsWith("#") && text.includes(":")) text = text.slice(text.indexOf(":") + 1);
+    const first = text.split("\n").map((s) => s.trim()).find((s) => s.length > 0);
+    if (first) return first.toUpperCase();
+  }
+  return "";
+}
+
+/** 键的有效宽高（含 KLE w2/h2 的 L 形扩展）——与 plate-export / pcb-export 同源 */
+export function keycapEffectiveSize(key: KeyProps): { w: number; h: number } {
+  const kw = key.w || 1;
+  const kh = key.h || 1;
+  if ((key.w2 || 0) > 0 && (key.h2 || 0) > 0 && ((key.x2 || 0) !== 0 || (key.y2 || 0) !== 0)) {
+    const extRight = (key.x ?? 0) + (key.x2 || 0) + (key.w2 || 0);
+    const extBottom = (key.y ?? 0) + (key.y2 || 0) + (key.h2 || 0);
+    return {
+      w: Math.max(kw, extRight - (key.x ?? 0)),
+      h: Math.max(kh, extBottom - (key.y ?? 0)),
+    };
+  }
+  return { w: kw, h: kh };
+}
+
+/** ISO Enter：高键（实际高 > 实际宽）+ L 形（有 w2/h2 且带偏移）+ 底部那块是 1.5u */
+export function isIsoEnterKey(key: KeyProps): boolean {
+  const { w, h } = keycapEffectiveSize(key);
+  const lShape =
+    (key.w2 || 0) > 0 && (key.h2 || 0) > 0 && ((key.x2 || 0) !== 0 || (key.y2 || 0) !== 0);
+  return h > w && lShape && Math.abs((key.w2 || 0) - 1.5) < 1e-6;
+}
+
+/**
+ * 判定该键是否命中**特殊模型**（返回 null = 走「行 + 宽度」常规匹配）。
+ *
+ * 优先级：阶梯键 → ISO Enter → home 键（R3 行的 F / J / 5）。
+ */
+export function specialKeycap(key: KeyProps, row: KeycapRow): KeycapSpecial | null {
+  if (key.l) return "stepped";
+  if (isIsoEnterKey(key)) return "iso";
+  if (row === 3) {
+    const legend = primaryLegendLine(key);
+    if (legend === "F" || legend === "J" || legend === "5") return "home";
+  }
+  return null;
+}
+
+/**
+ * 单个键的模型名：先判特殊模型（阶梯 / home / ISO），否则按「行 + 宽度」匹配并回落 1u。
+ */
+export function keycapModelFor(key: KeyProps, row: KeycapRow): string {
+  const special = specialKeycap(key, row);
+  if (special) return SPECIAL_MODELS[special];
+  return keycapModelName(row, key.w || 1);
 }
 
 // ─── 定位板开孔中心（与 plate-export 同源）────────────────
@@ -261,6 +339,8 @@ export interface KeycapPlan {
   placements: KeycapPlacement[];
   /** 库里没有对应宽度、回落 1u 的键数 */
   fallbackCount: number;
+  /** 命中特殊模型（阶梯 / home / ISO）的键数 */
+  specialCount: number;
   /** 参与装配的键数 */
   total: number;
   rowSource: "label" | "position";
@@ -285,16 +365,21 @@ export function buildKeycapPlacements(
   const placements: KeycapPlacement[] = [];
   const rowCounts: Record<KeycapRow, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   let fallbackCount = 0;
+  let specialCount = 0;
 
   for (let i = 0; i < keys.length; i++) {
     const row = rows.rows[i];
     if (row === null || row === undefined) continue;
     const key = keys[i]!;
-    const width = key.w || 1;
-    if (!hasKeycapModel(row, width)) fallbackCount++;
+    const special = specialKeycap(key, row);
+    if (special) {
+      specialCount++;
+    } else if (!hasKeycapModel(row, key.w || 1)) {
+      fallbackCount++;
+    }
     const hole = switchHoleCenterMm(key, u1);
     placements.push({
-      name: keycapModelName(row, width),
+      name: keycapModelFor(key, row),
       x: hole.x - origin.x,
       y: origin.y - hole.y,
       rotation: key.r || 0,
@@ -305,6 +390,7 @@ export function buildKeycapPlacements(
   return {
     placements,
     fallbackCount,
+    specialCount,
     total: placements.length,
     rowSource: rows.source,
     rowCounts,
