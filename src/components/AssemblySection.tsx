@@ -328,11 +328,16 @@ export default function AssemblySection({
 
       {/* 部件选择（顺序：键帽 / 定位板 / 轴体 / 卫星轴 / PCB板 / 轴间棉 / 轴下垫 / 底棉） */}
       <div style={{ padding: "10px 12px 4px 12px", display: "flex", flexWrap: "wrap", gap: "6px 18px" }}>
+        {/*
+          键帽：模型修正中，暂时禁用（2026-10-15 机主要求）。
+          恢复时把 `disabled` 去掉、hint 换回 t("assembly.capsHint") 即可 —— 匹配逻辑 /
+          云端落位 / 标定表都还在，唯一的开关就是下面这一行。
+        */}
         <PartCheck
           label={t("assembly.caps")}
-          checked={sel.caps}
-          onChange={() => toggle("caps")}
-          hint={t("assembly.capsHint")}
+          checked={false}
+          disabled
+          hint={t("assembly.capsPaused")}
         />
         <PartCheck label={t("assembly.plate")} checked={sel.plate} onChange={() => toggle("plate")} />
         <PartCheck

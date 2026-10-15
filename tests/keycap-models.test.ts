@@ -457,8 +457,13 @@ describe("buildKeycapPlacements", () => {
 describe("键帽相关文案（9 语言）", () => {
   const ALL_LANGS: Lang[] = ["en", "zh", "zh-HK", "ko", "ja", "ru", "fr", "pt", "es"];
 
-  it("assembly.capsHint / capsFallback / capsRowByPosition 各语言齐备", () => {
-    for (const key of ["assembly.capsHint", "assembly.capsFallback", "assembly.capsRowByPosition"]) {
+  it("assembly.capsHint / capsFallback / capsRowByPosition / capsPaused 各语言齐备", () => {
+    for (const key of [
+      "assembly.capsHint",
+      "assembly.capsFallback",
+      "assembly.capsRowByPosition",
+      "assembly.capsPaused", // 键帽装配暂停提示（模型修正中）
+    ]) {
       for (const lang of ALL_LANGS) {
         expect(DICT[key]?.[lang], `${key} 缺 ${lang}`).toBeTruthy();
       }
