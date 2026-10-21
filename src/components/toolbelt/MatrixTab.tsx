@@ -8,6 +8,7 @@ import { SectionHeader } from "./shared/SectionHeader";
 import { computeKeyMatrices, findMatrixCollisions, matrixSize } from "../../lib/key-matrix";
 import { keyToKeycode, isResolvedKeycode } from "../../lib/qmk-keycodes";
 import { buildExportModel, generateKeymapC, generateKeyboardJson } from "../../lib/qmk-export-community";
+import { isDeviceKey, getDeviceKind } from "../../lib/device-geometry";
 import { saveFile } from "../../lib/platform-bridge";
 
 interface MatrixTabProps {
@@ -23,8 +24,16 @@ export function MatrixTab({ keys, selectedIds, meta, onSetProp }: MatrixTabProps
   const { t } = useI18n();
 
   const matrices = useMemo(() => computeKeyMatrices(keys), [keys]);
-  const size = useMemo(() => matrixSize(matrices), [matrices]);
-  const collisions = useMemo(() => findMatrixCollisions(matrices), [matrices]);
+  // 器件（旋钮 / 屏幕）不是矩阵开关；兼容按键不进入导出 —— 统计同样排除
+  const activeMatrices = useMemo(
+    () => matrices.filter((_, i) => {
+      const k = keys[i];
+      return !!k && !isDeviceKey(k) && k.compat !== 1;
+    }),
+    [matrices, keys],
+  );
+  const size = useMemo(() => matrixSize(activeMatrices), [activeMatrices]);
+  const collisions = useMemo(() => findMatrixCollisions(activeMatrices), [activeMatrices]);
   const model = useMemo(() => buildExportModel(keys), [keys]);
 
   const centerX = useMemo(() => {
@@ -40,6 +49,7 @@ export function MatrixTab({ keys, selectedIds, meta, onSetProp }: MatrixTabProps
 
   const firstIdx = selectedIds.length > 0 ? parseInt(selectedIds[0]!, 10) : -1;
   const key = firstIdx >= 0 && firstIdx < keys.length ? keys[firstIdx]! : null;
+  const deviceKindSel = key ? getDeviceKind(key) : null;
   const info = firstIdx >= 0 ? matrices[firstIdx] : undefined;
   const code = key ? keyToKeycode(key, (key.x ?? 0) + (key.w ?? 1) / 2 <= centerX) : "";
 
@@ -103,6 +113,10 @@ export function MatrixTab({ keys, selectedIds, meta, onSetProp }: MatrixTabProps
         {!key ? (
           <div style={{ fontSize: 12, color: "var(--theme-text-muted)", padding: "6px 0" }}>
             {t("mx.hintNoSel")}
+          </div>
+        ) : deviceKindSel ? (
+          <div style={{ fontSize: 12, color: "var(--theme-text-muted)", padding: "6px 0" }}>
+            {t("mx.deviceHint")}
           </div>
         ) : (
           <>

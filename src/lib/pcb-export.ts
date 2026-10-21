@@ -18,13 +18,14 @@
  *    云端权威实现为**完整超集**（私有仓 worker/src/geometry/pcb-export.ts）。
  */
 
-import type { KLELayout } from "./kle-types";
+import type { KLELayout, DeviceKind } from "./kle-types";
 import type { StpExtrudeData, ModelPlacement } from "./stp-export";
 import { getStabOffset } from "./stab-offsets";
 import { rotatePoint, computeLayoutBBoxInUnits } from "./coordinate-system";
 import { TYPEC_ICON, TYPEC_HOLES, MCU_ICON } from "./component-icons";
 import polygonClipping from "polygon-clipping";
 import { offsetPolygonOutward, filletPolygon } from "./plate-export";
+import { deviceCutoutPolygons, getDeviceKind } from "./device-geometry";
 import { GH60_OUTLINE, GH60_SLOTS, GH60_TYPEC } from "../data/gh60";
 
 // ─── Type-C 3D 模型装配常量 ───────────────────────────────
@@ -371,6 +372,8 @@ interface KeyInfo {
   visualCx: number; visualCy: number;
   /** Switch footprint center (mm)：阶梯键 (l) 相对视觉中心左移 0.25u，其余同 visual */
   swCx: number; swCy: number;
+  /** 器件类型（旋钮 / 屏幕）：不是开关，不出轴孔 / 卫星轴 / 3D 轴体 */
+  device: DeviceKind | null;
   /** 该键在 layout.keys 中的原始下标（过滤 decal 后仍指向真实键；全链路统一用它，禁再用过滤后下标当原始下标） */
   srcIndex: number;
 }
@@ -403,7 +406,8 @@ function computePCBKeyPositions(
 
     const isTall = actualH > actualW;
     const size = isTall ? actualH : actualW;
-    const hasStab = config.needStab && size >= 2;
+    const device = getDeviceKind(k);
+    const hasStab = !device && config.needStab && size >= 2;
     if (hasStab) stabCount++;
 
     // 旋转后视觉中心——绕 cluster rotation origin 旋转后的实际位置
@@ -427,6 +431,18 @@ function computePCBKeyPositions(
     if (visualCx + halfW + config.edgeDistance > holeMaxX) holeMaxX = visualCx + halfW + config.edgeDistance;
     if (visualCy + halfH + config.edgeDistance > holeMaxY) holeMaxY = visualCy + halfH + config.edgeDistance;
 
+    // 器件开槽可能探出按键包围盒（屏幕出线槽向出线边外扩 1.5mm）——板框 / 轴下垫等按开槽范围扩边
+    if (device) {
+      for (const poly of deviceCutoutPolygons(k, U)) {
+        for (const p of poly) {
+          if (p.x - config.edgeDistance < holeMinX) holeMinX = p.x - config.edgeDistance;
+          if (p.y - config.edgeDistance < holeMinY) holeMinY = p.y - config.edgeDistance;
+          if (p.x + config.edgeDistance > holeMaxX) holeMaxX = p.x + config.edgeDistance;
+          if (p.y + config.edgeDistance > holeMaxY) holeMaxY = p.y + config.edgeDistance;
+        }
+      }
+    }
+
     // 开关焊盘/轴座中心：阶梯键 (KLE `l`) 相对视觉中心左移 0.25u（同 builder.swillkb）
     let swCx = visualCx, swCy = visualCy;
     if (k.l) {
@@ -438,7 +454,7 @@ function computePCBKeyPositions(
 
     keyInfos.push({
       cx, cy, kw: actualW, kh: actualH,
-      rot, rx, ry, isTall, hasStab, visualCx, visualCy, swCx, swCy, srcIndex,
+      rot, rx, ry, isTall, hasStab, visualCx, visualCy, swCx, swCy, srcIndex, device,
     });
   }
 
@@ -569,6 +585,17 @@ export function computeSwitchPadGeometry(
     const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
     const cStart = circles.length, pStart = polys.length;
 
+    // 器件（旋钮 / 屏幕）：不出开关孔 / LED / 卫星轴，只按器件规则开槽
+    if (ki.device) {
+      for (const pts of deviceCutoutPolygons(keys[ki.srcIndex]!, U)) {
+        polys.push(pts.map((p) => [p.x, p.y] as [number, number]));
+      }
+      if (compatKeyIndices?.has(ki.srcIndex)) {
+        for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
+      }
+      continue;
+    }
+
     for (let i = 0; i < switchOffsets.length; i++) {
       let ox = switchOffsets[i]!.x, oy = switchOffsets[i]!.y;
       if (ki.isTall) { const t = ox; ox = -oy; oy = t; }
@@ -672,6 +699,16 @@ export function computeBottomFoamGeometry(
       const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
       const angle = ki.rot + (ki.isTall ? 90 : 0) + swRot;
       const pStart = polys.length;
+      // 器件（旋钮 / 屏幕）：旋钮 17×17 方孔、屏幕出线槽
+      if (ki.device) {
+        for (const pts of deviceCutoutPolygons(keys[ki.srcIndex]!, U)) {
+          polys.push(pts.map((p) => [p.x, p.y] as [number, number]));
+        }
+        if (compatKeyIndices?.has(ki.srcIndex)) {
+          for (let k = pStart; k < polys.length; k++) compatPolys.push(polys[k]!);
+        }
+        continue;
+      }
       const tf = (pts: [number, number][]) => pts.map(([dx, dy]) => {
         const r = angle % 360 !== 0 ? rotatePoint({ x: dx, y: dy }, angle, { x: 0, y: 0 }) : { x: dx, y: dy };
         return [ki.swCx + r.x, ki.swCy + r.y] as [number, number];
@@ -920,6 +957,17 @@ ${gh60
     const swRot = switchRotations?.[`switch-${ki.srcIndex}`] || 0;
     const stRot = stabRotations?.[`stab-${ki.srcIndex}`] || 0;
 
+    // ── 器件（旋钮 / 屏幕）：按器件规则开槽，无轴孔 / LED / 卫星轴 ──
+    if (ki.device) {
+      for (const pts of deviceCutoutPolygons(keys[ki.srcIndex]!, U)) {
+        const vp = pts.map((p) => [p.x - holeOffX + pad, p.y - holeOffY + pad] as Pt2);
+        svg += `<path d="${ringPathD(vp)}"/>`;
+        dxfPolygon(vp);
+        stpPolyHoles.push(pts.map((p) => [p.x, -p.y] as [number, number]));
+      }
+      continue;
+    }
+
     // ── Switch holes ──
     const holes: { ox: number; oy: number; r: number }[] = [];
 
@@ -1159,6 +1207,7 @@ ${gh60
   // Collect T4 placements (one per key — default, unconditional)
   for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
     const ki = keyInfos[keyIndex]!;
+    if (ki.device) continue; // 器件不是轴体
     modelPlacements.push({
       type: "t4",
       x: ki.visualCx,
@@ -1172,6 +1221,7 @@ ${gh60
   if (config.solderType === "socket") {
     for (let keyIndex = 0; keyIndex < keyInfos.length; keyIndex++) {
       const ki = keyInfos[keyIndex]!;
+      if (ki.device) continue; // 器件不是轴体
       // Hotswap in STP coordinates (Y-up = -cy)
       modelPlacements.push({
         type: "hotswap",

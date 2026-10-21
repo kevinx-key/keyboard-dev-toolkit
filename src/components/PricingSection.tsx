@@ -15,6 +15,7 @@ import { buildCheckoutRequest, applyFreshToRequest, newIdemKey, type PlateOrderI
 import { getRawRows } from "../lib/kle-serial";
 import { openExternal } from "../lib/platform-bridge";
 import { tOption, tServerText, tServerNotice, tQuoteReason, fill, LANG_LOCALE } from "../lib/pricing-i18n";
+import { isDeviceKey } from "../lib/device-geometry";
 
 interface PricingSectionProps {
   layout: KLELayout;
@@ -100,8 +101,8 @@ export default function PricingSection({ layout, rgbEnabled = false, pcbSize = n
   const fx = useFxRates();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  // 键数始终跟随当前配列（与 PCB 编辑器一致：排除 decal 装饰键）；不信任 form.keyCount 快照
-  const keyCount = layout.keys.filter((k) => !k.d).length;
+  // 键数始终跟随当前配列（与 PCB 编辑器一致：排除 decal 装饰键与旋钮 / 屏幕器件）；不信任 form.keyCount 快照
+  const keyCount = layout.keys.filter((k) => !k.d && !isDeviceKey(k)).length;
   const [form, setForm] = useState<QuoteRequest>(() => defaultForm(keyCount));
   const [copied, setCopied] = useState(false);
   const [meta, setMeta] = useState<MetaResponse | null>(null);

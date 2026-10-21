@@ -19,6 +19,7 @@
 
 import type { KLELayout, KeyProps } from "./kle-types";
 import { rotatePoint } from "./coordinate-system";
+import { isDeviceKey } from "./device-geometry";
 
 /** 键位单位（PCB 侧固定 19.05 —— `pcb-export.ts` 的 `U`） */
 const PCB_U = 19.05;
@@ -137,6 +138,7 @@ export function buildSwitchPlacements(
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i]!;
     if (key.d) continue; // decal 不装轴
+    if (isDeviceKey(key)) continue; // 旋钮 / 屏幕不装轴
     if (!(key.w > 0)) continue;
     const c = pcbSwitchCenterMm(key, PCB_U);
     placements.push({

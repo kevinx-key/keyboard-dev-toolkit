@@ -1,6 +1,8 @@
 import type { KLELayout, KeyProps, KLEMeta } from "./kle-types";
 import { parseLabelColor, getDecalConfig, type DecalConfig } from "./kle-types";
 import { KEY_UNIT } from "./kle-parser";
+import { U_MM } from "./coordinate-system";
+import { getDeviceKind, getScreenGeometry, knobDiameterMm } from "./device-geometry";
 import { getRawRows, parseKLEJSON } from "./kle-serial";
 import { isValidHexColor } from "./sanitize";
 import { computeLShapeSvgPath } from "./lshape-path";
@@ -196,6 +198,32 @@ function renderKey(
   const cx = px + pw / 2;
   const cy = py + ph / 2;
   const rotAttr = r ? ` transform="rotate(${r} ${(x + w / 2) * KEY_UNIT} ${(y + h / 2) * KEY_UNIT})"` : "";
+
+  // ── 器件（旋钮 / 屏幕）：独立渲染，不画键帽 / 图例 ──
+  const deviceKind = getDeviceKind(k);
+  if (deviceKind) {
+    const mmToPx = KEY_UNIT / U_MM;
+    const cx = x + (w * KEY_UNIT) / 2;
+    const cy = y + (h * KEY_UNIT) / 2;
+    let g = `<g${rotAttr}${isGhosted ? ' opacity="0.4"' : ""}>`;
+    if (deviceKind === "knob") {
+      // 简约单圆：纯平色；用户设置了双色时用过渡色
+      const base = k.c && isValidHexColor(k.c) ? k.c : "#c8c8c8";
+      const c2 = k.c2 && isValidHexColor(k.c2) ? k.c2 : null;
+      const fill = c2 ? `url(#${keyGradientId(base, c2, k.cang ?? 135)})` : base;
+      const d = Math.min(knobDiameterMm(k) * mmToPx, Math.min(w, h) * KEY_UNIT);
+      g += `<circle cx="${cx}" cy="${cy}" r="${d / 2}" fill="${fill}" stroke="${darken(base, 25)}" stroke-width="0.8" />`;
+    } else {
+      const geo = getScreenGeometry(k);
+      const sw = geo.w * mmToPx;
+      const sh = geo.h * mmToPx;
+      const sr = Math.min(geo.r * mmToPx, Math.min(sw, sh) / 2);
+      g += `<rect x="${cx - sw / 2}" y="${cy - sh / 2}" width="${sw}" height="${sh}" rx="${sr}" fill="#0b0b0e" stroke="#3a3a42" stroke-width="0.8" />`;
+      g += `<rect x="${cx - sw / 2 + 2}" y="${cy - sh / 2 + 2}" width="${Math.max(0, sw - 4)}" height="${Math.max(0, sh - 4)}" rx="${Math.max(0, sr - 2)}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.6" />`;
+    }
+    g += `</g>`;
+    return g;
+  }
 
   let group = `<g${rotAttr}${isGhosted ? ' opacity="0.4"' : ""}${isDecal ? ' stroke-dasharray="3,2"' : ""}>`;
 

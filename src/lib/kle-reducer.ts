@@ -4,8 +4,22 @@
  */
 
 import type { EditorState, EditorAction, KeyProps, KLEMeta, UndoSnapshot } from "./kle-types";
-import { DEFAULT_PROPS, DEFAULT_META, applyCompatToLabels } from "./kle-types";
+import { DEFAULT_PROPS, DEFAULT_META, applyCompatToLabels, LABEL_POSITIONS } from "./kle-types";
 import { PRESET_NAMES } from "../data/presets";
+import { U_MM } from "./coordinate-system";
+import {
+  KNOB_DEFAULT_DIA_MM,
+  SCREEN_DEFAULT_EXIT,
+  SCREEN_DEFAULT_H_MM,
+  SCREEN_DEFAULT_RADIUS_MM,
+  SCREEN_DEFAULT_W_MM,
+  SCREEN_MAX_MM,
+  SCREEN_MIN_MM,
+  clampScreenRadius,
+  getDeviceKind,
+  mmToUnits,
+  normalizeScreenExit,
+} from "./device-geometry";
 
 const MAX_HISTORY = 100;
 
@@ -82,6 +96,47 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       if (ids.length === 0) return state; // Empty selection is a no-op
       const newKeys = state.layout.keys.map((k, i) => {
         if (ids.includes(String(i))) {
+          // ── 器件（旋钮 / 屏幕）：尺寸由器件参数驱动 ──
+          const deviceKind = getDeviceKind(k);
+          if (deviceKind && (prop === "w" || prop === "h")) {
+            // 旋钮直径 / 屏幕宽高是唯一尺寸入口，禁止直接改网格占位
+            return k;
+          }
+          if (prop === "knobDia") {
+            const dia = Number(value);
+            if (!Number.isFinite(dia) || dia <= 0) return k;
+            const next = Math.min(200, Math.max(1, dia));
+            const units = mmToUnits(next);
+            return { ...k, knobDia: Math.round(next * 10) / 10, w: units, h: units };
+          }
+          if (prop === "screenW" || prop === "screenH") {
+            const raw = Number(value);
+            if (!Number.isFinite(raw)) return k;
+            const next = Math.min(SCREEN_MAX_MM, Math.max(SCREEN_MIN_MM, raw));
+            const wMm = prop === "screenW" ? next : (typeof k.screenW === "number" ? k.screenW : (k.w || 1) * U_MM);
+            const hMm = prop === "screenH" ? next : (typeof k.screenH === "number" ? k.screenH : (k.h || 1) * U_MM);
+            return {
+              ...k,
+              screenW: Math.round(wMm * 100) / 100,
+              screenH: Math.round(hMm * 100) / 100,
+              w: mmToUnits(wMm),
+              h: mmToUnits(hMm),
+              screenR: clampScreenRadius(k.screenR ?? 0, wMm, hMm),
+            };
+          }
+          if (prop === "screenR") {
+            const wMm = typeof k.screenW === "number" ? k.screenW : (k.w || 1) * U_MM;
+            const hMm = typeof k.screenH === "number" ? k.screenH : (k.h || 1) * U_MM;
+            const rRaw = Number(value);
+            if (!Number.isFinite(rRaw)) return k;
+            return { ...k, screenR: clampScreenRadius(rRaw, wMm, hMm) };
+          }
+          if (prop === "screenExit") {
+            const exit = normalizeScreenExit(value);
+            if (!exit) return k;
+            return { ...k, screenExit: exit };
+          }
+
           // 兼容层：修改兼容状态/组号时，同步写回标签槽（画布标签实时反映 "<组号>,<值>"）
           if (prop === "compat") {
             const nextCompat = value as 0 | 1 | undefined;
@@ -172,6 +227,45 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const newKey: KeyProps = { ...DEFAULT_PROPS, x, y, ...action.props };
       return pushUndo(state, {
         layout: { ...state.layout, meta: deriveNameFromPreset(state.layout.meta), keys: [...state.layout.keys, newKey], _sourceCache: undefined },
+        isDirty: true,
+      });
+    }
+
+    case "ADD_DEVICE": {
+      const keys = state.layout.keys;
+      // 追加到配列最下方（与「添加按键」逻辑一致：整行之下），并自动选中新器件
+      const bottomY = keys.reduce((m, k) => Math.max(m, (k.y ?? 0) + (k.h ?? 1)), 0);
+      const base: KeyProps = {
+        ...DEFAULT_PROPS,
+        labels: Array(LABEL_POSITIONS).fill(""),
+        x: 0,
+        y: round(bottomY),
+      };
+      const newKey: KeyProps = action.device === "knob"
+        ? {
+            ...base,
+            w: mmToUnits(KNOB_DEFAULT_DIA_MM),
+            h: mmToUnits(KNOB_DEFAULT_DIA_MM),
+            knobDia: KNOB_DEFAULT_DIA_MM,
+          }
+        : {
+            ...base,
+            w: mmToUnits(SCREEN_DEFAULT_W_MM),
+            h: mmToUnits(SCREEN_DEFAULT_H_MM),
+            screenW: SCREEN_DEFAULT_W_MM,
+            screenH: SCREEN_DEFAULT_H_MM,
+            screenR: SCREEN_DEFAULT_RADIUS_MM,
+            screenExit: SCREEN_DEFAULT_EXIT,
+            c: "#000000",
+          };
+      return pushUndo(state, {
+        layout: {
+          ...state.layout,
+          meta: deriveNameFromPreset(state.layout.meta),
+          keys: [...keys, newKey],
+          _sourceCache: undefined,
+        },
+        selectedIds: [String(keys.length)],
         isDirty: true,
       });
     }

@@ -11,6 +11,7 @@
 import type { KeyProps, KLELayout, KLEMeta } from "./kle-types";
 import { DEFAULT_PROPS, DEFAULT_ALIGN, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions, parseViaCompatTag } from "./kle-types";
 import { keyPropsToIntermediate } from "./kle-parser";
+import { normalizeScreenExit } from "./device-geometry";
 
 /** Parse a layouts.json format preset into KeyProps[].
  *  Uses absolute position tracking matching the original KLE $serial.deserialize.
@@ -74,6 +75,16 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         if (current.matrixRow !== undefined) key.matrixRow = current.matrixRow;
         if (current.matrixCol !== undefined) key.matrixCol = current.matrixCol;
 
+        // 器件（旋钮 / 屏幕，编辑器专属扩展）
+        if (current.knobDia !== undefined) key.knobDia = current.knobDia;
+        if (current.screenW !== undefined) key.screenW = current.screenW;
+        if (current.screenH !== undefined) key.screenH = current.screenH;
+        if (current.screenR !== undefined) key.screenR = current.screenR;
+        if (current.screenExit !== undefined) {
+          const exit = normalizeScreenExit(current.screenExit);
+          if (exit) key.screenExit = exit;
+        }
+
         // VIA 兼容标记（"<matrix>\n\n\n<option>,<value>"）→ compat / compatOption
         const via = parseViaCompatTag(serialLabels);
         if (via) {
@@ -101,6 +112,11 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         current.g = false;
         current.matrixRow = undefined;
         current.matrixCol = undefined;
+        current.knobDia = undefined;
+        current.screenW = undefined;
+        current.screenH = undefined;
+        current.screenR = undefined;
+        current.screenExit = undefined;
 
       } else if (typeof item === "object" && item !== null) {
         const props = item as import("./kle-parser").IntermediateLayoutItem;
@@ -150,6 +166,12 @@ export function parseLayoutJSON(presetData: unknown): KeyProps[] {
         // 矩阵覆盖（编辑器专属扩展）
         if (props.matrixRow !== undefined) current.matrixRow = props.matrixRow as number;
         if (props.matrixCol !== undefined) current.matrixCol = props.matrixCol as number;
+        // 器件（旋钮 / 屏幕，编辑器专属扩展）
+        if (props.knobDia !== undefined) current.knobDia = props.knobDia as number;
+        if (props.screenW !== undefined) current.screenW = props.screenW as number;
+        if (props.screenH !== undefined) current.screenH = props.screenH as number;
+        if (props.screenR !== undefined) current.screenR = props.screenR as number;
+        if (props.screenExit !== undefined) current.screenExit = props.screenExit as import("./kle-types").ScreenExit;
       }
     }
 

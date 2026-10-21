@@ -359,6 +359,7 @@ export default function EditorPage() {
               onStepChange={(steps) => { stepRef.current = steps; setStepConfig(steps); }}
               onAddKeys={editor.addKeys}
               onAddSpecialKey={handleAddSpecialKey}
+              onAddDevice={editor.addDevice}
               onDelete={editor.deleteSelected}
               onUndo={editor.undo}
               onRedo={editor.redo}

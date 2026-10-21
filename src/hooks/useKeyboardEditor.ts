@@ -7,7 +7,7 @@
 
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { editorReducer, createInitialState, parseHashFragment, serializeKLE } from "../lib";
-import type { KeyProps, KLEMeta, KLELayout } from "../lib";
+import type { KeyProps, KLEMeta, KLELayout, DeviceKind } from "../lib";
 import { parseKLE } from "../lib";
 import { logger } from "../lib/error-logger";
 import { DEFAULT_PROPS } from "../lib/kle-types";
@@ -55,7 +55,7 @@ export interface StepConfig {
 const DEFAULT_STEPS: StepConfig = { move: 0.25, size: 0.25, rotate: 15 };
 
 // M15 修复：数字属性校验 — 防止 NaN/Infinity/null 穿透到 reducer
-const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth", "compatOption"]);
+const NUMERIC_PROPS = new Set(["x", "y", "w", "h", "x2", "y2", "w2", "h2", "r", "rx", "ry", "f", "f2", "displayWidth", "compatOption", "knobDia", "screenW", "screenH", "screenR"]);
 
 export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
   const [state, dispatch] = useReducer(editorReducer, null, () => {
@@ -264,6 +264,10 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
     dispatch({ type: "ADD_SPECIAL_KEY", props });
   }, []);
 
+  const addDevice = useCallback((device: DeviceKind) => {
+    dispatch({ type: "ADD_DEVICE", device });
+  }, []);
+
   const deleteSelected = useCallback(() => {
     dispatch({ type: "DELETE_SELECTED" });
   }, []);
@@ -305,6 +309,7 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
     setMeta,
     addKeys,
     addSpecialKey,
+    addDevice,
     deleteSelected,
     moveSelected,
     copy,

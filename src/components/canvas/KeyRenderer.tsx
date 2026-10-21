@@ -8,6 +8,13 @@ import { computeLShapeSvgPath } from "../../lib/lshape-path";
 import { rotatedBbox } from "../../lib/geometry-utils";
 import { lighten, mixColor } from "../../lib/color-utils";
 import { isValidHexColor } from "../../lib/sanitize";
+import { U_MM } from "../../lib/coordinate-system";
+import {
+  getDeviceKind,
+  getScreenGeometry,
+  knobDiameterMm,
+  screenSlotRectLocal,
+} from "../../lib/device-geometry";
 import LabelRenderer from "./LabelRenderer";
 
 interface KeyRendererProps {
@@ -117,6 +124,27 @@ export default function KeyRenderer({
   const extTop = hasExt ? (effY2 - minY) * KEY_UNIT : 0;
   const extWidth = hasExt ? effW2 * KEY_UNIT - KEY_GAP * 2 : 0;
   const extHeight = hasExt ? effH2 * KEY_UNIT - KEY_GAP * 2 : 0;
+
+  // ── 器件（旋钮 / 屏幕）几何 ──
+  const deviceKind = getDeviceKind(keyData);
+  const isKnob = deviceKind === "knob";
+  const isScreen = deviceKind === "screen";
+  const MM_TO_PX = KEY_UNIT / U_MM;
+  /** 器件中心（wrapper 内坐标；非旋转键即 wrapper 中心） */
+  const devCx = bodyOffX + kbWidth / 2;
+  const devCy = bodyOffY + kbHeight / 2;
+  const knobPx = isKnob ? knobDiameterMm(keyData) * MM_TO_PX : 0;
+  const screenGeo = isScreen ? getScreenGeometry(keyData) : null;
+  const screenPxW = screenGeo ? screenGeo.w * MM_TO_PX : 0;
+  const screenPxH = screenGeo ? screenGeo.h * MM_TO_PX : 0;
+  const screenPxR = screenGeo
+    ? Math.min(screenGeo.r * MM_TO_PX, Math.min(screenPxW, screenPxH) / 2)
+    : 0;
+  const slotRect = isScreen ? screenSlotRectLocal(keyData) : null;
+  const slotLeft = slotRect ? devCx + slotRect.x0 * MM_TO_PX : 0;
+  const slotTop = slotRect ? devCy + slotRect.y0 * MM_TO_PX : 0;
+  const slotW = slotRect ? (slotRect.x1 - slotRect.x0) * MM_TO_PX : 0;
+  const slotH = slotRect ? (slotRect.y1 - slotRect.y0) * MM_TO_PX : 0;
 
   // ── Visual state flags ──
   const isDecal = !!keyData.d;
@@ -280,6 +308,73 @@ export default function KeyRenderer({
     wrapperStyle.transformOrigin = `${originX}px ${originY}px`;
   }
 
+  // ── 器件主体（旋钮圆 / 屏幕黑矩形 + 出线槽） ──
+  const deviceBody = isKnob ? (
+    /* 简约单圆：纯平色（可自定义过渡色时用双色渐变），无内外双圆 / 无阴影 */
+    <div
+      style={{
+        position: "absolute",
+        left: devCx - knobPx / 2,
+        top: devCy - knobPx / 2,
+        width: knobPx, height: knobPx,
+        borderRadius: "50%",
+        backgroundColor: baseC,
+        ...(hasGradient ? { backgroundImage: bodyGradient } : {}),
+        border: `1px solid ${getKeyStrokeColor(baseC)}`,
+        boxSizing: "border-box",
+        zIndex: 1,
+        pointerEvents: "none",
+      }}
+    />
+  ) : isScreen ? (
+    <>
+      {/* 屏幕主体：黑色长方形（按需求固定黑色，不随主题） */}
+      <div
+        style={{
+          position: "absolute",
+          left: devCx - screenPxW / 2,
+          top: devCy - screenPxH / 2,
+          width: screenPxW, height: screenPxH,
+          borderRadius: screenPxR,
+          background: "linear-gradient(155deg, #1c1c22 0%, #0a0a0d 55%, #000000 100%)",
+          border: "1px solid #3a3a42",
+          boxSizing: "border-box",
+          boxShadow: "inset 0 0 10px rgba(255,255,255,0.06), 0 1px 4px rgba(0,0,0,0.45)",
+          overflow: "hidden",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      >
+        {/* 玻璃反光 */}
+        <div
+          style={{
+            position: "absolute",
+            inset: "8%",
+            borderRadius: Math.max(0, screenPxR * 0.6),
+            background: "linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0.01) 45%, rgba(255,255,255,0) 70%)",
+          }}
+        />
+      </div>
+      {/* 出线槽标示：仅在屏幕被选中时显示（纯编辑辅助，不常驻、不导出） */}
+      {isSelected && !preview && (
+        <div
+          style={{
+            position: "absolute",
+            left: slotLeft,
+            top: slotTop,
+            width: slotW,
+            height: slotH,
+            backgroundColor: "rgba(var(--theme-primary-rgb), 0.28)",
+            border: "1px dashed var(--theme-primary)",
+            boxSizing: "border-box",
+            zIndex: 2,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+    </>
+  ) : null;
+
   return (
     <Fragment>
       {/* L-shaped key: selected SVG outline overlay */}
@@ -317,6 +412,9 @@ export default function KeyRenderer({
         style={wrapperStyle}
       >
         {!isDecal ? (
+          deviceKind ? (
+            deviceBody
+          ) : (
           <>
             {hasExt && !stepped ? (
               // ── L-shaped non-stepped key (e.g., ISO Enter) ──
@@ -488,24 +586,57 @@ export default function KeyRenderer({
               />
             )}
           </>
+          )
         ) : null}
 
-        {/* ── Labels ── */}
-        <LabelRenderer
-          labels={keyData.labels}
-          isDecal={isDecal}
-          faceLeft={faceLeft}
-          faceTop={faceTop}
-          faceWidth={faceWidth}
-          faceHeight={faceHeight}
-          bboxW={bboxW}
-          bboxH={bboxH}
-          keyData={keyData}
-        />
+        {/* ── Labels（器件不显示图例） ── */}
+        {!deviceKind && (
+          <LabelRenderer
+            labels={keyData.labels}
+            isDecal={isDecal}
+            faceLeft={faceLeft}
+            faceTop={faceTop}
+            faceWidth={faceWidth}
+            faceHeight={faceHeight}
+            bboxW={bboxW}
+            bboxH={bboxH}
+            keyData={keyData}
+          />
+        )}
 
         {/* ── Selected indicator (for non-L-shaped keys) ── */}
         {isSelected && !preview && !hasExt && (
-          hasRotation ? (
+          isKnob ? (
+            <div
+              style={{
+                position: "absolute",
+                left: devCx - knobPx / 2 - 2,
+                top: devCy - knobPx / 2 - 2,
+                width: knobPx + 4,
+                height: knobPx + 4,
+                borderRadius: "50%",
+                border: "2px solid var(--theme-primary)",
+                boxShadow: "0 0 0 2px rgba(51,122,183,0.3)",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            />
+          ) : isScreen ? (
+            <div
+              style={{
+                position: "absolute",
+                left: devCx - screenPxW / 2 - 2,
+                top: devCy - screenPxH / 2 - 2,
+                width: screenPxW + 4,
+                height: screenPxH + 4,
+                borderRadius: screenPxR + 2,
+                border: "2px solid var(--theme-primary)",
+                boxShadow: "0 0 0 2px rgba(51,122,183,0.3)",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            />
+          ) : hasRotation ? (
             <div
               style={{
                 position: "absolute",

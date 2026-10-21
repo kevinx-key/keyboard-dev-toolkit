@@ -7,10 +7,15 @@
 import type { KeyProps } from "../../lib/kle-types";
 import { getPrimaryLabel } from "../../lib/kle-types";
 import { KEY_UNIT } from "../../lib";
+import { U_MM } from "../../lib/coordinate-system";
+import { getDeviceKind, knobDiameterMm } from "../../lib/device-geometry";
 
 /** Determine which visual category a key belongs to based on its primary label */
 export function getKeyCategory(key: KeyProps): string {
   if (key.d) return "Decals";
+  const device = getDeviceKind(key);
+  if (device === "knob") return "Knobs";
+  if (device === "screen") return "Screens";
   const label = getPrimaryLabel(key.labels) || "";
   const cleanLabel = label.trim();
   if (!cleanLabel) return "Specials";
@@ -51,6 +56,14 @@ export function hitTestKey(
       const dy = uy - oy;
       testX = ox + dx * cos - dy * sin;
       testY = oy + dx * sin + dy * cos;
+    }
+    // 旋钮：按圆形命中（避免在圆外的包络角点误选）
+    if (getDeviceKind(k) === "knob") {
+      const cx = k.x + k.w / 2;
+      const cy = k.y + k.h / 2;
+      const r = (knobDiameterMm(k) / U_MM) / 2;
+      if (Math.hypot(testX - cx, testY - cy) <= r) return i;
+      continue;
     }
     if (testX >= k.x && testX < k.x + k.w && testY >= k.y && testY < k.y + k.h) {
       return i;

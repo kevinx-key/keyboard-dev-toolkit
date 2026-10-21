@@ -6,7 +6,7 @@ import {
   ClipboardPaste, Save, Download, ChevronDown, FileCode2, FileImage, FileJson, FileDown, LayoutTemplate,
   SlidersHorizontal, X, Settings,
 } from "lucide-react";
-import type { KLELayout } from "../lib";
+import type { KLELayout, DeviceKind } from "../lib";
 import { parseLayoutJSON } from "../lib/kle-serial";
 import { DEFAULT_META } from "../lib/kle-types";
 import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
@@ -40,6 +40,8 @@ interface FloatingToolbarProps {
   onStepChange: (steps: StepConfigType) => void;
   onAddKeys: (count: number) => void;
   onAddSpecialKey?: (keyDef: SpecialKeyDef) => void;
+  /** 添加器件：旋钮（EC11） / 屏幕 */
+  onAddDevice?: (device: DeviceKind) => void;
   onDelete: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -180,6 +182,16 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
                 {sk.id === "isoEnter" ? sk.label : t(`toolbar.${sk.id}`)}
               </button>
             ))}
+            <div className="kle-dropdown-divider" />
+            <div className="kle-dropdown-header">{t("toolbar.devicesHeader")}</div>
+            <button data-testid="add-knob" className="kle-dropdown-item"
+              onClick={() => { props.onAddDevice?.("knob"); setAddKeyOpen(false); }}>
+              <Plus size={11} style={{ marginRight: 4 }} /> {t("toolbar.addKnob")}
+            </button>
+            <button data-testid="add-screen" className="kle-dropdown-item"
+              onClick={() => { props.onAddDevice?.("screen"); setAddKeyOpen(false); }}>
+              <Plus size={11} style={{ marginRight: 4 }} /> {t("toolbar.addScreen")}
+            </button>
           </div>
         )}
       </div>

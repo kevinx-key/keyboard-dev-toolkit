@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Grid3x3, ClipboardList, Loader2, Package, FileDown, FileCode2 } from "lucide-react";
@@ -18,6 +18,7 @@ import InteractivePCBPreview from "./InteractivePCBPreview";
 import { useStpConfirm } from "./StpConfirmDialog";
 import { assignMatrix, keyPropsToKLEKeys } from "../lib/matrix-core";
 import { isQmkExportEnabled } from "../plugins";
+import { isDeviceKey } from "../lib/device-geometry";
 
 // ─── Constants ──────────────────────────────────────────
 
@@ -387,7 +388,8 @@ export default function PCBSection({
     });
   }, [setConfig]);
 
-  const keyCount = layout.keys.filter((k) => !k.d).length;
+  // 器件（旋钮 / 屏幕）不是开关，不计入键数
+  const keyCount = layout.keys.filter((k) => !k.d && !isDeviceKey(k)).length;
   const interferenceChecked = cloudInterference !== null;
   const interferenceCount = cloudInterference?.pairs.length ?? 0;
   const selectedPcbKeyInfo = useMemo(() => {

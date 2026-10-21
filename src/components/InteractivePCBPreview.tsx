@@ -6,6 +6,7 @@ import type { PCBPreviewRegion, PCBComponentRegion, InterferenceMark } from "../
 import type { KeyProps } from "../lib/kle-types";
 import type { MatrixResult } from "../lib/matrix-types";
 import { U_MM } from "../lib/coordinate-system";
+import { isDeviceKey } from "../lib/device-geometry";
 import { sanitizeSvg } from "../lib/sanitize";
 import { useI18n } from "../lib/i18n";
 
@@ -175,7 +176,8 @@ export default function InteractivePCBPreview({
 
   const matrixLabels: Array<{ key: KeyProps; cx: number; by: number; label: string }> = useMemo(() => {
     if (!showMatrix || !matrixResult || !layoutKeys) return [];
-    const nonDecal = layoutKeys.filter((k: KeyProps) => !k.d);
+    // 器件（旋钮 / 屏幕）没有开关焊盘，不显示矩阵坐标徽章
+    const nonDecal = layoutKeys.filter((k: KeyProps) => !k.d && !isDeviceKey(k));
     if (nonDecal.length === 0) return [];
     const edge = 5;
     const pad = 5;

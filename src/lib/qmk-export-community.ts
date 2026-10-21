@@ -9,8 +9,9 @@
  */
 
 import type { KeyProps, KLEMeta } from "./kle-types";
-import { computeKeyMatrices, matrixSize, type KeyMatrixInfo } from "./key-matrix";
+import { computeKeyMatrices, type KeyMatrixInfo } from "./key-matrix";
 import { keyToKeycode, isResolvedKeycode } from "./qmk-keycodes";
+import { isDeviceKey } from "./device-geometry";
 
 const PHYS_ROW_TOL = 0.5;
 
@@ -65,7 +66,6 @@ function groupByPhysicalRow(indices: number[], keys: KeyProps[]): number[][] {
 /** 构建导出模型（keymap.c 与 keyboard.json 共用）。 */
 export function buildExportModel(keys: KeyProps[]): ExportModel {
   const matrices = computeKeyMatrices(keys);
-  const size = matrixSize(matrices);
 
   if (keys.length === 0) {
     return { entries: [], rowGroups: [], matrixRows: 0, matrixCols: 0, matrices, unresolved: [] };
@@ -80,8 +80,10 @@ export function buildExportModel(keys: KeyProps[]): ExportModel {
   }
   const centerX = (minX + maxX) / 2;
 
-  // 排除兼容按键（compat=1）
-  const exportIndices = keys.map((_, i) => i).filter((i) => keys[i]!.compat !== 1);
+  // 排除兼容按键（compat=1）与器件（旋钮 / 屏幕：不是矩阵开关）
+  const exportIndices = keys
+    .map((_, i) => i)
+    .filter((i) => keys[i]!.compat !== 1 && !isDeviceKey(keys[i]!));
   const groups = groupByPhysicalRow(exportIndices, keys);
 
   const entries: ExportEntry[] = [];
@@ -102,11 +104,18 @@ export function buildExportModel(keys: KeyProps[]): ExportModel {
     rowGroups.push(groupPositions);
   }
 
+  // 矩阵尺寸按真正导出的按键计算（器件不占矩阵行/列）
+  let maxRow = -1, maxCol = -1;
+  for (const e of entries) {
+    if (e.row > maxRow) maxRow = e.row;
+    if (e.col > maxCol) maxCol = e.col;
+  }
+
   return {
     entries,
     rowGroups,
-    matrixRows: size.rows,
-    matrixCols: size.cols,
+    matrixRows: maxRow + 1,
+    matrixCols: maxCol + 1,
     matrices,
     unresolved,
   };

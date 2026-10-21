@@ -13,10 +13,11 @@
  */
 
 import polygonClipping from "polygon-clipping";
-import type { KLELayout } from "./kle-types";
+import type { KLELayout, DeviceKind } from "./kle-types";
 import type { StpExtrudeData } from "./stp-export";
 import { getStabOffset } from "./stab-offsets";
 import { rotatePoint, rotatePoints, computeLayoutBBoxInUnits } from "./coordinate-system";
+import { deviceCutoutPolygons, getDeviceKind } from "./device-geometry";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -708,6 +709,8 @@ export function generatePlate(
     rx: number; ry: number; rot: number; isTall: boolean;
     /** 阶梯键 (KLE `l`)，轴孔相对几何中心左移 0.25u */
     stepped: boolean;
+    /** 器件类型（旋钮 / 屏幕）：不是开关，按器件规则开槽（无轴孔 / 卫星轴） */
+    device: DeviceKind | null;
     /** Visual center after KLE layout rotation (mm) */
     visualCx: number; visualCy: number;
     /** 该键在 layout.keys 中的原始下标（过滤 decal 后仍指向真实键；统一编号空间） */
@@ -747,7 +750,7 @@ export function generatePlate(
     }
 
     if (!k.d) {
-      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, stepped: !!k.l, visualCx, visualCy, srcIndex });
+      keyInfos.push({ cx, cy, kw: actualW, kh: actualH, rx, ry, rot: k.r || 0, isTall, stepped: !!k.l, visualCx, visualCy, srcIndex, device: getDeviceKind(k) });
     }
   }
 
@@ -784,50 +787,61 @@ export function generatePlate(
     const ki = keyInfos[keyIndex]!;
     const keyPolys: { x: number; y: number }[][] = [];
 
-    // Switch cutout
-    const swPts = getSwitchPolygon(cfg.switchType, kerfHalf);
-    if (swPts.length === 0) continue;
+    if (ki.device) {
+      // ── 器件（旋钮 / 屏幕）：不是开关，按器件规则开槽 ──
+      // 旋钮 → 17×17mm 方孔；屏幕 → 沿出线边 3mm 宽出线槽（随键旋转）
+      const srcKey = keys[ki.srcIndex]!;
+      for (const pts of deviceCutoutPolygons(srcKey, U)) {
+        const poly = pts.map((p) => ({ x: p.x, y: p.y }));
+        keyPolys.push(poly);
+        allSwitchHoles.push(poly);
+      }
+    } else {
+      // Switch cutout
+      const swPts = getSwitchPolygon(cfg.switchType, kerfHalf);
+      if (swPts.length === 0) continue;
 
-    // 阶梯键 (KLE `l`)：轴孔相对键帽几何中心左移 0.25u（同 builder.swillkb）
-    if (ki.stepped) translatePoints(swPts, -0.25 * U, 0);
+      // 阶梯键 (KLE `l`)：轴孔相对键帽几何中心左移 0.25u（同 builder.swillkb）
+      if (ki.stepped) translatePoints(swPts, -0.25 * U, 0);
 
-    if (ki.isTall) rotatePoints(swPts, 90, { x: 0, y: 0 });
-    translatePoints(swPts, ki.cx, ki.cy);
-    if (ki.rot !== 0) {
-      const rotOrigin = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-      rotatePoints(swPts, ki.rot, rotOrigin);
-    }
-    if (ki.kw === 6 || (ki.isTall && ki.kh === 6)) translatePoints(swPts, cfg.u1 / 2, 0);
+      if (ki.isTall) rotatePoints(swPts, 90, { x: 0, y: 0 });
+      translatePoints(swPts, ki.cx, ki.cy);
+      if (ki.rot !== 0) {
+        const rotOrigin = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
+        rotatePoints(swPts, ki.rot, rotOrigin);
+      }
+      if (ki.kw === 6 || (ki.isTall && ki.kh === 6)) translatePoints(swPts, cfg.u1 / 2, 0);
 
-    keyPolys.push(swPts);
-    allSwitchHoles.push(swPts);
+      keyPolys.push(swPts);
+      allSwitchHoles.push(swPts);
 
-    // Stabilizer cutout
-    const stabSize = ki.isTall ? ki.kh : ki.kw;
-    const needStab = stabSize >= 2 && cfg.stabType > 0 && cfg.stabType <= 3;
+      // Stabilizer cutout
+      const stabSize = ki.isTall ? ki.kh : ki.kw;
+      const needStab = stabSize >= 2 && cfg.stabType > 0 && cfg.stabType <= 3;
 
-    if (needStab) {
-      const stabOffset = getStabOffset(stabSize);
-      if (stabOffset !== null) {
-        const place = (path: { x: number; y: number }[]) => {
-          translatePoints(path, ki.cx, ki.cy);
-          if (ki.rot !== 0) {
-            const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
-            rotatePoints(path, ki.rot, ro);
+      if (needStab) {
+        const stabOffset = getStabOffset(stabSize);
+        if (stabOffset !== null) {
+          const place = (path: { x: number; y: number }[]) => {
+            translatePoints(path, ki.cx, ki.cy);
+            if (ki.rot !== 0) {
+              const ro = (ki.rx !== 0 || ki.ry !== 0) ? { x: ki.rx, y: ki.ry } : { x: ki.cx, y: ki.cy };
+              rotatePoints(path, ki.rot, ro);
+            }
+            keyPolys.push(path);
+          };
+          if (options?.foamStab) {
+            for (const path of getFoamStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
+          } else if (cfg.stabType === 3) {
+            // FL 腹灵
+            for (const path of getFulingStabPolygon(stabOffset, kerfHalf, ki.isTall, stabSize)) place(path);
+          } else if (cfg.stabType === 2) {
+            // PCB stab
+            for (const path of getPCBStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
+          } else {
+            // Cherry only
+            place(getStabPolygonCherry(stabOffset, kerfHalf, ki.isTall));
           }
-          keyPolys.push(path);
-        };
-        if (options?.foamStab) {
-          for (const path of getFoamStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
-        } else if (cfg.stabType === 3) {
-          // FL 腹灵
-          for (const path of getFulingStabPolygon(stabOffset, kerfHalf, ki.isTall, stabSize)) place(path);
-        } else if (cfg.stabType === 2) {
-          // PCB stab
-          for (const path of getPCBStabPolygons(stabOffset, kerfHalf, ki.isTall)) place(path);
-        } else {
-          // Cherry only
-          place(getStabPolygonCherry(stabOffset, kerfHalf, ki.isTall));
         }
       }
     }

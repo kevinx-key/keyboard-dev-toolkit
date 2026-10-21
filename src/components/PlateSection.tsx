@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { Loader2, Package, FileDown, FileCode2 } from "lucide-react";
@@ -16,6 +16,7 @@ import InteractivePlatePreview from "./InteractivePlatePreview";
 import { useStpConfirm } from "./StpConfirmDialog";
 import PlatePricingSection from "./PlatePricingSection";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
+import { isDeviceKey } from "../lib/device-geometry";
 
 // ─── 定位板设置类型 / 默认值见 lib/editor-settings（PlateSettings） ──
 
@@ -181,9 +182,10 @@ export default function PlateSection({ layout, config, setConfig, rotationOverri
     if (!key || key.d) return null;
     return `  ${t("canvas.infoPos")} X:${key.x.toFixed(1)} Y:${key.y.toFixed(1)}  ${t("canvas.infoRot")}:${key.r || 0}°`;
   }, [layout.keys, effSelectedKeyIdx, t]);
-  const keyCount = layout.keys.filter((k) => !k.d).length;
+  // 器件（旋钮 / 屏幕）不是开关，不计入键数 / 卫星轴数
+  const keyCount = layout.keys.filter((k) => !k.d && !isDeviceKey(k)).length;
   const stabCount = useMemo(() => layout.keys.filter((k) => {
-    if (k.d) return false;
+    if (k.d || isDeviceKey(k)) return false;
     return Math.max(k.w || 1, k.h || 1) >= 2;
   }).length, [layout.keys]);
 

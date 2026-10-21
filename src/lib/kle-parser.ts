@@ -11,6 +11,7 @@
 
 import type { KeyProps, KLELayout, KLEMeta, ComputedKey } from "./kle-types";
 import { DEFAULT_PROPS, DEFAULT_META, KLE_KEY_PROPS, reorderLabelsToPositions, reorderLabelsFromPositions, parseViaCompatTag, VIA_OPTION_LABEL_SLOT } from "./kle-types";
+import { normalizeScreenExit } from "./device-geometry";
 import { stringify as urlonStringify, parse as urlonParse } from "./kle-urlon";
 
 /* ===== Constants ===== */
@@ -75,6 +76,9 @@ export interface IntermediateLayoutItem {
   sm?: string; sb?: string; st?: string;
   // 矩阵覆盖（编辑器专属扩展，KLE 工具会忽略未知字段）
   matrixRow?: number; matrixCol?: number;
+  // 器件（编辑器专属扩展，KLE 工具会忽略未知字段）
+  knobDia?: number;
+  screenW?: number; screenH?: number; screenR?: number; screenExit?: string;
 }
 
 export type RowItem = string | IntermediateLayoutItem;
@@ -255,6 +259,13 @@ export function keyPropsToIntermediate(layout: KLELayout): IntermediateFormat {
       // 矩阵覆盖（编辑器专属扩展，仅在有值时写出；KLE 工具忽略未知字段）
       if (key.matrixRow !== undefined) props["matrixRow"] = key.matrixRow;
       if (key.matrixCol !== undefined) props["matrixCol"] = key.matrixCol;
+
+      // 器件（旋钮 / 屏幕）——编辑器专属扩展，KLE 工具忽略未知字段
+      if (key.knobDia !== undefined) props["knobDia"] = key.knobDia;
+      if (key.screenW !== undefined) props["screenW"] = key.screenW;
+      if (key.screenH !== undefined) props["screenH"] = key.screenH;
+      if (key.screenR !== undefined) props["screenR"] = key.screenR;
+      if (key.screenExit !== undefined) props["screenExit"] = key.screenExit;
 
       // Build the label string in serialized format
 
@@ -438,6 +449,16 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         if (current.matrixRow !== undefined) key.matrixRow = current.matrixRow;
         if (current.matrixCol !== undefined) key.matrixCol = current.matrixCol;
 
+        // 器件（旋钮 / 屏幕）
+        if (current.knobDia !== undefined) key.knobDia = current.knobDia;
+        if (current.screenW !== undefined) key.screenW = current.screenW;
+        if (current.screenH !== undefined) key.screenH = current.screenH;
+        if (current.screenR !== undefined) key.screenR = current.screenR;
+        if (current.screenExit !== undefined) {
+          const exit = normalizeScreenExit(current.screenExit);
+          if (exit) key.screenExit = exit;
+        }
+
         keys.push(key);
 
         // Advance X position
@@ -458,6 +479,11 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         current.fa = [];
         current.matrixRow = undefined;
         current.matrixCol = undefined;
+        current.knobDia = undefined;
+        current.screenW = undefined;
+        current.screenH = undefined;
+        current.screenR = undefined;
+        current.screenExit = undefined;
 
       } else if (typeof item === "object" && item !== null) {
         // Property override object
@@ -542,6 +568,13 @@ function intermediateToKeyProps(intermediate: IntermediateRow[]): KLELayout {
         if (props.matrixRow !== undefined) current.matrixRow = props.matrixRow as number;
         if (props.matrixCol !== undefined) current.matrixCol = props.matrixCol as number;
 
+        // 器件（旋钮 / 屏幕）
+        if (props.knobDia !== undefined) current.knobDia = props.knobDia as number;
+        if (props.screenW !== undefined) current.screenW = props.screenW as number;
+        if (props.screenH !== undefined) current.screenH = props.screenH as number;
+        if (props.screenR !== undefined) current.screenR = props.screenR as number;
+        if (props.screenExit !== undefined) current.screenExit = props.screenExit as string;
+
         // Boolean flags
         if (props.n !== undefined) current.n = props.n as boolean;
         if (props.l !== undefined) current.l = props.l as boolean;
@@ -624,6 +657,12 @@ interface StickyState {
   // 矩阵覆盖（每键生效，随键重置）
   matrixRow?: number;
   matrixCol?: number;
+  // 器件（每键生效，随键重置）
+  knobDia?: number;
+  screenW?: number;
+  screenH?: number;
+  screenR?: number;
+  screenExit?: string;
 }
 
 function createDefaultSticky(): StickyState {

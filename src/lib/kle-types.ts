@@ -93,6 +93,12 @@ export function parseLabelColor(raw: string): { text: string; color: string | nu
   return { text: raw, color: null };
 }
 
+/** 画布器件类型：旋钮 / 屏幕（普通开关键无器件字段） */
+export type DeviceKind = "knob" | "screen";
+
+/** 屏幕出线方向（相对屏幕自身，随键整体旋转） */
+export type ScreenExit = "top" | "right" | "bottom" | "left";
+
 /** Single key property set (matches KLE raw data format) */
 export interface KeyProps {
   /** 12-position labels array */
@@ -168,6 +174,15 @@ export interface KeyProps {
   matrixRow?: number;
   /** 矩阵位置覆盖：用户自定义的列（undefined = 按几何自动分配）。不写入 KLE 导出。 */
   matrixCol?: number;
+  /** 器件：旋钮（EC11）。直径 mm；存在即表示该键位是旋钮而不是开关。
+   *  w/h 由直径换算并保持同步（下方编辑器只按 17×17 方孔开槽）。 */
+  knobDia?: number;
+  /** 器件：屏幕。宽 / 高 / 圆角半径 (mm)；存在即表示该键位是屏幕而不是开关。 */
+  screenW?: number;
+  screenH?: number;
+  screenR?: number;
+  /** 器件：屏幕出线方向（下方编辑器沿该边开 3mm 宽出线槽） */
+  screenExit?: ScreenExit;
 }
 
 /** VIA 键标签中「options 标记」所在的序列化标签槽位：
@@ -262,7 +277,7 @@ export const DEFAULT_PROPS: KeyProps = {
 export const KLE_KEY_PROPS = new Set([
   "r", "rx", "ry", "x", "y", "w", "h", "x2", "y2", "w2", "h2",
   "a", "f", "f2", "fa", "p", "c", "c2", "cang", "t", "d", "g", "l", "n", "sm", "sb", "st", "stab",
-  "matrixRow", "matrixCol",
+  "matrixRow", "matrixCol", "knobDia", "screenW", "screenH", "screenR", "screenExit",
 ]);
 
 /** A fully computed key with absolute pixel positions */
@@ -417,6 +432,8 @@ export type EditorAction =
   | { type: "SET_META"; meta: Partial<KLEMeta> }
   | { type: "ADD_KEYS"; count: number }
   | { type: "ADD_SPECIAL_KEY"; props: Partial<KeyProps> }
+  /** 在配列下方追加一个器件（旋钮 / 屏幕），并选中它 */
+  | { type: "ADD_DEVICE"; device: DeviceKind }
   | { type: "DELETE_SELECTED" }
   | { type: "MOVE_SELECTED"; dx: number; dy: number }
   | { type: "COPY_SELECTED" }

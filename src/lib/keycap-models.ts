@@ -24,6 +24,7 @@
 
 import type { KLELayout, KeyProps } from "./kle-types";
 import { U_MM, rotatePoint } from "./coordinate-system";
+import { isDeviceKey } from "./device-geometry";
 
 // ─── 常量（与服务端 stp.rs 同源，改一处要同步）─────────────
 
@@ -368,9 +369,10 @@ export function buildKeycapPlacements(
   let specialCount = 0;
 
   for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]!;
+    if (isDeviceKey(key)) continue; // 旋钮 / 屏幕不装键帽
     const row = rows.rows[i];
     if (row === null || row === undefined) continue;
-    const key = keys[i]!;
     const special = specialKeycap(key, row);
     if (special) {
       specialCount++;
