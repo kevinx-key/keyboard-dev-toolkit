@@ -1,6 +1,6 @@
 {
   "name": "custom-key-pcb-tool",
-  "version": "1.0.116",
+  "version": "1.0.117",
   "private": true,
   "description": "Keyboard Dev Toolkit — 键盘配列编辑器 + PCB/定位板自动生成工具 (KLE 兼容)",
   "author": "K Star Lab",
@@ -34,6 +34,7 @@
     "pro:stub": "node scripts/fetch-pro.mjs --stub",
     "pro:sync-stub": "node scripts/fetch-pro.mjs --sync-stub",
     "build": "node scripts/sync-version.mjs && next build && node scripts/obfuscate-build.mjs",
+    "build:release": "node scripts/sync-version.mjs --sync-only && next build && node scripts/obfuscate-build.mjs",
     "build:dev": "node scripts/sync-version.mjs && next build",
     "version:bump": "node scripts/sync-version.mjs --bump",
     "version:sync": "node scripts/sync-version.mjs --sync-only",

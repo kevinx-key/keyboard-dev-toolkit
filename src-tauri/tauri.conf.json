@@ -1,13 +1,13 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Keyboard Dev Toolkit",
-  "version": "1.0.113",
+  "version": "1.0.117",
   "identifier": "com.kstar.pcb-tool",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:release"
   },
   "app": {
     "windows": [

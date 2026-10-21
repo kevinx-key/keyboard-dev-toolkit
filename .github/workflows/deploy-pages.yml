@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Build (static export → out/)
-        run: npm run build
+        run: npm run build:release
         env:
           NEXT_PUBLIC_GEOMETRY_API_BASE: https://starthock.com
 

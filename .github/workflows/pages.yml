@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Build (static export, Pages subpath basePath)
-        run: npm run build
+        run: npm run build:release
         env:
           NEXT_PUBLIC_BASE_PATH: /keyboard-dev-toolkit
 

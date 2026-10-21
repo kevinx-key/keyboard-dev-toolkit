@@ -39,7 +39,7 @@ jobs:
         run: npm run typecheck
 
       - name: Build (static export)
-        run: npm run build
+        run: npm run build:release
 
       - name: Upload static export
         uses: actions/upload-artifact@v4
