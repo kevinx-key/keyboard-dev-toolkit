@@ -13,6 +13,7 @@ import {
   currentBookmarkUrl,
 } from "../lib/bookmark";
 import CompatLayerBar from "./CompatLayerBar";
+import { Z_INDEX } from "../lib/z-index";
 
 const iconProps = { size: 13, strokeWidth: 2 } as const;
 
@@ -112,7 +113,7 @@ function BookmarkButton() {
           className="kle-dropdown"
           data-testid="bookmark-panel"
           style={{
-            position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 1000,
+            position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: Z_INDEX.menu,
             width: 278, padding: "10px 12px",
             display: "flex", flexDirection: "column", gap: 8,
           }}
@@ -194,7 +195,7 @@ function LangDropdown({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => voi
         <Globe {...iconProps} /> {LANG_LABELS[lang]} <ChevronDown size={11} />
       </span>
       {open && (
-        <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 1000, minWidth: 132 }}>
+        <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: Z_INDEX.menu, minWidth: 132 }}>
           {ALL_LANGS.map((l) => (
             <button key={l} className={`kle-dropdown-item${l === lang ? " active" : ""}`}
               onClick={() => { setLang(l); setOpen(false); }}>
@@ -231,7 +232,7 @@ function ThemeDropdown({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme)
         <Palette {...iconProps} /> {THEME_LABELS[theme]} <ChevronDown size={11} />
       </span>
       {open && (
-        <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 1000, minWidth: 170 }}>
+        <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: Z_INDEX.menu, minWidth: 170 }}>
           {ALL_THEMES.map((t) => (
             <button key={t} className={`kle-dropdown-item${t === theme ? " active" : ""}`}
               onClick={() => { setTheme(t); setOpen(false); }}>

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { HexColorPicker } from "react-colorful";
 import { useI18n } from "../lib/i18n";
 import { DEFAULT_TEXT_COLOR } from "../lib/color-constants";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 import {
   hexToRgb,
   rgbToHex,
@@ -81,11 +83,12 @@ export default function ColorPickerPopover({
     setDraft(h);
   };
 
-  return (
+  const overlay = (
     <div
+      data-ui-blocking="true"
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 10000,
+        position: "fixed", inset: 0, zIndex: Z_INDEX.popover,
         display: "flex", alignItems: "center", justifyContent: "center",
         backgroundColor: "var(--theme-overlay)", backdropFilter: "blur(3px)",
         WebkitBackdropFilter: "blur(3px)",
@@ -94,7 +97,7 @@ export default function ColorPickerPopover({
       <div
         onClick={(e) => e.stopPropagation()}
         className={`kle-dialog${visible ? "" : " kle-dialog-exit"}`}
-        style={{ padding: "16px 18px", width: 380, maxWidth: "92vw" }}
+        style={{ padding: "16px 18px", width: 380, maxWidth: "92vw", maxHeight: "calc(100vh - 40px)", overflowY: "auto" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, borderBottom: "1px solid var(--theme-separator)", paddingBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--theme-text)" }}>
@@ -160,5 +163,9 @@ export default function ColorPickerPopover({
       </div>
     </div>
   );
+
+  // 挂到 body：避免被 .theme-future .kle-tabpanel 的 backdrop-filter 层叠上下文困住，
+  // 也避免被下方/上方区块的 z-index 压住。
+  return typeof document === "undefined" ? null : createPortal(overlay, document.body);
 }
 ColorPickerPopover.displayName = "ColorPickerPopover";

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { useI18n } from "../../lib/i18n";
+import { Z_INDEX } from "../../lib/z-index";
 
 interface ContextMenuProps {
   x: number;
@@ -34,6 +35,17 @@ export default function ContextMenu({
 }: ContextMenuProps) {
   const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+
+  // 靠近视口右/下边缘时自动内收，避免菜单被裁到屏幕外
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8));
+    setPos((p) => (p.left === left && p.top === top ? p : { left, top }));
+  }, [x, y]);
 
   // Click outside to close
   useEffect(() => {
@@ -52,12 +64,14 @@ export default function ContextMenu({
       className="kle-dropdown"
       style={{
         position: "fixed",
-        left: x,
-        top: y,
-        zIndex: 10000,
+        left: pos.left,
+        top: pos.top,
+        zIndex: Z_INDEX.popover,
         minWidth: 180,
         padding: "5px 0",
         fontSize: 13,
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
       }}
       onClick={(e) => e.stopPropagation()}
     >

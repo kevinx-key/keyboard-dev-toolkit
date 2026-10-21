@@ -8,6 +8,7 @@ import { useI18n, LANG_LABELS } from "../lib/i18n";
 import { computeLayoutBBoxInUnits } from "../lib/coordinate-system";
 import { exportSVG } from "../lib/kle-export";
 import { logger } from "../lib/error-logger";
+import { Z_INDEX } from "../lib/z-index";
 import {
   layoutKey,
   newSessionId,
@@ -708,7 +709,7 @@ The layout fingerprint differs from what you last committed in this session — 
   return (
     <>
       {open && (
-        <div style={{ position: "fixed", left: panelLeft, top: panelTop, width: PANEL_W, zIndex: 9999 }}>
+        <div style={{ position: "fixed", left: panelLeft, top: panelTop, width: PANEL_W, zIndex: Z_INDEX.floatingPanel }}>
           <div style={panelBody}>
             <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "6px 8px", borderBottom: "1px solid var(--theme-border)" }}>
               <button onClick={() => setShowList((v) => !v)} title={t("ai.history")} style={{ ...iconBtn, color: showList ? "var(--theme-accent)" : "var(--theme-text-muted)" }}>
@@ -833,7 +834,7 @@ The layout fingerprint differs from what you last committed in this session — 
         onPointerCancel={() => { dragRef.current = null; }}
         title={open ? t("ai.collapse") : t("tb.tab.ai")}
         style={{
-          position: "fixed", left: pos.x, top: pos.y, width: BALL, height: BALL, zIndex: 9999,
+          position: "fixed", left: pos.x, top: pos.y, width: BALL, height: BALL, zIndex: Z_INDEX.floatingPanel,
           borderRadius: "50%", cursor: "grab", touchAction: "none",
           display: "flex", alignItems: "center", justifyContent: "center",
           background: "var(--theme-accent)", color: "var(--theme-on-accent, white)",

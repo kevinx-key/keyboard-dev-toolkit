@@ -1429,6 +1429,9 @@
 /* ── 顶栏 / 品牌 / kbd ── */
 .kle-toolbar {
   position: relative;
+  /* 顶栏自身作为独立层叠上下文：其下拉菜单只在顶栏内部比较 z-index。
+     这是既有设计（顶栏固定在页面顶部，下拉不会与画布/悬浮面板大面积重叠）；
+     所以下拉的 Z_INDEX.menu 在此上下文内仍有效，但不会越过模态层级。 */
   z-index: 10;
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { CloudCog, X } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 
 interface StpConfirmDialogProps {
   open: boolean;
@@ -23,10 +24,11 @@ export default function StpConfirmDialog({ open, onConfirm, onCancel }: StpConfi
 
   return (
     <div
+      data-ui-blocking="true"
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1100,
+        zIndex: Z_INDEX.modal,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

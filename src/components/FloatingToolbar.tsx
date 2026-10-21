@@ -12,6 +12,7 @@ import { DEFAULT_META } from "../lib/kle-types";
 import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
 import { ALL_PRESETS, PRESET_NAMES } from "../data/presets";
 import { useI18n } from "../lib/i18n";
+import { Z_INDEX } from "../lib/z-index";
 import { usePresence } from "./ui/usePresence";
 
 export interface SpecialKeyDef {
@@ -121,8 +122,9 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
         padding: "6px 14px",
         boxShadow: "none",
         flexWrap: "wrap", justifyContent: "center",
-        // 下拉菜单需要浮在下方「键属性编辑区」之上：建立独立层叠上下文
-        position: "relative", zIndex: 30,
+        // 只做定位基准，不设 z-index：否则会把下拉/步骤弹窗困在本层叠上下文内
+        // （层叠统一走 lib/z-index.ts）
+        position: "relative",
       }}>
       {/* 预设配列选择框 */}
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -170,7 +172,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
         </span>
         {addKeyOpen && (
           <div className="kle-dropdown" style={{
-            position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 40, minWidth: 190,
+            position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: Z_INDEX.menu, minWidth: 190,
             // 菜单较长时在视口内滚动，避免超出屏幕无法点选
             maxHeight: "min(60vh, 460px)", overflowY: "auto", overscrollBehavior: "contain",
           }}>
@@ -276,7 +278,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
           <ChevronDown size={11} />
         </span>
         {downloadOpen && (
-          <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, minWidth: 190 }}>
+          <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: Z_INDEX.menu, minWidth: 190 }}>
             {[
               { label: "SVG", icon: <FileCode2 size={11} />, onClick: () => { props.onDownloadSVG?.(); setDownloadOpen(false); } },
               { label: "PNG (1×)", icon: <FileImage size={11} />, onClick: () => { props.onDownloadPNG?.(1); setDownloadOpen(false); } },
@@ -351,9 +353,9 @@ function StepOptionsDialog({ open, steps, onClose, onConfirm, onCancel }: StepOp
   );
 
   return (
-    <div style={{
+    <div data-ui-blocking="true" style={{
       position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-      zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: Z_INDEX.modal, display: "flex", alignItems: "center", justifyContent: "center",
       background: "var(--theme-overlay)",
     }} onClick={onClose}>
       <div className={`kle-dialog${visible ? "" : " kle-dialog-exit"}`} style={{ minWidth: 380, maxWidth: 480 }}

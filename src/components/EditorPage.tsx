@@ -47,6 +47,7 @@ import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import { useStpExport } from "../hooks/useStpExport";
 import { CompatLayerProvider } from "../lib/compat-layer";
 import { serializeProjectFile } from "../lib/project-serial";
+import { isEditableTarget, hasUiBlocker } from "../lib/dom-utils";
 import type { PlateOrderInfo } from "../lib/checkout-payload";
 
 declare global {
@@ -197,6 +198,10 @@ export default function EditorPage() {
   // F1 / ? keyboard shortcut to open help dialog
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // 输入框 / 文本域 / contentEditable 里打 "?" 不应弹帮助
+      if (isEditableTarget(e.target)) return;
+      // 模态框 / 导出遮罩打开时不再叠加新的帮助层
+      if (hasUiBlocker()) return;
       if (e.key === "F1" || e.key === "?") {
         e.preventDefault();
         setHelpDialogOpen(true);

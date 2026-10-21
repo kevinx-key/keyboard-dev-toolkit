@@ -11,6 +11,7 @@ import type { KeyProps, KLEMeta, KLELayout, DeviceKind } from "../lib";
 import { parseKLE } from "../lib";
 import { logger } from "../lib/error-logger";
 import { DEFAULT_PROPS } from "../lib/kle-types";
+import { isEditableTarget, hasUiBlocker } from "../lib/dom-utils";
 
 const STORAGE_KEY = "custom-key-pcb-tool-layout";
 const STORAGE_VERSION_KEY = "custom-key-pcb-tool-layout-version";
@@ -120,8 +121,10 @@ export function useKeyboardEditor(stepRef?: { current: StepConfig }) {
       const ctrl = e.ctrlKey || e.metaKey;
       const s = stateRef.current;
 
-      // Don't handle shortcuts when typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Don't handle shortcuts when typing in an input / textarea / select / contentEditable
+      if (isEditableTarget(e.target)) return;
+      // 模态对话框 / 导出进度遮罩打开时，禁止快捷键操作背后的画布
+      if (hasUiBlocker()) return;
 
       const step = stepRef?.current || DEFAULT_STEPS;
       const selId = s.selectedIds.length > 0 ? parseInt(s.selectedIds[0]!) : -1;

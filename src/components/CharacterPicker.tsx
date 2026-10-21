@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 
 interface CharacterSection {
   nameKey: string;
@@ -45,7 +46,7 @@ export default function CharacterPicker({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z_INDEX.popover,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

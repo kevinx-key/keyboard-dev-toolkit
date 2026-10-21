@@ -3,6 +3,7 @@
 import { History, X } from "lucide-react";
 import { usePresence } from "./ui/usePresence";
 import { useI18n } from "../lib/i18n";
+import { Z_INDEX } from "../lib/z-index";
 
 interface ProjectBackupEntry {
   id?: number;
@@ -28,9 +29,10 @@ export default function ProjectBackupDialog({
 
   return (
     <div
+      data-ui-blocking="true"
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 10000,
+        position: "fixed", inset: 0, zIndex: Z_INDEX.modal,
         backgroundColor: "var(--theme-overlay)",
         backdropFilter: "blur(3px)",
         WebkitBackdropFilter: "blur(3px)",

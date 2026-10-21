@@ -6,6 +6,7 @@ import { isQmkExportEnabled, getBuildVariant, getPlugin } from "../plugins";
 import type { QmkExportConfig, QmkExportResult, McuType, QmkFeature } from "../plugins/qmk-export/types";
 import { getPlatform } from "../lib/platform-bridge";
 import { useI18n } from "../lib/i18n";
+import { Z_INDEX } from "../lib/z-index";
 
 /* ============ 插件惰性加载 ============ */
 // 动态加载 QMK 插件：免费版构建不含此模块，Pro 版构建时才注入
@@ -361,8 +362,8 @@ export default function QmkExportOverlay({ visible, keyProps, keyboardName: init
     const timeStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 
     return (
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 99999,
+      <div data-ui-blocking="true" style={{
+        position: "fixed", inset: 0, zIndex: Z_INDEX.fullscreen,
         backgroundColor: "rgba(var(--theme-bg-rgb), 0.95)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
@@ -476,8 +477,8 @@ export default function QmkExportOverlay({ visible, keyProps, keyboardName: init
     const timeStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 
     return (
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 99999,
+      <div data-ui-blocking="true" style={{
+        position: "fixed", inset: 0, zIndex: Z_INDEX.fullscreen,
         backgroundColor: "rgba(var(--theme-bg-rgb), 0.90)",
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
@@ -572,8 +573,8 @@ export default function QmkExportOverlay({ visible, keyProps, keyboardName: init
      视图: 配置表单 (config) — 默认视图
      ══════════════════════════════════ */
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 99999,
+    <div data-ui-blocking="true" style={{
+      position: "fixed", inset: 0, zIndex: Z_INDEX.fullscreen,
       backgroundColor: "var(--theme-overlay)",
       backdropFilter: "blur(3px)",
       WebkitBackdropFilter: "blur(3px)",

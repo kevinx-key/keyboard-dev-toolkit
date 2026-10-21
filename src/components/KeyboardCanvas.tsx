@@ -11,6 +11,8 @@ import KeyRenderer from "./canvas/KeyRenderer";
 import ContextMenu from "./canvas/ContextMenu";
 import { getKeyCategory, hitTestKey, getKeysInArea } from "./canvas/CanvasInteraction";
 import { DEFAULT_CANVAS_BG } from "../lib/color-constants";
+import { isEditableTarget, hasUiBlocker } from "../lib/dom-utils";
+import { Z_INDEX } from "../lib/z-index";
 
 interface KeyboardCanvasProps {
   keys: KeyProps[]; selectedIds: string[];
@@ -289,6 +291,9 @@ export default function KeyboardCanvas({
   // ── Keyboard 0 to reset zoom ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // 输入框里打 "0" 不应复位画布缩放
+      if (isEditableTarget(e.target)) return;
+      if (hasUiBlocker()) return;
       if (e.key === "0" && !e.ctrlKey && !e.metaKey) { setScale(1); setPanX(0); setPanY(0); }
     };
     window.addEventListener("keydown", handler);
@@ -328,7 +333,7 @@ export default function KeyboardCanvas({
 
           {/* Selection rectangle */}
           {dragState?.type === "select" && (
-            <div style={{ position: "absolute", left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), border: "1px dashed var(--theme-selected)", backgroundColor: "rgba(var(--theme-selected-rgb), 0.1)", zIndex: 100, pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), border: "1px dashed var(--theme-selected)", backgroundColor: "rgba(var(--theme-selected-rgb), 0.1)", zIndex: Z_INDEX.canvasOverlay, pointerEvents: "none" }} />
           )}
 
           {/* Empty state */}

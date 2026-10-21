@@ -5,6 +5,7 @@ import { COLOR_SWATCHES } from "../data/color-swatches";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
 import { WHITE } from "../lib/color-constants";
+import { Z_INDEX } from "../lib/z-index";
 
 interface ColorSwatchPickerProps {
   open: boolean;
@@ -27,7 +28,7 @@ export default function ColorSwatchPicker({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z_INDEX.popover,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

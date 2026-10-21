@@ -3,6 +3,7 @@
 import { HelpCircle, X } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 
 interface HelpDialogProps {
   open: boolean;
@@ -29,10 +30,11 @@ export default function HelpDialog({ open, onClose }: HelpDialogProps) {
 
   return (
     <div
+      data-ui-blocking="true"
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1050,
+        zIndex: Z_INDEX.modal,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -59,6 +61,9 @@ export default function HelpDialog({ open, onClose }: HelpDialogProps) {
           maxWidth: 620,
           width: "100%",
           margin: 30,
+          // 矮窗口下可滚动，避免弹窗被视口裁切
+          maxHeight: "calc(100vh - 60px)",
+          overflowY: "auto",
           fontFamily: "var(--theme-font-ui)",
         }}
       >

@@ -9,6 +9,7 @@ import { U_MM } from "../lib/coordinate-system";
 import { isDeviceKey } from "../lib/device-geometry";
 import { sanitizeSvg } from "../lib/sanitize";
 import { useI18n } from "../lib/i18n";
+import { isEditableTarget, hasUiBlocker } from "../lib/dom-utils";
 
 // ─── Props ──────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ export default function InteractivePCBPreview({
   // Space → rotate; Arrow keys → move component
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      if (hasUiBlocker()) return;
       if (selectedComponentId !== null) {
         if (e.code === "Space") {
           e.preventDefault();

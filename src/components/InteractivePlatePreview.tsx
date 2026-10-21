@@ -5,6 +5,7 @@ import { Crosshair } from "lucide-react";
 import type { PreviewRegion } from "../lib/plate-export";
 import { sanitizeSvg } from "../lib/sanitize";
 import { useI18n } from "../lib/i18n";
+import { isEditableTarget, hasUiBlocker } from "../lib/dom-utils";
 
 // ─── Props ──────────────────────────────────────────────
 
@@ -67,6 +68,8 @@ export default function InteractivePlatePreview({
   useEffect(() => {
     if (!onSpaceRotate) return;
     const handler = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      if (hasUiBlocker()) return;
       if (e.code === "Space" && selectedKeyIdx !== null) {
         e.preventDefault();
         onSpaceRotate(selectedKeyIdx);

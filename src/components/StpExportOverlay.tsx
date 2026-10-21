@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useI18n } from "../lib/i18n";
+import { Z_INDEX } from "../lib/z-index";
 
 /**
  * 全屏导出遮罩 — STP 导出时覆盖整个界面
@@ -97,10 +98,11 @@ export default function StpExportOverlay({ visible, progress }: StpExportOverlay
 
   return (
     <div
+      data-ui-blocking="true"
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 99999,
+        zIndex: Z_INDEX.fullscreen,
         backgroundColor: "rgba(var(--theme-bg-rgb), 0.90)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",

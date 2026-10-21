@@ -7,6 +7,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { useI18n } from "../lib/i18n";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 
 type Phase = "idle" | "checking" | "latest" | "available" | "downloading" | "installed" | "error";
 
@@ -129,10 +130,11 @@ export default function UpdateDialog({ open, onClose }: UpdateDialogProps) {
 
   return (
     <div
+      data-ui-blocking="true"
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1060,
+        zIndex: Z_INDEX.modal,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

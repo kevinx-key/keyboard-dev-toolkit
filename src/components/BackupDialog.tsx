@@ -7,6 +7,7 @@ import { useI18n } from "../lib/i18n";
 import { getBackups, deleteBackup, clearAllBackups, downloadBackup, formatBackupTime } from "../lib/backup-manager";
 import type { BackupEntry } from "../lib/backup-manager";
 import { usePresence } from "./ui/usePresence";
+import { Z_INDEX } from "../lib/z-index";
 
 interface BackupDialogProps {
   open: boolean;
@@ -67,8 +68,9 @@ export default function BackupDialog({ open, onClose, onRestore }: BackupDialogP
 
   return (
     <div
+      data-ui-blocking="true"
       style={{
-        position: "fixed", inset: 0, zIndex: 9999,
+        position: "fixed", inset: 0, zIndex: Z_INDEX.modal,
         display: "flex", alignItems: "center", justifyContent: "center",
         backgroundColor: "var(--theme-overlay)",
         backdropFilter: "blur(3px)",
