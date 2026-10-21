@@ -199,6 +199,8 @@ export default function KeyboardCanvas({
       panStartRef.current = { x: e.clientX - panX, y: e.clientY - panY };
       return;
     }
+    // 只处理左键（右键交给 onContextMenu，避免右键空白处意外清空选择）
+    if (e.button !== 0) return;
     const pos = getCanvasPos(e);
     if (!pos) return;
     const hitIdx = hitTestKey(pos.x, pos.y, keys, compatDimSet);
@@ -215,14 +217,11 @@ export default function KeyboardCanvas({
       }
       return;
     }
-    // Issue 1: Don't start marquee on mousedown — only activate after drag threshold in mousemove
-    // 键盘预览界面（布局背景矩形）之外：左键不设置框选起点、也不影响当前选择
-    // （此前在预览区外按下会留下 pending 状态，移入预览区即意外启动框选）
-    const inBg = pos.x >= bgBounds.left && pos.x <= bgBounds.left + bgBounds.width
-      && pos.y >= bgBounds.top && pos.y <= bgBounds.top + bgBounds.height;
-    if (!inBg) return;
+    // 画布区任意空白处（含布局背景矩形之外的画布边距）都可以起框选 / 单击取消。
+    // 事件绑定在画布容器上（而非内容层），所以按下点在外围时移动/松开也能正常跟踪。
+    e.preventDefault();
     pendingSelectRef.current = { x: pos.x, y: pos.y };
-  }, [readOnly, preview, selectedSet, panX, panY, keys, onSelectKey, bgBounds, compatDimSet, getCanvasPos]);
+  }, [readOnly, preview, selectedSet, panX, panY, keys, onSelectKey, compatDimSet, getCanvasPos]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -273,6 +272,13 @@ export default function KeyboardCanvas({
     setDragState(null);
   }, [dragState, keys, onClearSelection, onSelectArea, onMoveKeys, isPanning, compatDimSet]);
 
+  /** 离开整块画布区（不是离开布局背景）才取消拖拽 / 平移 / 待框选 */
+  const handleCanvasMouseLeave = useCallback(() => {
+    if (isPanning) setIsPanning(false);
+    setDragState(null);
+    pendingSelectRef.current = null;
+  }, [isPanning]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -298,13 +304,17 @@ export default function KeyboardCanvas({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", position: "relative" }} suppressHydrationWarning>
-      {/* Canvas area（画布随配列定高；内容层水平+垂直居中） */}
-      <div ref={canvasWrapperRef} tabIndex={0} onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}
+      {/* Canvas area（画布随配列定高；内容层水平+垂直居中）
+          事件统一绑在画布容器：布局背景之外的画布边距也能框选 / 单击取消 */}
+      <div ref={canvasWrapperRef} tabIndex={0} onWheel={handleWheel}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleCanvasMouseLeave}
         onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, index: null }); }}
-        style={{ height: bgBounds.height + 40, flexShrink: 0, overflow: "hidden", position: "relative", cursor: cursorStyle, outline: "none" }}>
+        style={{ height: bgBounds.height + 40, flexShrink: 0, overflow: "hidden", position: "relative", cursor: cursorStyle, outline: "none", userSelect: "none" }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div ref={contentRef} suppressHydrationWarning onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
-            onMouseLeave={() => { if (isPanning) setIsPanning(false); setDragState(null); pendingSelectRef.current = null; }}
+          <div ref={contentRef} suppressHydrationWarning
             style={{ position: "relative", transform: `translate(${bgBounds.offsetX}px,${bgBounds.offsetY}px) scale(${scale}) translate(${panX / scale}px,${panY / scale}px)`, transformOrigin: "0 0", width: bgBounds.width, height: bgBounds.height, flexShrink: 0, userSelect: "none" }}>
           {/* Background */}
           <div style={{ position: "absolute", left: bgBounds.left, top: bgBounds.top, width: bgBounds.width, height: bgBounds.height, backgroundColor: backgroundColor || DEFAULT_CANVAS_BG, backgroundImage: texture ? `url(${texture})` : undefined, backgroundSize: "cover", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderRadius: radii || 6, pointerEvents: "none" }} />

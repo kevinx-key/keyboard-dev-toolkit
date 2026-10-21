@@ -339,7 +339,9 @@ export default function EditorPage() {
         <div className="kle-canvas-area" style={{
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          // 不可用 hidden：会把工具栏下拉菜单（如「+键」长菜单）裁在画布区底部，
+          // 导致菜单被下方属性编辑区压住、无法点到。画布内容自身由 KeyboardCanvas 裁切。
+          overflow: "visible",
           backgroundColor: "var(--theme-canvas-area)",
         }}>
           {/* HUD 数据标签（future 主题显示） */}

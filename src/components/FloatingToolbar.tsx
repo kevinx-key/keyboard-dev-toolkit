@@ -121,6 +121,8 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
         padding: "6px 14px",
         boxShadow: "none",
         flexWrap: "wrap", justifyContent: "center",
+        // 下拉菜单需要浮在下方「键属性编辑区」之上：建立独立层叠上下文
+        position: "relative", zIndex: 30,
       }}>
       {/* 预设配列选择框 */}
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -167,7 +169,11 @@ export default function FloatingToolbar(props: FloatingToolbarProps) {
           <ChevronDown size={11} />
         </span>
         {addKeyOpen && (
-          <div className="kle-dropdown" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20, minWidth: 190 }}>
+          <div className="kle-dropdown" style={{
+            position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 40, minWidth: 190,
+            // 菜单较长时在视口内滚动，避免超出屏幕无法点选
+            maxHeight: "min(60vh, 460px)", overflowY: "auto", overscrollBehavior: "contain",
+          }}>
             <div className="kle-dropdown-header">{t("toolbar.addKey")}</div>
             {[1, 5, 10, 25].map(n => (
               <button key={n} className="kle-dropdown-item" onClick={() => { props.onAddKeys(n); setAddKeyOpen(false); }}>
