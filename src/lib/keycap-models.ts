@@ -2,13 +2,13 @@
  * 键帽模型匹配（STP 装配图「键帽」部件）
  * ==================================================
  *
- * 模型库：`L:\k星工作室\键帽\cherry` → 云端容器 `assets/keycaps/`
- * 文件名即契约：`r{行}-{宽}u.stp`，例 `r1-1u.stp` / `r4-625u.stp`
- *   - `r{行}` = 行高（R1–R4）；`-` 只是分隔符；`{宽}u` = 键帽宽度（小数点省略：1.25u → `125u`）
- *   - 宽度按**画布键帽宽度**（KLE `w`）匹配；库里没有的宽度一律回落该行的 1u 键帽
- *   - 另有三个**特殊模型**（R 大写命名，见 `SPECIAL_MODELS`）：
- *     `R3-175stepped` = 阶梯键（KLE `l`）｜`R3-home` = R3 行的 F / J / 键值 5（带定位凸点）
- *     ｜`R3-iso` = ISO Enter（高键 + L 形、底部 1.5u）
+ * 模型库：全套 MX 键帽模型（非标可适配、不可开模，26 个）→ 云端容器 `assets/keycaps/`
+ *   源目录（本地）：`L:\k星工作室\键帽\<数据目录>\全套mx模型非标可适配不可开模`
+ * 文件名即契约：
+ *   - `R{行}-{宽}u.stp`  例 `R1-1u.stp` / `R3-175u.stp`（宽的小数点省略：1.25u → `125u`）
+ *   - `spc-{宽}u.stp`    空格：`spc-625u` / `spc-6u` / `spc-7u`
+ *   - 特殊模型见 `SPECIAL_MODELS`（阶梯 / sculpted / home / 小键盘 Enter·+ / ISO Enter）
+ *   本套模型的宽度是**稀疏**的（如 R1 只有 1u、2u），缺的宽度一律回落该行 1u 键帽
  *
  * 行高判定（机主 2026-10 定稿的强制规则，非标准配列也照此执行）：
  *   R1 = F 区 + 数字行 ｜ R2 = QWER 行 ｜ R3 = ASD 行 ｜ R4 = ZXC 行 + Ctrl/空格行
@@ -31,26 +31,32 @@ import { isDeviceKey } from "./device-geometry";
 /** 键帽原点相对定位板开孔顶面中心点的高度 (mm) */
 export const KEYCAP_LIFT_Z = 6.6;
 
-/** 模型库提供的宽度（u）——五行通用 */
-export const KEYCAP_WIDTHS: readonly number[] = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75];
-
-/** 各行的额外宽度（库中只有 R4 多一个 6.25u 空格） */
-export const KEYCAP_EXTRA_WIDTHS: Readonly<Record<KeycapRow, readonly number[]>> = {
-  1: [],
-  2: [],
-  3: [],
-  4: [6.25],
+/** 模型库提供的宽度（u）——按行；本套模型是**稀疏**的，缺的宽度回落该行 1u */
+export const KEYCAP_WIDTHS_BY_ROW: Readonly<Record<KeycapRow, readonly number[]>> = {
+  1: [1, 2],
+  2: [1, 1.5],
+  3: [1, 1.25, 1.5, 1.75, 2, 2.25],
+  4: [1, 1.25, 1.5, 1.75, 2, 2.25, 2.75],
 };
 
+/** 空格模型（`spc-{宽}u`）覆盖的宽度 */
+export const SPACE_WIDTHS: readonly number[] = [6.25, 6, 7];
+
 /**
- * 特殊模型（不按「行 + 宽度」规则走；文件名 R 大写，与常规 `r{行}-{宽}u` 区分）：
+ * 特殊模型（不按「行 + 宽度」规则走）：
  *   - `R3-175stepped` —— 阶梯键（KLE `l`，如阶梯 Caps Lock）
- *   - `R3-home`       —— 带定位凸点（home bump）的键：R3 行的 **F / J**，以及 R3 行里键值为 **5** 的键
- *   - `R3-iso`        —— ISO Enter（高键 + L 形、底部 1.5u 的那块）
+ *   - `R3-1sculpted`  —— sculpted（立体弧形）R3 1u
+ *   - `R3-home`       —— 定位凸点：R3 行的 F / J / 键值 5，或勾了「定位凸点」属性的键
+ *   - `R3-enter`      —— 小键盘 Enter（1u 宽 × 2u 高，落在 R3 行带）
+ *   - `R2-2u+`        —— 小键盘 +（1u 宽 × 2u 高，落在 R2 行带）
+ *   - `R3-iso`        —— ISO Enter（高键 + L 形、底部 1.5u）
  */
 export const SPECIAL_MODELS = {
   stepped: "R3-175stepped",
+  sculpted: "R3-1sculpted",
   home: "R3-home",
+  enter: "R3-enter",
+  plus: "R2-2u+",
   iso: "R3-iso",
 } as const;
 
@@ -70,18 +76,25 @@ export function keycapWidthSlug(width: number): string {
 /** 该行是否有这个宽度的模型 */
 export function hasKeycapModel(row: KeycapRow, width: number): boolean {
   const w = Number(width.toFixed(4));
-  if (KEYCAP_WIDTHS.includes(w)) return true;
-  return KEYCAP_EXTRA_WIDTHS[row].includes(w);
+  return (KEYCAP_WIDTHS_BY_ROW[row] as readonly number[]).includes(w);
+}
+
+/** 空格宽度 → `spc-{宽}u`；库里没有这个宽度返回 null */
+export function spaceKeycapName(width: number): string | null {
+  const w = Number(width.toFixed(4));
+  return SPACE_WIDTHS.includes(w) ? `spc-${keycapWidthSlug(w)}u` : null;
 }
 
 /**
- * 画布键帽宽度 → 模型名（`r{行}-{宽}u`）；库里没有的宽度回落该行的 1u。
+ * 画布键帽宽度 → 常规模型名（`R{行}-{宽}u`）；库里没有的宽度回落该行 1u。
  *
- * ⚠️ 只走「行 + 宽度」常规规则；阶梯键 / F·J·5 / ISO Enter 走 `keycapModelFor`。
+ * ⚠️ 只走「行 + 宽度」规则；空格 / 阶梯 / sculpted / home / 小键盘 Enter·+ / ISO Enter
+ * 走 `keycapModelFor`。
  */
 export function keycapModelName(row: KeycapRow, width: number): string {
-  const w = hasKeycapModel(row, width) ? Number(width.toFixed(4)) : 1;
-  return `r${row}-${keycapWidthSlug(w)}u`;
+  const w = Number(width.toFixed(4));
+  const use = hasKeycapModel(row, width) ? w : 1;
+  return `R${row}-${keycapWidthSlug(use)}u`;
 }
 
 /** 取键的**首个**图例行（去掉色号前缀、取第一行、转大写）—— 用于 F / J / 5 判定 */
@@ -119,27 +132,43 @@ export function isIsoEnterKey(key: KeyProps): boolean {
   return h > w && lShape && Math.abs((key.w2 || 0) - 1.5) < 1e-6;
 }
 
+/** 高 1u 的键（小键盘 Enter / +）：宽 1u、实际高 > 宽 */
+function isTall1u(key: KeyProps): boolean {
+  const { w, h } = keycapEffectiveSize(key);
+  return h > w && Math.abs((key.w || 1) - 1) < 1e-6;
+}
+
 /**
  * 判定该键是否命中**特殊模型**（返回 null = 走「行 + 宽度」常规匹配）。
  *
- * 优先级：阶梯键 → ISO Enter → home 键（R3 行的 F / J / 5）。
+ * 优先级：阶梯 → ISO Enter → 小键盘 Enter/+ → home → sculpted。
+ * （home 优先于 sculpted：F/J/5 的定位凸点是手感功能，sculpted 只是外形变异。）
+ *
+ * 小键盘两个 1u×2u 键按**所在行带**区分（KLE 里它们分别跨到不同行带）：
+ *   · R2 行带的 1u×2u = 小键盘 `+`  → `R2-2u+`
+ *   · 其余行带（R3/R4，含 104 配列里跨 ZXC 与底排的 Enter）→ `R3-enter`
  */
 export function specialKeycap(key: KeyProps, row: KeycapRow): KeycapSpecial | null {
   if (key.l) return "stepped";
   if (isIsoEnterKey(key)) return "iso";
+  if (isTall1u(key)) return row === 2 ? "plus" : "enter";
   if (row === 3) {
+    if (key.n) return "home";
     const legend = primaryLegendLine(key);
     if (legend === "F" || legend === "J" || legend === "5") return "home";
+    if (key.sculpted && Math.abs((key.w ?? 1) - 1) < 1e-6) return "sculpted";
   }
   return null;
 }
 
 /**
- * 单个键的模型名：先判特殊模型（阶梯 / home / ISO），否则按「行 + 宽度」匹配并回落 1u。
+ * 单个键的模型名：先判特殊模型，再判空格，最后按「行 + 宽度」匹配并回落 1u。
  */
 export function keycapModelFor(key: KeyProps, row: KeycapRow): string {
   const special = specialKeycap(key, row);
   if (special) return SPECIAL_MODELS[special];
+  const spc = spaceKeycapName(key.w || 1);
+  if (spc) return spc;
   return keycapModelName(row, key.w || 1);
 }
 
@@ -340,7 +369,7 @@ export interface KeycapPlan {
   placements: KeycapPlacement[];
   /** 库里没有对应宽度、回落 1u 的键数 */
   fallbackCount: number;
-  /** 命中特殊模型（阶梯 / home / ISO）的键数 */
+  /** 命中特殊模型（阶梯 / sculpted / home / 小键盘 Enter·+ / ISO Enter）的键数 */
   specialCount: number;
   /** 参与装配的键数 */
   total: number;
@@ -374,9 +403,10 @@ export function buildKeycapPlacements(
     const row = rows.rows[i];
     if (row === null || row === undefined) continue;
     const special = specialKeycap(key, row);
+    const isSpace = !special && spaceKeycapName(key.w || 1) !== null;
     if (special) {
       specialCount++;
-    } else if (!hasKeycapModel(row, key.w || 1)) {
+    } else if (!isSpace && !hasKeycapModel(row, key.w || 1)) {
       fallbackCount++;
     }
     const hole = switchHoleCenterMm(key, u1);

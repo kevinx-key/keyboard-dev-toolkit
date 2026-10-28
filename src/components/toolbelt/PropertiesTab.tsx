@@ -33,6 +33,15 @@ const COMPAT_STATES: { value: 0 | 1 | undefined; labelKey: string }[] = [
   { value: 1, labelKey: "compat.compatKey" },
 ];
 
+/** 键帽选项（字号下方那一栏）：属性名 → 文案 key。选中即应用；互斥关系由 kle-reducer 处理 */
+const CAP_FLAGS = [
+  { prop: "sculpted", labelKey: "prop.sculpted", tipKey: "tt.sculpted" },
+  { prop: "l", labelKey: "prop.stepped", tipKey: "tt.stepped" },
+  { prop: "g", labelKey: "prop.ghosted", tipKey: "tt.ghosted" },
+  { prop: "n", labelKey: "prop.homing", tipKey: "tt.homing" },
+  { prop: "d", labelKey: "prop.decal", tipKey: "tt.decal" },
+] as const satisfies readonly { prop: keyof KeyProps; labelKey: string; tipKey: string }[];
+
 /** 屏幕出线方向 → i18n key */
 const EXIT_LABEL: Record<ScreenExit, string> = {
   top: "screen.exitTop",
@@ -435,6 +444,34 @@ export function PropertiesTab({ keys, selectedIds, onSetProp }: PropertiesTabPro
             <span key={s} onClick={() => set("labelSize", s)} title={t("tip.propFontSize")} className={`kle-chip${curFontSize === s ? " active" : ""}`}
               style={{ padding: "1px 7px", fontSize: 11, cursor: hasSelection ? "pointer" : "default", borderRadius: "var(--theme-radius-sm)" }}>{s}</span>
           ))}
+        </div>
+      </div>
+
+      {/* 键帽选项（字号下方）：Sculpted / Stepped / Ghosted / Homing / Decal —— 选中即应用 */}
+      <div className="psec" style={{ ...psec, flex: "1 1 100%" }} data-testid="cap-options">
+        <SectionHeader>{t("pt.capShape")}</SectionHeader>
+        <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+          {CAP_FLAGS.map(({ prop, labelKey, tipKey }) => {
+            const active = prop === "sculpted" ? !!key?.sculpted : !!key?.[prop];
+            return (
+              <span
+                key={prop}
+                data-testid={`cap-flag-${prop}`}
+                aria-pressed={active}
+                onClick={() => set(prop, !active)}
+                title={t(tipKey)}
+                className={`kle-chip${active ? " active" : ""}`}
+                style={{
+                  padding: "3px 10px", fontSize: 11,
+                  cursor: hasSelection ? "pointer" : "default",
+                  borderRadius: "var(--theme-radius-sm)",
+                  opacity: hasSelection ? 1 : 0.45,
+                }}
+              >
+                {active ? "✓ " : ""}{t(labelKey)}
+              </span>
+            );
+          })}
         </div>
       </div>
 

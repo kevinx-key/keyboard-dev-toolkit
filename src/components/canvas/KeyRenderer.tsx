@@ -568,6 +568,23 @@ export default function KeyRenderer({
                 />
               </>
             )}
+            {/* Sculpted（立体弧形）：顶面内嵌一个椭圆凹面，区分平顶键帽 */}
+            {!!keyData.sculpted && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: faceLeft + 3,
+                  top: faceTop + 3,
+                  width: Math.max(4, faceWidth - 6),
+                  height: Math.max(4, faceHeight - 6),
+                  borderRadius: "50%",
+                  border: "1px solid rgba(255,255,255,0.45)",
+                  boxShadow: "inset 0 1px 4px rgba(0,0,0,0.22)",
+                  zIndex: 3,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
             {/* Homing bump */}
             {keyData.n && (
               <div

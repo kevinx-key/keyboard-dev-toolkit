@@ -157,6 +157,9 @@ export interface KeyProps {
   l: boolean;
   /** Homing bump */
   n: boolean;
+  /** Sculpted（立体弧形键帽）：装配时优先用 `R3-1sculpted`（仅 R3 的 1u 有模型）。
+   *  本应用扩展属性（KLE 无此项，故只随项目文件/本地存储持久化，不写入 KLE 导出）。 */
+  sculpted?: boolean;
   /** Switch mount */
   sm: string;
   /** Switch brand */

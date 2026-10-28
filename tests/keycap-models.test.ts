@@ -16,7 +16,8 @@
 import { describe, expect, it } from "vitest";
 import {
   KEYCAP_LIFT_Z,
-  KEYCAP_WIDTHS,
+  KEYCAP_WIDTHS_BY_ROW,
+  SPACE_WIDTHS,
   buildKeycapPlacements,
   hasKeycapModel,
   isIsoEnterKey,
@@ -24,6 +25,7 @@ import {
   keycapModelName,
   keycapWidthSlug,
   resolveKeycapRows,
+  spaceKeycapName,
   specialKeycap,
   switchHoleCenterMm,
 } from "../src/lib/keycap-models";
@@ -66,27 +68,40 @@ describe("键帽模型名（r{行}-{宽}u）", () => {
     expect(keycapWidthSlug(6.25)).toBe("625");
   });
 
-  it("五行通用宽度全部命中库中模型", () => {
-    const rows: KeycapRow[] = [1, 2, 3, 4];
-    for (const row of rows) {
-      for (const w of KEYCAP_WIDTHS) {
-        expect(hasKeycapModel(row, w), `r${row} 缺 ${w}u`).toBe(true);
-        expect(keycapModelName(row, w)).toBe(`r${row}-${keycapWidthSlug(w)}u`);
+  it("每行实际提供的宽度全部命中库中模型（稀疏表）", () => {
+    for (const row of [1, 2, 3, 4] as KeycapRow[]) {
+      const widths = KEYCAP_WIDTHS_BY_ROW[row];
+      expect(widths.length, `R${row} 宽度表不应为空`).toBeGreaterThan(0);
+      for (const w of widths) {
+        expect(hasKeycapModel(row, w), `R${row} 缺 ${w}u`).toBe(true);
+        expect(keycapModelName(row, w)).toBe(`R${row}-${keycapWidthSlug(w)}u`);
       }
     }
+    // 本套模型就是稀疏的：R1 只有 1u / 2u
+    expect([...KEYCAP_WIDTHS_BY_ROW[1]]).toEqual([1, 2]);
+    expect([...KEYCAP_WIDTHS_BY_ROW[3]]).toEqual([1, 1.25, 1.5, 1.75, 2, 2.25]);
   });
 
-  it("6.25u 只有 R4（空格）提供；其它行回落 1u", () => {
-    expect(keycapModelName(4, 6.25)).toBe("r4-625u");
-    expect(keycapModelName(1, 6.25)).toBe("r1-1u");
-    expect(keycapModelName(2, 6.25)).toBe("r2-1u");
-    expect(keycapModelName(3, 6.25)).toBe("r3-1u");
+  it("空格只走 spc-* 模型（6.25 / 6 / 7u），其余宽度回落该行 1u", () => {
+    expect(SPACE_WIDTHS).toEqual([6.25, 6, 7]);
+    expect(spaceKeycapName(6.25)).toBe("spc-625u");
+    expect(spaceKeycapName(6)).toBe("spc-6u");
+    expect(spaceKeycapName(7)).toBe("spc-7u");
+    expect(spaceKeycapName(6.5)).toBeNull();
+    // 空格在 R4 行带里也不会被当成 R4-625u
+    expect(keycapModelName(4, 6.25)).toBe("R4-1u");
+    expect(keycapModelFor(mkKey({ x: 0, y: 0, w: 6.25, h: 1 }), 4)).toBe("spc-625u");
+    expect(keycapModelFor(mkKey({ x: 0, y: 0, w: 7, h: 1 }), 4)).toBe("spc-7u");
   });
 
   it("库中没有的「奇怪宽度」一律回落该行 1u", () => {
-    for (const odd of [7, 6, 3, 2.75 + 0.25, 1.125, 0.5, 10]) {
-      expect(keycapModelName(2, odd), `${odd}u 应回落 1u`).toBe("r2-1u");
+    for (const odd of [3, 2.5, 1.125, 0.5, 10]) {
+      expect(keycapModelName(2, odd), `${odd}u 应回落 1u`).toBe("R2-1u");
       expect(hasKeycapModel(2, odd)).toBe(false);
+    }
+    // R1 没有 1.25u / 1.5u / 1.75u / 2.25u —— 全部回落 1u
+    for (const odd of [1.25, 1.5, 1.75, 2.25, 2.5, 2.75]) {
+      expect(keycapModelName(1, odd), `R1 无 ${odd}u`).toBe("R1-1u");
     }
   });
 });
@@ -95,7 +110,7 @@ describe("键帽模型名（r{行}-{宽}u）", () => {
 // 1b. 特殊模型（阶梯 / home F·J·5 / ISO Enter）
 // ═══════════════════════════════════════════════════════════════════
 
-describe("特殊模型匹配（R3-175stepped / R3-home / R3-iso）", () => {
+describe("特殊模型匹配（阶梯 / sculpted / home / 小键盘 Enter·+ / ISO Enter）", () => {
   /** 阶梯 Caps Lock：KLE `l` */
   const steppedCaps = mkKey({ x: 0, y: 0, w: 1.75, h: 1, l: true });
   /** 普通 1.75u Caps Lock（不阶梯） */
@@ -104,12 +119,16 @@ describe("特殊模型匹配（R3-175stepped / R3-home / R3-iso）", () => {
   const isoEnter = mkKey({ x: 0, y: 0, w: 1.25, h: 2, w2: 1.5, h2: 1, x2: -0.25 });
   /** big-ass enter：底部 2.25u —— 不是 ISO，不该命中 R3-iso */
   const bigAss = mkKey({ x: 0, y: 0, w: 1.5, h: 2, w2: 2.25, h2: 1, x2: -0.75 });
+  /** 小键盘 Enter：1u 宽 × 2u 高 */
+  const padEnter = mkKey({ x: 0, y: 0, w: 1, h: 2 });
+  /** 小键盘 +：1u 宽 × 2u 高 */
+  const padPlus = mkKey({ x: 0, y: 0, w: 1, h: 2 });
 
   it("阶梯键（KLE l）→ R3-175stepped；不阶梯的同宽键仍走常规", () => {
     expect(specialKeycap(steppedCaps, 3)).toBe("stepped");
     expect(keycapModelFor(steppedCaps, 3)).toBe("R3-175stepped");
     expect(specialKeycap(plainCaps, 3)).toBeNull();
-    expect(keycapModelFor(plainCaps, 3)).toBe("r3-175u");
+    expect(keycapModelFor(plainCaps, 3)).toBe("R3-175u");
   });
 
   it("ISO Enter → R3-iso；big-ass enter（底部 2.25u）不误判", () => {
@@ -117,6 +136,46 @@ describe("特殊模型匹配（R3-175stepped / R3-home / R3-iso）", () => {
     expect(keycapModelFor(isoEnter, 3)).toBe("R3-iso");
     expect(isIsoEnterKey(bigAss)).toBe(false);
     expect(keycapModelFor(bigAss, 3)).not.toBe("R3-iso");
+  });
+
+  it("小键盘 Enter（1u×2u）→ R3-enter；R2 行带的 1u×2u → R2-2u+", () => {
+    expect(specialKeycap(padEnter, 3)).toBe("enter");
+    expect(keycapModelFor(padEnter, 3)).toBe("R3-enter");
+    // 104 配列里小键盘 Enter 跨 ZXC 行与底排 → 行带落在 R4
+    expect(specialKeycap(padEnter, 4)).toBe("enter");
+    expect(keycapModelFor(padEnter, 4)).toBe("R3-enter");
+    expect(specialKeycap(padPlus, 2)).toBe("plus");
+    expect(keycapModelFor(padPlus, 2)).toBe("R2-2u+");
+    // 普通 1u 键不会命中
+    expect(specialKeycap(mkKey({ x: 0, y: 0, w: 1, h: 1 }), 3)).toBeNull();
+    // 2u 宽的键（非 1u 高键）也不命中
+    expect(specialKeycap(mkKey({ x: 0, y: 0, w: 2, h: 1 }), 3)).toBeNull();
+  });
+
+  it("sculpted → R3-1sculpted（仅 R3 的 1u）", () => {
+    const sculpt = mkKey({ x: 0, y: 0, w: 1, h: 1, sculpted: true });
+    expect(specialKeycap(sculpt, 3)).toBe("sculpted");
+    expect(keycapModelFor(sculpt, 3)).toBe("R3-1sculpted");
+    // 其它行 / 其它宽度：没有 sculpted 模型 → 常规
+    expect(specialKeycap(sculpt, 2)).toBeNull();
+    expect(keycapModelFor(mkKey({ x: 0, y: 0, w: 1.5, h: 1, sculpted: true }), 3)).toBe("R3-15u");
+  });
+
+  it("home 优先于 sculpted（F/J/5 的凸点是功能，sculpted 只是外形）", () => {
+    const fSculpted = mkKey({
+      x: 0, y: 0, w: 1, h: 1, sculpted: true,
+      labels: ["F", ...Array(11).fill("")],
+    });
+    expect(specialKeycap(fSculpted, 3)).toBe("home");
+    expect(keycapModelFor(fSculpted, 3)).toBe("R3-home");
+  });
+
+  it("勾「定位凸点」属性（n）的键 → R3-home", () => {
+    const anyKey = mkKey({ x: 0, y: 0, w: 1, h: 1, n: true, labels: ["A", ...Array(11).fill("")] });
+    expect(specialKeycap(anyKey, 3)).toBe("home");
+    expect(keycapModelFor(anyKey, 3)).toBe("R3-home");
+    // 非 R3 行没有 home 模型 → 常规
+    expect(specialKeycap(anyKey, 4)).toBeNull();
   });
 
   it("R3 行的 F / J / 5 → R3-home", () => {
@@ -159,14 +218,20 @@ describe("特殊模型匹配（R3-175stepped / R3-home / R3-iso）", () => {
       legendKey(0, 2, "A"), mkKey({ x: 1, y: 2, w: 1, h: 1, l: true, labels: Array(12).fill("") }),
       legendKey(2, 2, "F"), legendKey(3, 2, "J"), legendKey(4, 2, "5"),
       mkKey({ x: 5, y: 2, w: 1.25, h: 2, w2: 1.5, h2: 1, x2: -0.25, labels: Array(12).fill("") }),
+      mkKey({ x: 6, y: 2, w: 1, h: 2, labels: Array(12).fill("") }),          // 小键盘 Enter
+      mkKey({ x: 7, y: 2, w: 1, h: 1, sculpted: true, labels: Array(12).fill("") }), // sculpted
       legendKey(0, 3, "Z"), legendKey(1, 3, "X"),
+      mkKey({ x: 2, y: 3, w: 6.25, h: 1, labels: Array(12).fill("") }),       // 空格
     ]);
     const plan = buildKeycapPlacements(layout, { x: 0, y: 0 });
     const names = plan.placements.map((p) => p.name);
     expect(names).toContain("R3-175stepped");
     expect(names.filter((n) => n === "R3-home")).toHaveLength(3); // F / J / 5
     expect(names).toContain("R3-iso");
-    expect(plan.specialCount).toBe(5);
+    expect(names).toContain("R3-enter");
+    expect(names).toContain("R3-1sculpted");
+    expect(names).toContain("spc-625u");
+    expect(plan.specialCount).toBe(7); // stepped + 3 home + iso + enter + sculpted
     expect(plan.fallbackCount).toBe(0);
   });
 });
@@ -404,7 +469,7 @@ describe("buildKeycapPlacements", () => {
     expect(plan.total).toBe(15);
     expect(plan.rowSource).toBe("label");
     expect(plan.rowCounts).toEqual({ 1: 3, 2: 3, 3: 3, 4: 6 });
-    expect(plan.placements[0]).toEqual({ name: "r1-1u", x: 0, y: 0, rotation: 0 });
+    expect(plan.placements[0]).toEqual({ name: "R1-1u", x: 0, y: 0, rotation: 0 });
     // 右移 1u：装配坐标 X = 19.05（Y 不变）
     expect(plan.placements[1]!.x).toBeCloseTo(U, 9);
     expect(plan.placements[1]!.y).toBeCloseTo(0, 9);
@@ -418,12 +483,15 @@ describe("buildKeycapPlacements", () => {
       legendKey(0, 1, "Q"), legendKey(1, 1, "W"),
       legendKey(0, 2, "A"), legendKey(1, 2, "S"),
       legendKey(0, 3, "Z"), legendKey(1, 3, "X"),
-      mkKey({ x: 0, y: 4, w: 7, h: 1 }), // 7u 空格：库里没有 → 回落 1u
+      mkKey({ x: 2, y: 3, w: 2.5, h: 1 }), // R4 没有 2.5u → 回落 1u
+      mkKey({ x: 0, y: 4, w: 7, h: 1 }),   // 7u 空格 → spc-7u（不算回落）
     ]);
     const plan = buildKeycapPlacements(layout, { x: 0, y: 0 });
-    expect(plan.rowCounts).toEqual({ 1: 2, 2: 2, 3: 2, 4: 3 });
+    expect(plan.rowCounts).toEqual({ 1: 2, 2: 2, 3: 2, 4: 4 });
     expect(plan.fallbackCount).toBe(1);
-    expect(plan.placements[plan.placements.length - 1]!.name).toBe("r4-1u");
+    const names = plan.placements.map((p) => p.name);
+    expect(names[names.length - 2]).toBe("R4-1u"); // 2.5u 回落
+    expect(names[names.length - 1]).toBe("spc-7u"); // 空格走 spc
   });
 
   it("旋转键带上自身旋转角（绕键帽轴心）", () => {
@@ -435,13 +503,13 @@ describe("buildKeycapPlacements", () => {
     expect(plan.placements[2]!.rotation).toBe(-15);
   });
 
-  it("6.25u 空格匹配 r4-625u", () => {
+  it("6.25u 空格匹配 spc-625u", () => {
     const layout = makeLayout([
       legendKey(0, 0, "Z"), legendKey(1, 0, "X"),
       mkKey({ x: 0, y: 1, w: 6.25, h: 1 }),
     ]);
     const plan = buildKeycapPlacements(layout, { x: 0, y: 0 });
-    expect(plan.placements[2]!.name).toBe("r4-625u");
+    expect(plan.placements[2]!.name).toBe("spc-625u");
     expect(plan.fallbackCount).toBe(0);
   });
 
